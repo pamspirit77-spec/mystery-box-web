@@ -4,17 +4,36 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Mystery Box — Admin Top-up</title>
-<link rel="stylesheet" href="styles.css">
+<link rel="stylesheet" href="admin.css">
 <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;600;700&display=swap" rel="stylesheet">
-<style>
-body{padding:24px}.admin-wrap{max-width:1200px;margin:auto}.admin-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:18px}.admin-table{display:grid;gap:10px}.admin-row{background:#141420;border:1px solid #292944;border-radius:14px;padding:14px;display:grid;grid-template-columns:100px 1fr 110px 110px 150px;gap:12px;align-items:center}.admin-row.head{background:#1a1a2a;color:#aaa;font-size:12px}.admin-actions{display:flex;gap:6px;flex-wrap:wrap}.admin-btn{border:0;border-radius:8px;padding:8px 10px;color:#fff;cursor:pointer;font:inherit;font-size:12px}.approve{background:#16a34a}.reject{background:#dc2626}.copy{background:#37375a}.status{font-size:11px;padding:4px 7px;border-radius:6px;background:#333}.pending{color:#ffd166}.approved{color:#4ade80}.rejected{color:#fb7185}.proof{color:#9f7aea;text-decoration:none;font-size:12px}.muted{color:#8f8fa3;font-size:11px}@media(max-width:800px){.admin-row{grid-template-columns:1fr}.admin-row.head{display:none}}
-</style>
 </head>
 <body>
-<div class="admin-wrap">
-  <div class="admin-head"><div><h1>🛠️ ระบบแอดมินเติมเงิน</h1><div class="muted">ตรวจสอบลิงก์ Wallet / บัตร TrueMoney ก่อนอนุมัติ</div></div><button class="admin-btn copy" id="refreshBtn">รีเฟรช</button></div>
-  <div id="adminStatus" class="muted" style="margin-bottom:12px"></div>
-  <div class="admin-table" id="topupList"></div>
+<div class="admin-shell">
+  <section id="loginPanel" class="panel login-panel">
+    <h1>🛠️ Admin Control</h1>
+    <p>เข้าสู่ระบบสำหรับผู้ดูแลเท่านั้น</p>
+    <form id="loginForm">
+      <input id="adminEmail" type="email" placeholder="อีเมลแอดมิน" autocomplete="username" required>
+      <input id="adminPassword" type="password" placeholder="รหัสผ่าน" autocomplete="current-password" required>
+      <button type="submit">เข้าสู่ระบบ</button>
+      <div id="loginMessage" class="message"></div>
+    </form>
+  </section>
+
+  <section id="adminPanel" class="hidden">
+    <div class="admin-header">
+      <div>
+        <h1>🛠️ ระบบแอดมินเติมเงิน</h1>
+        <p>ตรวจสอบ Wallet / บัตร TrueMoney ก่อนอนุมัติ</p>
+      </div>
+      <div class="header-actions">
+        <button id="refreshBtn" class="secondary">รีเฟรช</button>
+        <button id="logoutBtn" class="secondary">ออกจากระบบ</button>
+      </div>
+    </div>
+    <div id="adminStatus" class="message"></div>
+    <div id="topupList" class="request-list"></div>
+  </section>
 </div>
 <script type="module" src="admin.js"></script>
 </body>

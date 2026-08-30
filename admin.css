@@ -1,1 +1,24 @@
-*{box-sizing:border-box;font-family:'Kanit',sans-serif}body{margin:0;background:#0b0b12;color:#fff}.admin-shell{max-width:1100px;margin:0 auto;padding:30px 18px}.panel,.request-card{background:#11111c;border:1px solid #25253d;border-radius:16px}.login-panel{max-width:430px;margin:10vh auto;padding:25px}.login-panel h1{margin-bottom:6px}.login-panel p,.admin-header p{color:#8a8a9e}.login-panel form{display:flex;flex-direction:column;gap:12px;margin-top:20px}.login-panel input,.request-card textarea{width:100%;padding:12px;border:1px solid #30304a;border-radius:10px;background:#0f0f19;color:#fff}.login-panel button,.header-actions button,.approve-btn,.reject-btn,.copy-btn{border:0;border-radius:9px;padding:10px 14px;cursor:pointer;color:#fff;background:linear-gradient(135deg,#ff0055,#7a00ff);font-weight:600}.secondary,.copy-btn{background:#25253d!important}.hidden{display:none!important}.admin-header{display:flex;justify-content:space-between;align-items:center;gap:15px;margin-bottom:18px}.header-actions{display:flex;gap:8px}.request-list{display:flex;flex-direction:column;gap:14px}.request-card{padding:18px}.request-head{display:flex;justify-content:space-between;gap:12px;align-items:flex-start}.request-head h3{margin:0 0 4px}.meta{color:#88889c;font-size:13px}.status{padding:5px 9px;border-radius:999px;font-size:12px}.status.pending{background:#3a2c0d;color:#ffd75e}.status.approved{background:#103d27;color:#58e39b}.status.rejected{background:#40151e;color:#ff6b88}.details-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:15px 0}.detail{background:#0d0d16;border-radius:10px;padding:10px}.detail small{display:block;color:#77778c;margin-bottom:3px}.wallet-link{word-break:break-all;color:#8db5ff}.proof{max-width:320px;max-height:320px;border-radius:10px;border:1px solid #30304a;margin-top:10px}.actions{display:flex;gap:8px;margin-top:15px}.approve-btn{background:#0e9f62}.reject-btn{background:#b62b4a}.message{min-height:22px;color:#ffcc66;margin-top:10px}.empty{text-align:center;color:#77778c;padding:40px}.note-label{display:block;margin-top:10px;color:#aaa;font-size:13px}@media(max-width:700px){.admin-header,.request-head{flex-direction:column}.details-grid{grid-template-columns:1fr}.header-actions{width:100%}.header-actions button{flex:1}}
+*{box-sizing:border-box;font-family:'Kanit',sans-serif}
+body{margin:0;background:#0b0b12;color:#fff}
+.admin-shell{max-width:1100px;margin:0 auto;padding:30px 18px}
+.panel,.request-card{background:#11111c;border:1px solid #25253d;border-radius:16px}
+.login-panel{max-width:430px;margin:10vh auto;padding:25px}
+.login-panel h1{margin:0 0 6px}.login-panel p,.admin-header p{color:#8a8a9e}
+.login-panel form{display:flex;flex-direction:column;gap:12px;margin-top:20px}
+.login-panel input{width:100%;padding:12px;border:1px solid #30304a;border-radius:10px;background:#0f0f19;color:#fff}
+.login-panel button,.header-actions button,.approve-btn,.reject-btn,.copy-btn{border:0;border-radius:9px;padding:10px 14px;cursor:pointer;color:#fff;background:linear-gradient(135deg,#ff0055,#7a00ff);font-weight:600}
+.secondary,.copy-btn{background:#25253d!important}
+.hidden{display:none!important}
+.admin-header{display:flex;justify-content:space-between;align-items:center;gap:15px;margin-bottom:18px}
+.header-actions{display:flex;gap:8px}.request-list{display:flex;flex-direction:column;gap:14px}
+.request-card{padding:18px}.request-head{display:flex;justify-content:space-between;gap:12px;align-items:flex-start}
+.request-head h3{margin:0 0 4px;font-size:14px;word-break:break-all}.meta{color:#88889c;font-size:13px}
+.status{padding:5px 9px;border-radius:999px;font-size:12px}
+.status.pending{background:#3a2c0d;color:#ffd75e}.status.approved{background:#103d27;color:#58e39b}.status.rejected{background:#40151e;color:#ff6b88}
+.details-grid{display:grid;grid-template-columns:1fr 2fr;gap:10px;margin:15px 0}
+.detail{background:#0d0d16;border-radius:10px;padding:10px}.detail small{display:block;color:#77778c;margin-bottom:3px}
+.wallet-link{word-break:break-all;color:#8db5ff}.proof-link{display:inline-block;margin-top:10px;color:#b99cff}
+.actions{display:flex;gap:8px;margin-top:15px;flex-wrap:wrap}
+.approve-btn{background:#0e9f62}.reject-btn{background:#b62b4a}
+.message{min-height:22px;color:#ffcc66;margin:10px 0}.empty{text-align:center;color:#77778c;padding:40px}
+@media(max-width:700px){.admin-header,.request-head{flex-direction:column}.details-grid{grid-template-columns:1fr}.header-actions{width:100%}.header-actions button{flex:1}}
