@@ -5,6 +5,7 @@ const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
 const loginPanel=$('#loginPanel'), adminPanel=$('#adminPanel'), loginForm=$('#loginForm');
 const loginMessage=$('#loginMessage'), statusEl=$('#adminStatus'), listEl=$('#topupList'), userList=$('#userList');
 let client=null, topups=[], users=[];
+let userPage=1, userPageSize=20, userTotal=0;
 
 function escapeHtml(v=''){return String(v).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[c]));}
 function getClient(){if(!SUPABASE_ENABLED)throw new Error('ยังไม่ได้ตั้งค่า Supabase');if(!client)client=createClient(SUPABASE_URL,SUPABASE_ANON_KEY,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}});return client;}
@@ -52,23 +53,44 @@ function bindTopupEvents(){
 function renderUsers(){
  const q=$('#userSearch').value.trim().toLowerCase();
  const rows=users.filter(u=>!q||`${u.username||''} ${u.id||''} ${u.email||''}`.toLowerCase().includes(q));
- if(!rows.length){userList.innerHTML='<div class="empty">ไม่พบผู้เล่น</div>';return;}
- userList.innerHTML=rows.map(u=>`<article class="user-card"><div class="user-main"><div><b>${escapeHtml(u.username||'ไม่มีชื่อ')}</b><div class="meta">${escapeHtml(u.email||'')}<br>${escapeHtml(u.id)}</div></div><div class="coin">🪙 ${Number(u.coins||0).toLocaleString()}</div></div><div class="user-actions"><input type="number" min="-1000000" max="1000000" step="1" placeholder="+/- เหรียญ" data-delta="${u.id}"><button class="adjust-btn" data-user="${u.id}">ปรับเหรียญ</button></div></article>`).join('');
- $$('.adjust-btn').forEach(btn=>btn.onclick=async()=>{const input=document.querySelector(`[data-delta="${btn.dataset.user}"]`),delta=Number(input?.value);if(!Number.isInteger(delta)||delta===0){alert('ใส่จำนวนเหรียญเป็นจำนวนเต็มที่ไม่ใช่ 0');return;}if(!confirm(`ยืนยันปรับเหรียญ ${delta>0?'+':''}${delta} เหรียญ?`))return;btn.disabled=true;const {error}=await getClient().rpc('admin_adjust_coins',{p_user_id:btn.dataset.user,p_delta:delta});if(error){alert(error.message);btn.disabled=false;return;}await loadAll();});
+ if(!rows.length){userList.innerHTML='<div class="empty">ไม่พบผู้เล่น</div>'; renderUserPagination(); return;}
+ userList.innerHTML=rows.map((u,i)=>`<article class="user-card"><div class="user-main"><div><div class="user-number">#${((userPage-1)*userPageSize)+i+1}</div><b>${escapeHtml(u.username||'ไม่มีชื่อ')}</b><div class="meta">${escapeHtml(u.email||'')}<br>${escapeHtml(u.id)}<br>สมัครเมื่อ ${u.created_at?new Date(u.created_at).toLocaleString('th-TH'):'-'}</div></div><div class="coin">🪙 ${Number(u.coins||0).toLocaleString()}</div></div><div class="user-actions"><input type="number" min="-1000000" max="1000000" step="1" placeholder="+/- เหรียญ" data-delta="${u.id}"><button class="adjust-btn" data-user="${u.id}">ปรับเหรียญ</button></div></article>`).join('');
+ $$('.adjust-btn').forEach(btn=>btn.onclick=async()=>{const input=document.querySelector(`[data-delta="${btn.dataset.user}"]`),delta=Number(input?.value);if(!Number.isInteger(delta)||delta===0){alert('ใส่จำนวนเหรียญเป็นจำนวนเต็มที่ไม่ใช่ 0');return;}if(!confirm(`ยืนยันปรับเหรียญ ${delta>0?'+':''}${delta} เหรียญ?`))return;btn.disabled=true;const {error}=await getClient().rpc('admin_adjust_coins',{p_user_id:btn.dataset.user,p_delta:delta});if(error){alert(error.message);btn.disabled=false;return;}await loadUsers();});
+ renderUserPagination();
+}
+function renderUserPagination(){
+ const el=$('#userPagination'); if(!el) return;
+ const totalPages=Math.max(1,Math.ceil(userTotal/userPageSize));
+ const pages=[];
+ const start=Math.max(1,userPage-2), end=Math.min(totalPages,start+4);
+ for(let n=start;n<=end;n++) pages.push(`<button class="page-btn ${n===userPage?'active':''}" data-page="${n}">${n}</button>`);
+ el.innerHTML=`<div class="page-info">ผู้เล่นทั้งหมด ${userTotal.toLocaleString()} คน • หน้า ${userPage} / ${totalPages}</div><div class="page-buttons"><button class="page-btn" data-page="${userPage-1}" ${userPage<=1?'disabled':''}>‹</button>${pages.join('')}<button class="page-btn" data-page="${userPage+1}" ${userPage>=totalPages?'disabled':''}>›</button></div>`;
+ $$('#userPagination [data-page]').forEach(btn=>btn.onclick=()=>{const n=Number(btn.dataset.page);if(n>=1&&n<=totalPages&&n!==userPage){userPage=n;loadUsers();}});
+}
+async function loadUsers(){
+ const c=getClient(), q=$('#userSearch').value.trim();
+ const {data,error}=await c.rpc('admin_list_users',{p_page:userPage,p_page_size:userPageSize,p_search:q});
+ if(error) throw error;
+ users=data||[]; userTotal=users.length?Number(users[0].total_count||0):userTotal;
+ renderStats(); renderUsers();
 }
 async function loadSite(){
  const {data,error}=await getClient().from('site_settings').select('maintenance_mode,announcement').eq('id',1).maybeSingle();
  if(error)throw error; const s=data||{maintenance_mode:false,announcement:''}; $('#maintenanceToggle').checked=!!s.maintenance_mode;$('#announcement').value=s.announcement||'';
 }
 async function loadAll(){
- if(!(await ensureAdmin()))return; statusEl.textContent='กำลังโหลด...'; const c=getClient();
- const [a,b]=await Promise.all([c.rpc('admin_list_topups'),c.rpc('admin_list_users')]);
- if(a.error)throw a.error;if(b.error)throw b.error;topups=a.data||[];users=b.data||[];
- renderStats();renderTopups();renderUsers();await loadSite();statusEl.textContent=`พร้อมใช้งาน • ${topups.length} รายการเติมเงิน`;
+ if(!(await ensureAdmin()))return; statusEl.textContent='กำลังโหลด...';
+ const a=await getClient().rpc('admin_list_topups');
+ if(a.error)throw a.error;
+ topups=a.data||[];
+ renderTopups();
+ await loadUsers();
+ await loadSite();
+ statusEl.textContent=`พร้อมใช้งาน • ${topups.length} รายการเติมเงิน • ผู้เล่น ${userTotal.toLocaleString()} คน`;
 }
 loginForm.onsubmit=async e=>{e.preventDefault();loginMessage.textContent='';try{const {error}=await getClient().auth.signInWithPassword({email:$('#adminEmail').value.trim(),password:$('#adminPassword').value});if(error)throw error;await loadAll();}catch(err){loginMessage.textContent=err.message||'เข้าสู่ระบบไม่สำเร็จ';}};
 $('#logoutBtn').onclick=async()=>{await getClient().auth.signOut();loginPanel.classList.remove('hidden');adminPanel.classList.add('hidden');};
-$('#refreshBtn').onclick=()=>loadAll();$('#topupFilter').onchange=renderTopups;$('#topupSearch').oninput=renderTopups;$('#userSearch').oninput=renderUsers;
+$('#refreshBtn').onclick=()=>loadAll();$('#topupFilter').onchange=renderTopups;$('#topupSearch').oninput=renderTopups;$('#userSearch').oninput=()=>{userPage=1;loadUsers().catch(err=>{statusEl.textContent=err.message||'โหลดผู้เล่นไม่สำเร็จ';});};
 $$('.tab').forEach(t=>t.onclick=()=>{$$('.tab').forEach(x=>x.classList.remove('active'));$$('.tab-panel').forEach(x=>x.classList.remove('active'));t.classList.add('active');$(`[data-panel="${t.dataset.tab}"]`).classList.add('active');});
 $('#saveSiteBtn').onclick=async()=>{const {error}=await getClient().from('site_settings').update({maintenance_mode:$('#maintenanceToggle').checked,announcement:$('#announcement').value.trim().slice(0,500),updated_at:new Date().toISOString()}).eq('id',1);$('#siteMessage').textContent=error?error.message:'บันทึกการตั้งค่าแล้ว';if(!error)setTimeout(()=>$('#siteMessage').textContent='',2000);};
 loadAll().catch(err=>{console.error(err);statusEl.textContent=err.message||'โหลดข้อมูลไม่สำเร็จ';});
