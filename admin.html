@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Mystery Box — Admin เติมเงิน</title>
+  <link rel="stylesheet" href="admin.css">
+  <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+  <main class="admin-shell">
+    <section id="loginPanel" class="panel login-panel">
+      <h1>🔐 Admin Top-up</h1>
+      <p>เข้าสู่ระบบแอดมินเพื่อจัดการคำขอเติมเงิน</p>
+      <form id="loginForm">
+        <input id="adminEmail" type="email" placeholder="อีเมลแอดมิน" required>
+        <input id="adminPassword" type="password" placeholder="รหัสผ่าน" required>
+        <button type="submit">เข้าสู่ระบบ</button>
+      </form>
+      <div id="loginMessage" class="message"></div>
+    </section>
+
+    <section id="dashboard" class="hidden">
+      <header class="admin-header">
+        <div><h1>🪙 คำขอเติมเงิน</h1><p id="adminIdentity"></p></div>
+        <div class="header-actions"><button id="refreshBtn">รีเฟรช</button><button id="logoutBtn" class="secondary">ออกจากระบบ</button></div>
+      </header>
+      <div id="adminMessage" class="message"></div>
+      <div id="requestList" class="request-list"></div>
+    </section>
+  </main>
+  <script type="module" src="admin.js"></script>
+</body>
+</html>

@@ -681,7 +681,7 @@ $('#claimResultBtn')?.addEventListener('click', () => {
 
 const rollBtn = $('#rollBtn');
 if(rollBtn) {
-  rollBtn.onclick = () => {
+  rollBtn.onclick = async () => {
     const b = boxes[selected];
     const totalPrice = b.price * rollCount;
     
@@ -745,9 +745,23 @@ if(rollBtn) {
     
     rolling = true;
     hasClaimed = false;
-    points -= totalPrice;
+
+    try {
+      if (online.client && !online.user) {
+        const newBalance = await online.spendGuestCoins(totalPrice);
+        if (!Number.isFinite(newBalance)) throw new Error('ไม่สามารถหักเหรียญจากระบบออนไลน์ได้');
+        points = newBalance;
+      } else {
+        points -= totalPrice;
+        online.saveCoins(points);
+      }
+    } catch (err) {
+      rolling = false;
+      hasClaimed = true;
+      toast('ทำรายการไม่สำเร็จ: ' + (err.message || 'ลองใหม่อีกครั้ง'));
+      return;
+    }
     syncPoints();
-    online.saveCoins(points);
     
     rollBtn.disabled = true;
     
@@ -863,10 +877,106 @@ if(rollBtn) {
   };
 }
 
-const addP1 = $('#addPoints');
-const addP2 = $('#addPoints2');
-if(addP1) addP1.onclick = () => { points += 50; syncPoints(); online.saveCoins(points); toast('+50 แต้ม (DEMO)'); };
-if(addP2) addP2.onclick = () => { points += 50; syncPoints(); online.saveCoins(points); toast('+50 แต้ม (DEMO)'); };
+
+// ระบบเติมเหรียญ: ใช้เฉพาะปุ่มเหรียญด้านบน
+const topupModal = $('#topupModal');
+const openTopup = () => {
+  if (!topupModal) return;
+  topupModal.classList.remove('hidden');
+  loadTopupRequests();
+};
+$('#coinTopupBtn')?.addEventListener('click', openTopup);
+$('#closeTopupModal')?.addEventListener('click', () => topupModal?.classList.add('hidden'));
+$$('.topup-tab').forEach(tab => tab.addEventListener('click', () => {
+  $$('.topup-tab').forEach(t => t.classList.remove('active'));
+  tab.classList.add('active');
+  const method = tab.dataset.topupMethod;
+  $('#walletTopupForm')?.classList.toggle('hidden', method !== 'wallet');
+  $('#cardTopupForm')?.classList.toggle('hidden', method !== 'card');
+}));
+
+function topupStatusLabel(status) {
+  return ({pending:'รอตรวจสอบ', approved:'อนุมัติแล้ว', rejected:'ปฏิเสธ'})[status] || status;
+}
+
+function renderTopupRequests(rows) {
+  const el = $('#topupRequestList');
+  if (!el) return;
+  if (!rows.length) {
+    el.innerHTML = '<div class="history-empty">ยังไม่มีคำขอเติมเงิน</div>';
+    return;
+  }
+  el.innerHTML = rows.map(r => `
+    <div class="topup-request-row">
+      <div><b>${r.method === 'wallet' ? '🔗 Wallet' : '🎫 TrueMoney Card'}</b><span>${Number(r.amount).toLocaleString()} บาท</span></div>
+      <span class="topup-status ${r.status}">${topupStatusLabel(r.status)}</span>
+    </div>
+  `).join('');
+}
+
+async function loadTopupRequests() {
+  const el = $('#topupRequestList');
+  if (!el) return;
+  if (!online.client) {
+    el.innerHTML = '<div class="history-empty">กรุณาตั้งค่า Supabase ก่อนใช้งานระบบเติมเงิน</div>';
+    return;
+  }
+  try {
+    renderTopupRequests(await online.getMyTopupRequests());
+  } catch (err) {
+    console.warn('Top-up request load failed:', err);
+    el.innerHTML = '<div class="history-empty">โหลดคำขอเติมเงินไม่สำเร็จ</div>';
+  }
+}
+
+async function submitTopup(form, method) {
+  const amount = method === 'wallet' ? Number($('#walletAmount')?.value) : Number($('#cardAmount')?.value);
+  if (!Number.isFinite(amount) || amount < 10) { toast('จำนวนเงินขั้นต่ำ 10 บาท'); return; }
+  const walletLink = method === 'wallet' ? ($('#walletLink')?.value || '').trim() : '';
+  const cardCode = method === 'card' ? ($('#cardCode')?.value || '').replace(/\\D/g, '') : '';
+  const imageFile = method === 'card' ? $('#cardImage')?.files?.[0] : null;
+  if (method === 'wallet' && !walletLink) { toast('กรุณาวางลิงก์ Wallet'); return; }
+  if (method === 'card' && (cardCode.length !== 14 || !imageFile)) { toast('กรุณากรอกรหัส 14 หลักและแนบรูป'); return; }
+  if (method === 'card' && imageFile && imageFile.size > 5 * 1024 * 1024) { toast('รูปต้องมีขนาดไม่เกิน 5 MB'); return; }
+  const btn = form.querySelector('.topup-submit');
+  if (btn) { btn.disabled = true; btn.textContent = 'กำลังส่ง...'; }
+  try {
+    await online.createTopupRequest({ method, amount, walletLink, cardCode, imageFile });
+    form.reset();
+    toast('ส่งคำขอเติมเงินแล้ว รอแอดมินตรวจสอบ');
+    await loadTopupRequests();
+  } catch (err) {
+    console.error(err);
+    toast('ส่งคำขอไม่สำเร็จ: ' + (err.message || 'ลองใหม่อีกครั้ง'));
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = 'ส่งคำขอเติมเงิน'; }
+  }
+}
+
+$('#walletTopupForm')?.addEventListener('submit', e => { e.preventDefault(); submitTopup(e.currentTarget, 'wallet'); });
+$('#cardTopupForm')?.addEventListener('submit', e => { e.preventDefault(); submitTopup(e.currentTarget, 'card'); });
+$('#refreshTopupBtn')?.addEventListener('click', loadTopupRequests);
+
+let topupPollTimer = null;
+function startTopupPolling() {
+  if (topupPollTimer) clearInterval(topupPollTimer);
+  topupPollTimer = setInterval(async () => {
+    if (topupModal?.classList.contains('hidden')) return;
+    const before = points;
+    try {
+      const rows = await online.getMyTopupRequests();
+      renderTopupRequests(rows);
+      const wallet = await online.loadGuestWallet();
+      if (wallet && Number.isFinite(Number(wallet.coins)) && Number(wallet.coins) !== before) {
+        const approved = rows.find(r => r.status === 'approved');
+        points = Number(wallet.coins);
+        syncPoints();
+        if (approved && Number(wallet.coins) > before) toast(`เติมสำเร็จ +${Number(wallet.coins) - before} เหรียญ`);
+      }
+    } catch (err) { console.warn('Top-up polling failed:', err); }
+  }, 5000);
+}
+startTopupPolling();
 
 const soundBtn = $('#soundBtn');
 if(soundBtn) soundBtn.onclick = () => toast('ระบบเสียงพร้อมใช้งานใน Prototype');
@@ -881,7 +991,6 @@ $$('.nav').forEach(n => n.onclick = () => {
     $('#historyModal')?.classList.remove('hidden');
   }
   else if(p === 'boxes') document.querySelector('.content')?.scrollIntoView({behavior: 'smooth'});
-  else if(p === 'points') toast('เติมแต้มเป็น DEMO');
   else if(p === 'home') document.querySelector('.hero')?.scrollIntoView({behavior: 'smooth'});
   else toast('หน้า ' + (n.querySelector('span')?.textContent || '') + ' อยู่ใน Prototype');
 });
