@@ -15,7 +15,53 @@
     }
   </script>
 </head>
-<body>
+<body class="auth-pending">
+  <section id="authScreen" class="auth-screen">
+    <div class="auth-card">
+      <div class="auth-logo">
+        <div class="logo-box">🎁</div>
+        <strong>MYSTERY</strong>
+        <span>BOX 3D</span>
+      </div>
+
+      <div class="auth-tabs">
+        <button type="button" class="auth-tab active" id="loginTab">เข้าสู่ระบบ</button>
+        <button type="button" class="auth-tab" id="registerTab">สมัครสมาชิก</button>
+      </div>
+
+      <form id="loginForm" class="auth-form">
+        <h1>เข้าสู่ระบบ</h1>
+        <p>เข้าสู่ระบบเพื่อเล่น Mystery Box 3D</p>
+        <label>อีเมล
+          <input id="loginEmail" type="email" autocomplete="email" placeholder="example@email.com" required>
+        </label>
+        <label>รหัสผ่าน
+          <input id="loginPassword" type="password" autocomplete="current-password" placeholder="รหัสผ่าน" required>
+        </label>
+        <button class="auth-submit" type="submit">เข้าสู่ระบบ</button>
+        <div id="loginMessage" class="auth-message"></div>
+      </form>
+
+      <form id="registerForm" class="auth-form hidden">
+        <h1>สมัครสมาชิก</h1>
+        <p>สร้างบัญชีแล้วเข้าเล่นได้ทันที</p>
+        <label>ชื่อผู้ใช้
+          <input id="registerUsername" type="text" minlength="3" maxlength="24" autocomplete="username" placeholder="ชื่อผู้ใช้" required>
+        </label>
+        <label>อีเมล
+          <input id="registerEmail" type="email" autocomplete="email" placeholder="example@email.com" required>
+        </label>
+        <label>รหัสผ่าน
+          <input id="registerPassword" type="password" minlength="6" autocomplete="new-password" placeholder="อย่างน้อย 6 ตัวอักษร" required>
+        </label>
+        <label>ยืนยันรหัสผ่าน
+          <input id="registerPasswordConfirm" type="password" minlength="6" autocomplete="new-password" placeholder="กรอกรหัสผ่านอีกครั้ง" required>
+        </label>
+        <button class="auth-submit" type="submit">สมัครสมาชิก</button>
+        <div id="registerMessage" class="auth-message"></div>
+      </form>
+    </div>
+  </section>
   <div id="siteAnnouncement" class="site-announcement hidden"></div>
   <div id="maintenanceOverlay" class="maintenance-overlay hidden">
     <div class="maintenance-card">
@@ -46,10 +92,10 @@
 
     <main class="main">
       <header class="topbar">
-        <div class="welcome">
+        <button class="welcome account-trigger" id="accountBtn" type="button">
           <div class="avatar">👤</div>
-          <div>ยินดีต้อนรับ, <b>Player_1024</b> <span class="level">VIP 2</span></div>
-        </div>
+          <div>ยินดีต้อนรับ, <b id="welcomeUsername">กำลังโหลด...</b> <span class="level">VIP 2</span></div>
+        </button>
         <div class="top-actions">
           <button class="top-points topup-trigger" id="topUpBtn" type="button" title="เติมเหรียญ">🪙 <strong id="topPoints">24</strong><span>เติมเหรียญ</span></button>
           <button class="icon-btn" id="soundBtn">🔊</button>
@@ -225,6 +271,17 @@
 
         <button class="open-btn topup-submit" id="topupSubmit" type="submit">ส่งคำขอเติมเงิน</button>
       </form>
+    </div>
+  </div>
+
+  <div class="modal hidden" id="accountModal">
+    <div class="modal-backdrop"></div>
+    <div class="modal-card account-card">
+      <button class="modal-close" id="closeAccountModal">×</button>
+      <div class="account-avatar">👤</div>
+      <h2 id="accountUsername">ผู้ใช้</h2>
+      <p id="accountEmail" class="account-email"></p>
+      <button class="logout-btn" id="logoutBtn" type="button">🚪 ออกจากระบบ</button>
     </div>
   </div>
 

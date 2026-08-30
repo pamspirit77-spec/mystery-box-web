@@ -481,8 +481,153 @@ $('#closeInventoryModal')?.addEventListener('click', () => {
 renderInventory();
 syncPoints();
 
-// Online bridge: if Supabase is configured, load the player's cloud balance/history.
-// If it is not configured yet, the original local prototype continues to work unchanged.
+// =========================================================
+// Supabase Auth — registration, login and logout
+// =========================================================
+const authScreen = $('#authScreen');
+const loginForm = $('#loginForm');
+const registerForm = $('#registerForm');
+const loginTab = $('#loginTab');
+const registerTab = $('#registerTab');
+const accountModal = $('#accountModal');
+
+function setAuthMessage(id, message, success = false) {
+  const el = $(id);
+  if (!el) return;
+  el.textContent = message || '';
+  el.classList.toggle('success', success);
+}
+
+function showAuthMode(mode) {
+  const login = mode === 'login';
+  loginForm?.classList.toggle('hidden', !login);
+  registerForm?.classList.toggle('hidden', login);
+  loginTab?.classList.toggle('active', login);
+  registerTab?.classList.toggle('active', !login);
+  setAuthMessage('#loginMessage', '');
+  setAuthMessage('#registerMessage', '');
+}
+
+function showGame(profile, user) {
+  document.body.classList.remove('auth-pending');
+  authScreen?.classList.add('hidden');
+
+  const username = profile?.username || user?.user_metadata?.username || 'ผู้ใช้';
+  const welcome = $('#welcomeUsername');
+  if (welcome) welcome.textContent = username;
+  const accountUsername = $('#accountUsername');
+  const accountEmail = $('#accountEmail');
+  if (accountUsername) accountUsername.textContent = username;
+  if (accountEmail) accountEmail.textContent = user?.email || '';
+}
+
+function showLoggedOut() {
+  document.body.classList.add('auth-pending');
+  authScreen?.classList.remove('hidden');
+  accountModal?.classList.add('hidden');
+  showAuthMode('login');
+  if (loginForm) loginForm.reset();
+  if (registerForm) registerForm.reset();
+}
+
+loginTab?.addEventListener('click', () => showAuthMode('login'));
+registerTab?.addEventListener('click', () => showAuthMode('register'));
+
+loginForm?.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const btn = loginForm.querySelector('button[type="submit"]');
+  const email = $('#loginEmail')?.value.trim();
+  const password = $('#loginPassword')?.value || '';
+  setAuthMessage('#loginMessage', '');
+  if (btn) btn.disabled = true;
+
+  try {
+    const profile = await online.signIn(email, password);
+    showGame(profile, online.user);
+    if (Number.isFinite(Number(profile?.coins))) {
+      points = Number(profile.coins);
+      syncPoints();
+    }
+    try {
+      const cloudHistory = await online.getRollHistory();
+      if (cloudHistory.length) {
+        rollHistory = cloudHistory;
+        localStorage.setItem(HISTORY_STORAGE_KEY, JSON.stringify(rollHistory));
+        renderRollHistory();
+      }
+    } catch (err) {
+      console.warn('Online history load unavailable:', err);
+    }
+    await applySiteSettings();
+  } catch (err) {
+    setAuthMessage('#loginMessage', err?.message || 'อีเมลหรือรหัสผ่านไม่ถูกต้อง');
+  } finally {
+    if (btn) btn.disabled = false;
+  }
+});
+
+registerForm?.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const btn = registerForm.querySelector('button[type="submit"]');
+  const username = $('#registerUsername')?.value.trim();
+  const email = $('#registerEmail')?.value.trim();
+  const password = $('#registerPassword')?.value || '';
+  const confirm = $('#registerPasswordConfirm')?.value || '';
+  setAuthMessage('#registerMessage', '');
+
+  if (password !== confirm) {
+    setAuthMessage('#registerMessage', 'รหัสผ่านและยืนยันรหัสผ่านไม่ตรงกัน');
+    return;
+  }
+  if (password.length < 6) {
+    setAuthMessage('#registerMessage', 'รหัสผ่านต้องมีอย่างน้อย 6 ตัวอักษร');
+    return;
+  }
+  if (username.length < 3) {
+    setAuthMessage('#registerMessage', 'ชื่อผู้ใช้ต้องมีอย่างน้อย 3 ตัวอักษร');
+    return;
+  }
+
+  if (btn) btn.disabled = true;
+  try {
+    const data = await online.signUp(email, password, username);
+    if (!data?.session || !data?.user) {
+      throw new Error('บัญชีถูกสร้างแล้ว แต่ Supabase ยังเปิดการยืนยันอีเมลอยู่ กรุณาปิด Confirm email ใน Authentication → Providers → Email แล้วลองสมัครใหม่');
+    }
+    online.user = data.user;
+    const profile = await online.loadProfile();
+    showGame(profile, data.user);
+    if (Number.isFinite(Number(profile?.coins))) {
+      points = Number(profile.coins);
+      syncPoints();
+    }
+    setAuthMessage('#registerMessage', '');
+    await applySiteSettings();
+  } catch (err) {
+    setAuthMessage('#registerMessage', err?.message || 'สมัครสมาชิกไม่สำเร็จ');
+  } finally {
+    if (btn) btn.disabled = false;
+  }
+});
+
+$('#accountBtn')?.addEventListener('click', () => accountModal?.classList.remove('hidden'));
+$('#closeAccountModal')?.addEventListener('click', () => accountModal?.classList.add('hidden'));
+accountModal?.querySelector('.modal-backdrop')?.addEventListener('click', () => accountModal?.classList.add('hidden'));
+
+$('#logoutBtn')?.addEventListener('click', async () => {
+  const btn = $('#logoutBtn');
+  if (btn) btn.disabled = true;
+  try {
+    await online.signOut();
+    showLoggedOut();
+  } catch (err) {
+    toast(err?.message || 'ออกจากระบบไม่สำเร็จ');
+  } finally {
+    if (btn) btn.disabled = false;
+  }
+});
+
+// Online bridge: load the authenticated player's cloud balance/history.
 async function applySiteSettings() {
   try {
     const settings = await online.getSiteSettings();
@@ -503,9 +648,14 @@ async function applySiteSettings() {
 }
 
 online.init().then(async profile => {
-  applySiteSettings();
-  if (!profile) return;
-  if (Number.isFinite(Number(profile.coins))) {
+  if (!online.user) {
+    showLoggedOut();
+    return;
+  }
+  showGame(profile, online.user);
+  await applySiteSettings();
+
+  if (Number.isFinite(Number(profile?.coins))) {
     points = Number(profile.coins);
     syncPoints();
   }
@@ -520,7 +670,8 @@ online.init().then(async profile => {
     console.warn('Online history load unavailable:', err);
   }
 }).catch(err => {
-  console.warn('Supabase is not configured or unavailable yet:', err);
+  console.warn('Supabase authentication unavailable:', err);
+  showLoggedOut();
 });
 
 let isUserInteracting = false;
