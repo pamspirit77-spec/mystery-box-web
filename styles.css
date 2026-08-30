@@ -1298,4 +1298,46 @@ nav {
     font-size: 11px;
   }
 }
-\n\n/* Top-up UI - isolated styles */\n.topup-quick-btn {\n  border: 1px solid #3a3159;\n  background: linear-gradient(135deg, #ff0055, #7a00ff);\n  color: #fff;\n  min-height: 36px;\n  padding: 0 14px;\n  border-radius: 18px;\n  font-weight: 600;\n  cursor: pointer;\n}\n.topup-modal-card { max-width: 680px; }\n.topup-subtitle { color: #8a8a9e; font-size: 13px; margin-top: 4px; }\n.topup-tabs { display:flex; gap:8px; margin:18px 0; flex-wrap:wrap; }\n.topup-tab { flex:1; min-width:220px; padding:11px 14px; border:1px solid #25253d; background:#161626; color:#aaa; border-radius:10px; cursor:pointer; }\n.topup-tab.active { color:#fff; border-color:#ff0055; background:#21162a; }\n.topup-form { display:flex; flex-direction:column; gap:13px; }\n.topup-form label { display:flex; flex-direction:column; gap:6px; color:#ddd; font-size:13px; }\n.topup-form input, .topup-form select { width:100%; padding:11px 12px; border:1px solid #30304a; border-radius:9px; background:#0f0f19; color:#fff; outline:none; }\n.topup-form input:focus, .topup-form select:focus { border-color:#7a00ff; }\n.topup-help { color:#77778c; font-size:12px; }\n.topup-submit { margin-top:4px; }\n.topup-status-box { margin-top:22px; padding-top:15px; border-top:1px solid #25253d; }\n.topup-request-list { display:flex; flex-direction:column; gap:8px; max-height:220px; overflow:auto; }\n.topup-request-row { display:flex; justify-content:space-between; align-items:center; gap:10px; padding:10px 12px; background:#11111c; border:1px solid #25253d; border-radius:9px; }\n.topup-request-row > div { display:flex; flex-direction:column; gap:2px; }\n.topup-request-row span:not(.topup-status) { color:#88889c; font-size:12px; }\n.topup-status { padding:4px 8px; border-radius:999px; font-size:11px; white-space:nowrap; }\n.topup-status.pending { background:#3a2c0d; color:#ffd75e; }\n.topup-status.approved { background:#103d27; color:#58e39b; }\n.topup-status.rejected { background:#40151e; color:#ff6b88; }\n@media (max-width: 700px) {\n  .topup-quick-btn { padding:0 10px; font-size:12px; }\n  .topup-tabs { flex-direction:column; }\n  .topup-tab { min-width:0; width:100%; }\n}\n
+
+
+/* =========================================================
+   Top-up UI — isolated add-on; existing game UI remains unchanged.
+   ========================================================= */
+.topup-trigger {
+  border: 1px solid #25253d;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font: inherit;
+}
+.topup-trigger span {
+  color: #fff;
+  font-size: 12px;
+  font-weight: 600;
+}
+.topup-card {
+  width: min(560px, calc(100% - 30px));
+}
+.topup-note { color: #8f8fa3; font-size: 12px; margin-top: 4px; }
+.topup-methods { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin:14px 0; }
+.topup-method {
+  padding:11px 10px; border:1px solid #292944; border-radius:10px;
+  background:#141420; color:#aaa; cursor:pointer; font:inherit;
+}
+.topup-method.active { background:#21162c; border-color:#ff0055; color:#fff; }
+.topup-form { display:flex; flex-direction:column; gap:12px; }
+.topup-form label { display:flex; flex-direction:column; gap:6px; color:#ddd; font-size:12px; }
+.topup-form input, .topup-form select {
+  width:100%; padding:11px 12px; border-radius:9px; border:1px solid #2b2b45;
+  background:#0f0f19; color:#fff; outline:none; font:inherit;
+}
+.topup-form input:focus, .topup-form select:focus { border-color:#7a00ff; }
+.topup-help { color:#77778d; font-size:11px; line-height:1.5; }
+.topup-submit { margin-top:4px; }
+@media (max-width:600px) {
+  .topup-trigger { padding:6px 9px; }
+  .topup-trigger span { display:none; }
+  .topup-methods { grid-template-columns:1fr; }
+  .topup-card { width:calc(100% - 20px); }
+}

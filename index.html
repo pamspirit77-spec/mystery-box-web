@@ -42,8 +42,7 @@
           <div>ยินดีต้อนรับ, <b>Player_1024</b> <span class="level">VIP 2</span></div>
         </div>
         <div class="top-actions">
-          <div class="top-points">🪙 <strong id="topPoints">24</strong></div>
-          <button class="topup-quick-btn" id="coinTopupBtn">เติมเหรียญ</button>
+          <button class="top-points topup-trigger" id="topUpBtn" type="button" title="เติมเหรียญ">🪙 <strong id="topPoints">24</strong><span>เติมเหรียญ</span></button>
           <button class="icon-btn" id="soundBtn">🔊</button>
         </div>
       </header>
@@ -167,63 +166,56 @@
     </div>
   </div>
 
-
-  <!-- Top-up Modal -->
   <div class="modal hidden" id="topupModal">
     <div class="modal-backdrop"></div>
-    <div class="modal-card wide topup-modal-card">
+    <div class="modal-card topup-card">
       <button class="modal-close" id="closeTopupModal">×</button>
       <div class="modal-head-row">
         <div>
           <h2>🪙 เติมเหรียญ</h2>
-          <p class="topup-subtitle">ส่งคำขอเติมเงิน แล้วรอแอดมินตรวจสอบและอนุมัติ</p>
+          <p class="topup-note">เลือกช่องทางเติมเงิน แล้วรอแอดมินตรวจสอบและอนุมัติ</p>
         </div>
       </div>
-
-      <div class="topup-tabs">
-        <button class="topup-tab active" data-topup-method="wallet">🔗 ซองของขวัญ / ลิงก์ Wallet</button>
-        <button class="topup-tab" data-topup-method="card">🎫 บัตรเงินสด TrueMoney</button>
+      <div class="topup-methods">
+        <button class="topup-method active" type="button" data-method="wallet">🔗 ซองของขวัญ / Wallet</button>
+        <button class="topup-method" type="button" data-method="card">🎫 บัตร TrueMoney</button>
       </div>
 
-      <form id="walletTopupForm" class="topup-form">
+      <form id="topupForm" class="topup-form">
+        <input type="hidden" id="topupMethod" value="wallet">
         <label>จำนวนเงิน (บาท)
-          <input id="walletAmount" type="number" min="10" step="1" placeholder="อย่างน้อย 10 บาท" required>
+          <input id="topupAmount" type="number" min="10" step="1" placeholder="ขั้นต่ำ 10 บาท" required>
         </label>
-        <label>ลิงก์ซองของขวัญ / Wallet
-          <input id="walletLink" type="url" placeholder="วางลิงก์ Wallet ที่นี่" required>
-        </label>
-        <p class="topup-help">ขั้นต่ำ 10 บาท • จำนวนที่กรอกจะเป็นจำนวนเหรียญที่ขอเติม</p>
-        <button class="open-btn topup-submit" type="submit">ส่งคำขอเติมเงิน</button>
-      </form>
 
-      <form id="cardTopupForm" class="topup-form hidden">
-        <label>มูลค่าบัตร
-          <select id="cardAmount" required>
-            <option value="50">50 บาท</option>
-            <option value="90">90 บาท</option>
-            <option value="150">150 บาท</option>
-            <option value="300">300 บาท</option>
-            <option value="500">500 บาท</option>
-            <option value="1000">1,000 บาท</option>
-          </select>
-        </label>
-        <label>รหัสบัตร TrueMoney (14 หลัก)
-          <input id="cardCode" inputmode="numeric" maxlength="14" pattern="\d{14}" placeholder="กรอกรหัส 14 หลัก" required>
-        </label>
-        <label>แนบรูปบัตร / สลิป
-          <input id="cardImage" type="file" accept="image/*" capture="environment" required>
-        </label>
-        <p class="topup-help">มูลค่าบัตรที่ใช้ได้: 50, 90, 150, 300, 500 และ 1,000 บาท</p>
-        <button class="open-btn topup-submit" type="submit">ส่งคำขอเติมเงิน</button>
-      </form>
-
-      <div class="topup-status-box">
-        <div class="section-head">
-          <h3>คำขอเติมเงินล่าสุด</h3>
-          <button class="mini-link" id="refreshTopupBtn" type="button">รีเฟรช</button>
+        <div id="walletFields">
+          <label>ลิงก์ซองของขวัญ / Wallet
+            <input id="walletLink" type="url" placeholder="วางลิงก์ที่คัดลอกมา" autocomplete="off">
+          </label>
+          <div class="topup-help">กรอกยอดตามจริง แล้ววางลิงก์สำหรับให้แอดมินตรวจสอบ</div>
         </div>
-        <div id="topupRequestList" class="topup-request-list"><div class="history-empty">กำลังโหลด...</div></div>
-      </div>
+
+        <div id="cardFields" class="hidden">
+          <label>มูลค่าบัตร
+            <select id="cardAmount">
+              <option value="50">50 บาท</option>
+              <option value="90">90 บาท</option>
+              <option value="150">150 บาท</option>
+              <option value="300">300 บาท</option>
+              <option value="500">500 บาท</option>
+              <option value="1000">1,000 บาท</option>
+            </select>
+          </label>
+          <label>รหัสบัตร TrueMoney (14 หลัก)
+            <input id="cardCode" type="text" inputmode="numeric" maxlength="14" placeholder="กรอกรหัส 14 หลัก" autocomplete="off">
+          </label>
+          <label>แนบรูปบัตร / หลักฐาน
+            <input id="cardProof" type="file" accept="image/*">
+          </label>
+          <div class="topup-help">ระบบจะส่งข้อมูลให้แอดมินตรวจสอบก่อนเพิ่มเหรียญ</div>
+        </div>
+
+        <button class="open-btn topup-submit" id="topupSubmit" type="submit">ส่งคำขอเติมเงิน</button>
+      </form>
     </div>
   </div>
 

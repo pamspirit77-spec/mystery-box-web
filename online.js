@@ -6,13 +6,6 @@ class OnlineDB {
     this.client = null;
     this.user = null;
     this.enabled = SUPABASE_ENABLED;
-    this.guestKey = localStorage.getItem('mystery_box_guest_key');
-    if (!this.guestKey && crypto?.randomUUID) {
-      this.guestKey = crypto.randomUUID();
-      localStorage.setItem('mystery_box_guest_key', this.guestKey);
-    }
-    this.guestUsername = localStorage.getItem('mystery_box_guest_name') || `Player_${Math.floor(1000 + Math.random() * 9000)}`;
-    localStorage.setItem('mystery_box_guest_name', this.guestUsername);
   }
 
   async init() {
@@ -25,15 +18,9 @@ class OnlineDB {
     const { data: { session } } = await this.client.auth.getSession();
     this.user = session?.user ?? null;
 
-    if (this.user) return await this.loadProfile();
-
-    // Guest wallet: keeps the existing game usable without forcing a login.
-    try {
-      return await this.loadGuestWallet();
-    } catch (err) {
-      console.warn('Guest wallet unavailable:', err);
-      return null;
-    }
+    // No anonymous account: the real account system will use Supabase Auth.
+    // This keeps the game usable locally until Login/Register is connected.
+    return this.user ? await this.loadProfile() : null;
   }
 
   async signUp(email, password, username = '') {
@@ -85,16 +72,6 @@ class OnlineDB {
     return data;
   }
 
-  async loadGuestWallet() {
-    if (!this.client || !this.guestKey) return null;
-    const { data, error } = await this.client.rpc('get_guest_wallet', {
-      p_guest_key: this.guestKey,
-      p_username: this.guestUsername
-    });
-    if (error) throw error;
-    return data ? { coins: Number(data.coins || 0), username: data.username || this.guestUsername } : null;
-  }
-
   async saveCoins(coins) {
     if (!this.client || !this.user) return;
     const { error } = await this.client
@@ -104,57 +81,39 @@ class OnlineDB {
     if (error) console.warn('Supabase coins sync failed:', error);
   }
 
-  async spendGuestCoins(amount) {
-    if (!this.client || !this.guestKey) return null;
-    const { data, error } = await this.client.rpc('spend_guest_coins', {
-      p_guest_key: this.guestKey,
-      p_amount: Math.max(1, Math.floor(Number(amount)))
+
+  async submitTopup(payload) {
+    if (!this.client || !this.user) throw new Error('กรุณาเข้าสู่ระบบก่อนเติมเงิน');
+    const { data, error } = await this.client.from('topup_requests').insert({
+      user_id: this.user.id,
+      method: payload.method,
+      amount: payload.amount,
+      wallet_link: payload.walletLink || null,
+      card_code: payload.cardCode || null,
+      proof_path: payload.proofPath || null
+    }).select('id').single();
+    if (error) throw error;
+    return data;
+  }
+
+  async uploadTopupProof(file) {
+    if (!this.client || !this.user) throw new Error('กรุณาเข้าสู่ระบบก่อนเติมเงิน');
+    const safeName = String(file.name || 'proof').replace(/[^a-zA-Z0-9._-]/g, '_');
+    const path = `${this.user.id}/${Date.now()}_${crypto.randomUUID()}_${safeName}`;
+    const { error } = await this.client.storage.from('topup-proofs').upload(path, file, {
+      cacheControl: '3600', upsert: false, contentType: file.type || 'image/jpeg'
     });
     if (error) throw error;
-    return Number(data);
+    return path;
   }
 
-  async createTopupRequest({ method, amount, walletLink = '', cardCode = '', imageFile = null }) {
-    if (!this.client || !this.guestKey) throw new Error('ระบบออนไลน์ยังไม่พร้อม');
-    let imagePath = null;
-    if (imageFile) {
-      const safeName = imageFile.name.replace(/[^a-zA-Z0-9._-]/g, '_');
-      imagePath = `${this.guestKey}/${Date.now()}-${safeName}`;
-      const { error: uploadError } = await this.client.storage
-        .from('topup-proofs')
-        .upload(imagePath, imageFile, { upsert: false, contentType: imageFile.type || 'image/jpeg' });
-      if (uploadError) throw uploadError;
-    }
-
-    const { data, error } = await this.client
-      .from('topup_requests')
-      .insert({
-        guest_key: this.guestKey,
-        player_name: this.guestUsername,
-        method,
-        amount: Math.floor(Number(amount)),
-        wallet_link: walletLink || null,
-        card_code: cardCode || null,
-        image_path: imagePath
-      })
-      .select('id, status, amount, method, created_at')
-      .single();
-    if (error) throw error;
-    return data;
-  }
-
-  async getMyTopupRequests() {
-    if (!this.client || !this.guestKey) return [];
-    const { data, error } = await this.client.rpc('get_my_topup_requests', { p_guest_key: this.guestKey });
+  async getMyTopups() {
+    if (!this.client || !this.user) return [];
+    const { data, error } = await this.client.from('topup_requests')
+      .select('id, method, amount, status, created_at, reviewed_at')
+      .eq('user_id', this.user.id).order('created_at', { ascending:false }).limit(20);
     if (error) throw error;
     return data || [];
-  }
-
-  async getTopupStatus(requestId) {
-    if (!this.client || !this.guestKey) return null;
-    const { data, error } = await this.client.rpc('get_topup_status', { p_request_id: requestId, p_guest_key: this.guestKey });
-    if (error) throw error;
-    return data;
   }
 
   async addRollHistory(items, boxName, timestamp = Date.now()) {

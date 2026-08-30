@@ -681,7 +681,7 @@ $('#claimResultBtn')?.addEventListener('click', () => {
 
 const rollBtn = $('#rollBtn');
 if(rollBtn) {
-  rollBtn.onclick = async () => {
+  rollBtn.onclick = () => {
     const b = boxes[selected];
     const totalPrice = b.price * rollCount;
     
@@ -745,23 +745,9 @@ if(rollBtn) {
     
     rolling = true;
     hasClaimed = false;
-
-    try {
-      if (online.client && !online.user) {
-        const newBalance = await online.spendGuestCoins(totalPrice);
-        if (!Number.isFinite(newBalance)) throw new Error('ไม่สามารถหักเหรียญจากระบบออนไลน์ได้');
-        points = newBalance;
-      } else {
-        points -= totalPrice;
-        online.saveCoins(points);
-      }
-    } catch (err) {
-      rolling = false;
-      hasClaimed = true;
-      toast('ทำรายการไม่สำเร็จ: ' + (err.message || 'ลองใหม่อีกครั้ง'));
-      return;
-    }
+    points -= totalPrice;
     syncPoints();
+    online.saveCoins(points);
     
     rollBtn.disabled = true;
     
@@ -877,109 +863,101 @@ if(rollBtn) {
   };
 }
 
-
-// ระบบเติมเหรียญ: ใช้เฉพาะปุ่มเหรียญด้านบน
-const topupModal = $('#topupModal');
-const openTopup = () => {
-  if (!topupModal) return;
-  topupModal.classList.remove('hidden');
-  loadTopupRequests();
-};
-$('#coinTopupBtn')?.addEventListener('click', openTopup);
-$('#closeTopupModal')?.addEventListener('click', () => topupModal?.classList.add('hidden'));
-$$('.topup-tab').forEach(tab => tab.addEventListener('click', () => {
-  $$('.topup-tab').forEach(t => t.classList.remove('active'));
-  tab.classList.add('active');
-  const method = tab.dataset.topupMethod;
-  $('#walletTopupForm')?.classList.toggle('hidden', method !== 'wallet');
-  $('#cardTopupForm')?.classList.toggle('hidden', method !== 'card');
-}));
-
-function topupStatusLabel(status) {
-  return ({pending:'รอตรวจสอบ', approved:'อนุมัติแล้ว', rejected:'ปฏิเสธ'})[status] || status;
-}
-
-function renderTopupRequests(rows) {
-  const el = $('#topupRequestList');
-  if (!el) return;
-  if (!rows.length) {
-    el.innerHTML = '<div class="history-empty">ยังไม่มีคำขอเติมเงิน</div>';
-    return;
-  }
-  el.innerHTML = rows.map(r => `
-    <div class="topup-request-row">
-      <div><b>${r.method === 'wallet' ? '🔗 Wallet' : '🎫 TrueMoney Card'}</b><span>${Number(r.amount).toLocaleString()} บาท</span></div>
-      <span class="topup-status ${r.status}">${topupStatusLabel(r.status)}</span>
-    </div>
-  `).join('');
-}
-
-async function loadTopupRequests() {
-  const el = $('#topupRequestList');
-  if (!el) return;
-  if (!online.client) {
-    el.innerHTML = '<div class="history-empty">กรุณาตั้งค่า Supabase ก่อนใช้งานระบบเติมเงิน</div>';
-    return;
-  }
-  try {
-    renderTopupRequests(await online.getMyTopupRequests());
-  } catch (err) {
-    console.warn('Top-up request load failed:', err);
-    el.innerHTML = '<div class="history-empty">โหลดคำขอเติมเงินไม่สำเร็จ</div>';
-  }
-}
-
-async function submitTopup(form, method) {
-  const amount = method === 'wallet' ? Number($('#walletAmount')?.value) : Number($('#cardAmount')?.value);
-  if (!Number.isFinite(amount) || amount < 10) { toast('จำนวนเงินขั้นต่ำ 10 บาท'); return; }
-  const walletLink = method === 'wallet' ? ($('#walletLink')?.value || '').trim() : '';
-  const cardCode = method === 'card' ? ($('#cardCode')?.value || '').replace(/\\D/g, '') : '';
-  const imageFile = method === 'card' ? $('#cardImage')?.files?.[0] : null;
-  if (method === 'wallet' && !walletLink) { toast('กรุณาวางลิงก์ Wallet'); return; }
-  if (method === 'card' && (cardCode.length !== 14 || !imageFile)) { toast('กรุณากรอกรหัส 14 หลักและแนบรูป'); return; }
-  if (method === 'card' && imageFile && imageFile.size > 5 * 1024 * 1024) { toast('รูปต้องมีขนาดไม่เกิน 5 MB'); return; }
-  const btn = form.querySelector('.topup-submit');
-  if (btn) { btn.disabled = true; btn.textContent = 'กำลังส่ง...'; }
-  try {
-    await online.createTopupRequest({ method, amount, walletLink, cardCode, imageFile });
-    form.reset();
-    toast('ส่งคำขอเติมเงินแล้ว รอแอดมินตรวจสอบ');
-    await loadTopupRequests();
-  } catch (err) {
-    console.error(err);
-    toast('ส่งคำขอไม่สำเร็จ: ' + (err.message || 'ลองใหม่อีกครั้ง'));
-  } finally {
-    if (btn) { btn.disabled = false; btn.textContent = 'ส่งคำขอเติมเงิน'; }
-  }
-}
-
-$('#walletTopupForm')?.addEventListener('submit', e => { e.preventDefault(); submitTopup(e.currentTarget, 'wallet'); });
-$('#cardTopupForm')?.addEventListener('submit', e => { e.preventDefault(); submitTopup(e.currentTarget, 'card'); });
-$('#refreshTopupBtn')?.addEventListener('click', loadTopupRequests);
-
-let topupPollTimer = null;
-function startTopupPolling() {
-  if (topupPollTimer) clearInterval(topupPollTimer);
-  topupPollTimer = setInterval(async () => {
-    if (topupModal?.classList.contains('hidden')) return;
-    const before = points;
-    try {
-      const rows = await online.getMyTopupRequests();
-      renderTopupRequests(rows);
-      const wallet = await online.loadGuestWallet();
-      if (wallet && Number.isFinite(Number(wallet.coins)) && Number(wallet.coins) !== before) {
-        const approved = rows.find(r => r.status === 'approved');
-        points = Number(wallet.coins);
-        syncPoints();
-        if (approved && Number(wallet.coins) > before) toast(`เติมสำเร็จ +${Number(wallet.coins) - before} เหรียญ`);
-      }
-    } catch (err) { console.warn('Top-up polling failed:', err); }
-  }, 5000);
-}
-startTopupPolling();
-
 const soundBtn = $('#soundBtn');
 if(soundBtn) soundBtn.onclick = () => toast('ระบบเสียงพร้อมใช้งานใน Prototype');
+
+// Top-up system: isolated from the existing box/3D/gameplay logic.
+const topupModal = $('#topupModal');
+const topupForm = $('#topupForm');
+const topupMethod = $('#topupMethod');
+const topupAmount = $('#topupAmount');
+const walletFields = $('#walletFields');
+const cardFields = $('#cardFields');
+const walletLink = $('#walletLink');
+const cardAmount = $('#cardAmount');
+const cardCode = $('#cardCode');
+const cardProof = $('#cardProof');
+const topupSubmit = $('#topupSubmit');
+
+function setTopupMethod(method) {
+  if (topupMethod) topupMethod.value = method;
+  $$('.topup-method').forEach(btn => btn.classList.toggle('active', btn.dataset.method === method));
+  if (walletFields) walletFields.classList.toggle('hidden', method !== 'wallet');
+  if (cardFields) cardFields.classList.toggle('hidden', method !== 'card');
+  if (topupAmount) topupAmount.value = method === 'card' ? (cardAmount?.value || '50') : '';
+  if (walletLink) walletLink.required = method === 'wallet';
+  if (cardCode) cardCode.required = method === 'card';
+  if (cardProof) cardProof.required = method === 'card';
+}
+
+function openTopupModal() {
+  if (!topupModal) return;
+  setTopupMethod(topupMethod?.value || 'wallet');
+  topupModal.classList.remove('hidden');
+}
+
+$('#topUpBtn')?.addEventListener('click', openTopupModal);
+$('#closeTopupModal')?.addEventListener('click', () => topupModal?.classList.add('hidden'));
+topupModal?.querySelector('.modal-backdrop')?.addEventListener('click', () => topupModal.classList.add('hidden'));
+$$('.topup-method').forEach(btn => btn.addEventListener('click', () => setTopupMethod(btn.dataset.method)));
+cardAmount?.addEventListener('change', () => { if (topupMethod?.value === 'card' && topupAmount) topupAmount.value = cardAmount.value; });
+cardCode?.addEventListener('input', () => { cardCode.value = cardCode.value.replace(/\D/g, '').slice(0, 14); });
+
+topupForm?.addEventListener('submit', async (event) => {
+  event.preventDefault();
+  if (!online.user) {
+    toast('กรุณาเข้าสู่ระบบก่อนเติมเงิน');
+    return;
+  }
+  const method = topupMethod?.value || 'wallet';
+  const amount = Number(topupAmount?.value || 0);
+  if (!Number.isInteger(amount) || amount < 10) {
+    toast('ยอดเติมขั้นต่ำ 10 บาท');
+    return;
+  }
+  if (method === 'card') {
+    const selectedCardAmount = Number(cardAmount?.value || 0);
+    if (amount !== selectedCardAmount) {
+      if (topupAmount) topupAmount.value = selectedCardAmount;
+      toast('กรุณาใช้จำนวนเงินตามมูลค่าบัตร');
+      return;
+    }
+    if (!/^\d{14}$/.test(cardCode?.value || '')) {
+      toast('กรุณากรอกรหัสบัตร 14 หลัก');
+      return;
+    }
+    if (!cardProof?.files?.[0]) {
+      toast('กรุณาแนบรูปบัตรหรือหลักฐาน');
+      return;
+    }
+  } else if (!/^https?:\/\//i.test(walletLink?.value || '')) {
+    toast('กรุณาวางลิงก์ Wallet ให้ถูกต้อง');
+    return;
+  }
+
+  if (topupSubmit) { topupSubmit.disabled = true; topupSubmit.textContent = 'กำลังส่งคำขอ...'; }
+  try {
+    let proofPath = null;
+    if (method === 'card') proofPath = await online.uploadTopupProof(cardProof.files[0]);
+    await online.submitTopup({
+      method,
+      amount,
+      walletLink: method === 'wallet' ? walletLink.value.trim() : null,
+      cardCode: method === 'card' ? cardCode.value : null,
+      proofPath
+    });
+    topupForm.reset();
+    setTopupMethod('wallet');
+    topupModal.classList.add('hidden');
+    toast('ส่งคำขอเติมเงินแล้ว รอแอดมินตรวจสอบ');
+  } catch (err) {
+    console.error('Top-up submit failed:', err);
+    toast(err?.message || 'ส่งคำขอเติมเงินไม่สำเร็จ');
+  } finally {
+    if (topupSubmit) { topupSubmit.disabled = false; topupSubmit.textContent = 'ส่งคำขอเติมเงิน'; }
+  }
+});
+
 
 $$('.nav').forEach(n => n.onclick = () => {
   $$('.nav').forEach(x => x.classList.remove('active'));
