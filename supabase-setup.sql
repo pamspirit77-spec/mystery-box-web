@@ -80,7 +80,11 @@ create table if not exists public.topup_requests (
   reviewed_by uuid references auth.users(id),
   reviewed_at timestamptz,
   created_at timestamptz not null default now(),
-  check ((method = 'wallet' and wallet_link is not null and card_code is null) or (method = 'card' and card_code is not null and proof_path is not null))
+  check (
+    (method = 'wallet' and wallet_link is not null and wallet_link ~* '^https?://' and card_code is null)
+    or
+    (method = 'card' and card_code is not null and card_code ~ '^[0-9]{14}$' and wallet_link is null)
+  )
 );
 
 alter table public.topup_requests enable row level security;
