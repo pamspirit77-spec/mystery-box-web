@@ -1062,7 +1062,7 @@ function setTopupMethod(method) {
   if (topupAmount) topupAmount.value = method === 'card' ? (cardAmount?.value || '50') : '';
   if (walletLink) walletLink.required = method === 'wallet';
   if (cardCode) cardCode.required = method === 'card';
-  if (cardProof) cardProof.required = method === 'card';
+  if (cardProof) cardProof.required = false;
 }
 
 function openTopupModal() {
@@ -1108,11 +1108,14 @@ topupForm?.addEventListener('submit', async (event) => {
 
   if (topupSubmit) { topupSubmit.disabled = true; topupSubmit.textContent = 'กำลังส่งคำขอ...'; }
   try {
+    let proofPath = null;
+    if (method === 'card' && cardProof?.files?.[0]) proofPath = await online.uploadTopupProof(cardProof.files[0]);
     await online.submitTopup({
       method,
       amount,
       walletLink: method === 'wallet' ? walletLink.value.trim() : null,
       cardCode: method === 'card' ? cardCode.value : null,
+      proofPath
     });
     topupForm.reset();
     setTopupMethod('wallet');
@@ -1185,20 +1188,6 @@ $('#clearHistoryBtn')?.addEventListener('click', () => {
   renderRollHistory();
   toast('ล้างประวัติการสุ่มแล้ว');
 });
-
-// ซิงก์เหรียญจาก Supabase เป็นระยะ เพื่อให้เหรียญที่แอดมินอนุมัติเข้ามาในเกมอัตโนมัติ
-setInterval(async () => {
-  if (!online.user) return;
-  try {
-    const profile = await online.loadProfile();
-    if (profile && Number.isFinite(Number(profile.coins))) {
-      points = Number(profile.coins);
-      syncPoints();
-    }
-  } catch (err) {
-    console.warn('Balance sync unavailable:', err);
-  }
-}, 3000);
 
 // ตรวจสอบอายุประวัติเป็นระยะ เพื่อให้รายการเก่ากว่า 7 วันหายอัตโนมัติ
 cleanupRollHistory();

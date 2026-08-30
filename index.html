@@ -277,7 +277,10 @@
           <label>รหัสบัตร TrueMoney (14 หลัก)
             <input id="cardCode" type="text" inputmode="numeric" maxlength="14" placeholder="กรอกรหัส 14 หลัก" autocomplete="off">
           </label>
-          <div class="topup-help">ส่งรหัสบัตรให้แอดมินตรวจสอบ แล้วรออนุมัติ</div>
+          <label>แนบรูปบัตร / หลักฐาน
+            <input id="cardProof" type="file" accept="image/*">
+          </label>
+          <div class="topup-help">ระบบจะส่งข้อมูลให้แอดมินตรวจสอบก่อนเพิ่มเหรียญ</div>
         </div>
 
         <button class="open-btn topup-submit" id="topupSubmit" type="submit">ส่งคำขอเติมเงิน</button>

@@ -97,10 +97,12 @@ class OnlineDB {
     if (!this.client || !this.user) throw new Error('กรุณาเข้าสู่ระบบก่อนเติมเงิน');
     const { data, error } = await this.client.from('topup_requests').insert({
       user_id: this.user.id,
+      player_name: this.user.user_metadata?.username || `User_${this.user.id.slice(0, 8)}`,
       method: payload.method,
       amount: payload.amount,
       wallet_link: payload.walletLink || null,
-      card_code: payload.cardCode || null
+      card_code: payload.cardCode || null,
+      proof_path: payload.proofPath || null
     }).select('id').single();
     if (error) throw error;
     return data;
