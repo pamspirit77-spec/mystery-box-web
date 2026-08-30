@@ -100,8 +100,7 @@ class OnlineDB {
       method: payload.method,
       amount: payload.amount,
       wallet_link: payload.walletLink || null,
-      card_code: payload.cardCode || null,
-      proof_path: payload.proofPath || null
+      card_code: payload.cardCode || null
     }).select('id').single();
     if (error) throw error;
     return data;

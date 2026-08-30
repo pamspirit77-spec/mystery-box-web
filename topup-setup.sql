@@ -27,6 +27,12 @@ create table if not exists public.topup_requests (
   )
 );
 
+
+-- IMPORTANT: Existing installations may already have topup_requests without proof_path.
+-- Add the column safely so the admin RPC schema matches old databases.
+alter table public.topup_requests
+  add column if not exists proof_path text;
+
 alter table public.topup_requests enable row level security;
 alter table public.admin_users enable row level security;
 
