@@ -1,7 +1,7 @@
 // Supabase configuration for Mystery Box 3D
-// 1) Open Supabase -> Project Settings -> API
-// 2) Copy Project URL and the Publishable/anon key here.
-// IMPORTANT: Never put the service_role/secret key in this file or in browser code.
+// For Render deployment, these placeholders are replaced at build time from:
+// SUPABASE_URL and SUPABASE_ANON_KEY environment variables.
+// IMPORTANT: Never put a Supabase secret/service_role key in browser code.
 
 export const SUPABASE_URL = 'PASTE_YOUR_SUPABASE_PROJECT_URL_HERE';
 export const SUPABASE_ANON_KEY = 'PASTE_YOUR_SUPABASE_PUBLISHABLE_OR_ANON_KEY_HERE';

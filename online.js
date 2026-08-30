@@ -15,18 +15,38 @@ class OnlineDB {
       auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true }
     });
 
-    let { data: { session } } = await this.client.auth.getSession();
-
-    // Anonymous account is only a temporary bridge for this online-ready build.
-    // A real email/Google login can replace this in the next step without changing game systems.
-    if (!session) {
-      const result = await this.client.auth.signInAnonymously();
-      if (result.error) throw result.error;
-      session = result.data.session;
-    }
-
+    const { data: { session } } = await this.client.auth.getSession();
     this.user = session?.user ?? null;
+
+    // No anonymous account: the real account system will use Supabase Auth.
+    // This keeps the game usable locally until Login/Register is connected.
     return this.user ? await this.loadProfile() : null;
+  }
+
+  async signUp(email, password, username = '') {
+    if (!this.client) throw new Error('Supabase is not configured');
+    const { data, error } = await this.client.auth.signUp({
+      email,
+      password,
+      options: { data: { username } }
+    });
+    if (error) throw error;
+    return data;
+  }
+
+  async signIn(email, password) {
+    if (!this.client) throw new Error('Supabase is not configured');
+    const { data, error } = await this.client.auth.signInWithPassword({ email, password });
+    if (error) throw error;
+    this.user = data.user;
+    return await this.loadProfile();
+  }
+
+  async signOut() {
+    if (!this.client) return;
+    const { error } = await this.client.auth.signOut();
+    if (error) throw error;
+    this.user = null;
   }
 
   async loadProfile() {
@@ -41,7 +61,7 @@ class OnlineDB {
     if (!data) {
       const profile = {
         id: this.user.id,
-        username: `User_${this.user.id.slice(0, 8)}`,
+        username: this.user.user_metadata?.username || `User_${this.user.id.slice(0, 8)}`,
         coins: 24
       };
       const { data: created, error: createError } = await this.client
@@ -65,11 +85,11 @@ class OnlineDB {
     if (!this.client || !this.user || !Array.isArray(items)) return;
     const rows = items.map(item => ({
       user_id: this.user.id,
-      prize_name: item.name,
+      item_name: item.name,
       rarity: item.rarity,
       icon: item.icon,
       box_name: boxName,
-      created_at: new Date(timestamp).toISOString()
+      rolled_at: new Date(timestamp).toISOString()
     }));
     if (!rows.length) return;
     const { error } = await this.client.from('gacha_history').insert(rows);
@@ -81,18 +101,18 @@ class OnlineDB {
     const cutoff = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
     const { data, error } = await this.client
       .from('gacha_history')
-      .select('id, prize_name, rarity, icon, box_name, created_at')
+      .select('id, item_name, rarity, icon, box_name, rolled_at')
       .eq('user_id', this.user.id)
-      .gte('created_at', cutoff)
-      .order('created_at', { ascending: false });
+      .gte('rolled_at', cutoff)
+      .order('rolled_at', { ascending: false });
     if (error) throw error;
     return (data || []).map(row => ({
       id: row.id,
-      prizeName: row.prize_name,
+      prizeName: row.item_name,
       rarity: row.rarity,
       icon: row.icon,
       boxName: row.box_name,
-      timestamp: new Date(row.created_at).getTime()
+      timestamp: new Date(row.rolled_at).getTime()
     }));
   }
 }
