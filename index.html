@@ -83,6 +83,7 @@
         <button class="nav" data-page="boxes">📦 <span>กล่องสุ่ม</span></button>
         <button class="nav" data-page="rewards">🏆 <span>รางวัล</span></button>
         <button class="nav" data-page="history">📜 <span>ประวัติ</span></button>
+        <button class="nav" data-page="account">👤 <span>บัญชี / ออกจากระบบ</span></button>
       </nav>
       <div class="sidebar-bottom">
         <div class="small-label">แต้มคงเหลือ</div>
@@ -141,6 +142,19 @@
             <button class="mini-link" id="viewAll">ดูทั้งหมด</button>
           </div>
           <div class="inventory-grid" id="inventoryGrid"></div>
+        </div>
+      </section>
+
+      <section class="account-page hidden" id="accountPage">
+        <div class="account-page-card">
+          <div class="account-page-avatar">👤</div>
+          <div class="eyebrow">ACCOUNT</div>
+          <h1 id="accountPageUsername">ผู้ใช้</h1>
+          <p id="accountPageEmail" class="account-page-email"></p>
+          <div class="account-page-actions">
+            <button class="logout-page-btn" id="accountPageLogout" type="button">🚪 ออกจากระบบ</button>
+            <button class="account-back-btn" id="accountBackHome" type="button">🏠 กลับหน้าแรก</button>
+          </div>
         </div>
       </section>
     </main>

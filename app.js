@@ -517,8 +517,12 @@ function showGame(profile, user) {
   if (welcome) welcome.textContent = username;
   const accountUsername = $('#accountUsername');
   const accountEmail = $('#accountEmail');
+  const accountPageUsername = $('#accountPageUsername');
+  const accountPageEmail = $('#accountPageEmail');
   if (accountUsername) accountUsername.textContent = username;
   if (accountEmail) accountEmail.textContent = user?.email || '';
+  if (accountPageUsername) accountPageUsername.textContent = username;
+  if (accountPageEmail) accountPageEmail.textContent = user?.email || '';
 }
 
 function showLoggedOut() {
@@ -1130,18 +1134,48 @@ topupForm?.addEventListener('submit', async (event) => {
 });
 
 
+function showAccountPage() {
+  ['.hero', '.content', '.bottom-grid'].forEach(sel => document.querySelector(sel)?.classList.add('hidden'));
+  $('#accountPage')?.classList.remove('hidden');
+  window.scrollTo({top: 0, behavior: 'smooth'});
+}
+
+function showHomePage() {
+  ['.hero', '.content', '.bottom-grid'].forEach(sel => document.querySelector(sel)?.classList.remove('hidden'));
+  $('#accountPage')?.classList.add('hidden');
+}
+
 $$('.nav').forEach(n => n.onclick = () => {
   $$('.nav').forEach(x => x.classList.remove('active'));
   n.classList.add('active');
   const p = n.dataset.page;
-  if(p === 'rewards') openInventoryModal();
+  if(p === 'account') showAccountPage();
+  else if(p === 'rewards') { showHomePage(); openInventoryModal(); }
   else if(p === 'history') {
+    showHomePage();
     renderRollHistory();
     $('#historyModal')?.classList.remove('hidden');
   }
-  else if(p === 'boxes') document.querySelector('.content')?.scrollIntoView({behavior: 'smooth'});
-  else if(p === 'home') document.querySelector('.hero')?.scrollIntoView({behavior: 'smooth'});
-  else toast('หน้า ' + (n.querySelector('span')?.textContent || '') + ' อยู่ใน Prototype');
+  else if(p === 'boxes') { showHomePage(); document.querySelector('.content')?.scrollIntoView({behavior: 'smooth'}); }
+  else if(p === 'home') { showHomePage(); document.querySelector('.hero')?.scrollIntoView({behavior: 'smooth'}); }
+});
+
+$('#accountPageLogout')?.addEventListener('click', async () => {
+  const btn = $('#accountPageLogout');
+  if (btn) { btn.disabled = true; btn.textContent = 'กำลังออกจากระบบ...'; }
+  try {
+    await online.signOut();
+    showLoggedOut();
+  } catch (err) {
+    toast(err?.message || 'ออกจากระบบไม่สำเร็จ');
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = '🚪 ออกจากระบบ'; }
+  }
+});
+
+$('#accountBackHome')?.addEventListener('click', () => {
+  const home = document.querySelector('.nav[data-page="home"]');
+  home?.click();
 });
 
 $('#closeHistoryModal')?.addEventListener('click', () => {
