@@ -32,7 +32,7 @@ function renderTopups(){
   const method=r.method==='wallet'?'🔗 Wallet':'🎫 TrueMoney';
   const details=r.method==='wallet'
    ?`<div class="detail"><small>จำนวน</small><b>${escapeHtml(r.amount)} บาท</b></div><div class="detail"><small>Wallet Link</small><div class="wallet-link">${escapeHtml(r.wallet_link||'-')}</div></div>`
-   :`<div class="detail"><small>จำนวน</small><b>${escapeHtml(r.amount)} บาท</b></div><div class="detail"><small>บัตร / หลักฐาน</small><div>รหัส: ${escapeHtml(r.card_code||'-')}</div>${r.proof_path?`<a class="proof-link" href="#" data-proof="${escapeHtml(r.proof_path)}">เปิดรูปหลักฐาน</a>`:''}</div>`;
+   :`<div class="detail"><small>จำนวน</small><b>${escapeHtml(r.amount)} บาท</b></div><div class="detail"><small>บัตร / หลักฐาน</small><div>รหัส: ${escapeHtml(r.card_code||'-')}</div>${r.proof_image?`<a class="proof-link" href="#" data-proof="${escapeHtml(r.proof_image)}">เปิดรูปหลักฐาน</a>`:''}</div>`;
   const action=r.status==='pending'?`<div class="actions">${r.method==='wallet'&&r.wallet_link?`<button class="copy-btn" data-copy="${escapeHtml(r.wallet_link)}">คัดลอกลิงก์</button>`:''}<button class="approve-btn" data-action="approve" data-id="${r.id}">✓ อนุมัติและเพิ่มเหรียญ</button><button class="reject-btn" data-action="reject" data-id="${r.id}">✕ ปฏิเสธ</button></div>`:`<span class="status ${escapeHtml(r.status)}">${r.status==='approved'?'อนุมัติแล้ว':'ปฏิเสธแล้ว'}</span>`;
   return `<article class="request-card"><div class="request-head"><div><h3>${escapeHtml(r.username||'ไม่ทราบชื่อ')}</h3><div class="meta">UUID: ${escapeHtml(r.user_id)} • ${new Date(r.created_at).toLocaleString('th-TH')}</div></div><span class="status ${escapeHtml(r.status)}">${escapeHtml(r.status)}</span></div><div class="details-grid"><div class="detail"><small>ช่องทาง</small>${method}</div>${details}</div>${action}</article>`;
  }).join('');
@@ -43,7 +43,7 @@ function bindTopupEvents(){
   const approve=btn.dataset.action==='approve'; if(!confirm(approve?'ยืนยันว่าได้ตรวจสอบการชำระเงินจริงแล้ว?':'ยืนยันปฏิเสธรายการนี้?'))return;
   btn.disabled=true;
   const fn=approve?'admin_review_topup':'admin_review_topup';
-  const {error}=await getClient().rpc(fn,{p_topup_id:btn.dataset.id,p_approve:approve});
+  const {error}=await getClient().rpc(fn,{p_topup_id:Number(btn.dataset.id),p_approve:approve});
   if(error){alert(error.message);btn.disabled=false;return;} await loadAll();
  });
  $$('[data-copy]').forEach(btn=>btn.onclick=async()=>{try{await navigator.clipboard.writeText(btn.dataset.copy);btn.textContent='คัดลอกแล้ว';}catch{alert('คัดลอกไม่สำเร็จ');}});
