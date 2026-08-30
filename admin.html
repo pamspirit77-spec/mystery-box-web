@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Mystery Box — Admin Top-up</title>
+<title>Mystery Box — Admin Control</title>
 <link rel="stylesheet" href="admin.css">
 <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;600;700&display=swap" rel="stylesheet">
 </head>
@@ -11,7 +11,7 @@
 <div class="admin-shell">
   <section id="loginPanel" class="panel login-panel">
     <h1>🛠️ Admin Control</h1>
-    <p>เข้าสู่ระบบสำหรับผู้ดูแลเท่านั้น</p>
+    <p>เฉพาะบัญชีที่ถูกเพิ่มใน <b>admin_users</b> เท่านั้น</p>
     <form id="loginForm">
       <input id="adminEmail" type="email" placeholder="อีเมลแอดมิน" autocomplete="username" required>
       <input id="adminPassword" type="password" placeholder="รหัสผ่าน" autocomplete="current-password" required>
@@ -23,16 +23,62 @@
   <section id="adminPanel" class="hidden">
     <div class="admin-header">
       <div>
-        <h1>🛠️ ระบบแอดมินเติมเงิน</h1>
-        <p>ตรวจสอบ Wallet / บัตร TrueMoney ก่อนอนุมัติ</p>
+        <h1>🛠️ Mystery Box Admin</h1>
+        <p>ควบคุมเว็บ • อนุมัติเติมเงิน • จัดการเหรียญผู้เล่น</p>
       </div>
       <div class="header-actions">
         <button id="refreshBtn" class="secondary">รีเฟรช</button>
         <button id="logoutBtn" class="secondary">ออกจากระบบ</button>
       </div>
     </div>
+
+    <div class="stats" id="stats"></div>
+
+    <nav class="tabs">
+      <button class="tab active" data-tab="topups">💰 เติมเงิน</button>
+      <button class="tab" data-tab="users">👥 ผู้เล่น</button>
+      <button class="tab" data-tab="site">🌐 ควบคุมเว็บ</button>
+    </nav>
+
     <div id="adminStatus" class="message"></div>
-    <div id="topupList" class="request-list"></div>
+
+    <section class="tab-panel active" data-panel="topups">
+      <div class="toolbar">
+        <select id="topupFilter">
+          <option value="all">ทั้งหมด</option>
+          <option value="pending">รอตรวจสอบ</option>
+          <option value="approved">อนุมัติแล้ว</option>
+          <option value="rejected">ปฏิเสธแล้ว</option>
+        </select>
+        <input id="topupSearch" placeholder="ค้นหา Username / UUID">
+      </div>
+      <div id="topupList" class="request-list"></div>
+    </section>
+
+    <section class="tab-panel" data-panel="users">
+      <div class="toolbar">
+        <input id="userSearch" placeholder="ค้นหา Username / UUID / Email">
+      </div>
+      <div id="userList" class="user-list"></div>
+    </section>
+
+    <section class="tab-panel" data-panel="site">
+      <div class="panel settings-card">
+        <h2>🌐 ตั้งค่าเว็บไซต์</h2>
+        <label class="switch-row">
+          <span><b>โหมดปิดปรับปรุง</b><small>ผู้เล่นจะเห็นหน้าเว็บถูกปิดชั่วคราว</small></span>
+          <input id="maintenanceToggle" type="checkbox">
+        </label>
+        <label>
+          <span>ประกาศหน้าเว็บ</span>
+          <textarea id="announcement" rows="4" maxlength="500" placeholder="ข้อความประกาศ..."></textarea>
+        </label>
+        <div class="actions">
+          <button id="saveSiteBtn" class="approve-btn">บันทึกการตั้งค่า</button>
+        </div>
+        <div id="siteMessage" class="message"></div>
+      </div>
+    </section>
   </section>
 </div>
 <script type="module" src="admin.js"></script>

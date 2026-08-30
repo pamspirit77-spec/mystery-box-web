@@ -72,6 +72,17 @@ class OnlineDB {
     return data;
   }
 
+  async getSiteSettings() {
+    if (!this.client) return { maintenance_mode: false, announcement: '' };
+    const { data, error } = await this.client
+      .from('site_settings')
+      .select('maintenance_mode, announcement')
+      .eq('id', 1)
+      .maybeSingle();
+    if (error) throw error;
+    return data || { maintenance_mode: false, announcement: '' };
+  }
+
   async saveCoins(coins) {
     if (!this.client || !this.user) return;
     const { error } = await this.client

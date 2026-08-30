@@ -1341,3 +1341,9 @@ nav {
   .topup-methods { grid-template-columns:1fr; }
   .topup-card { width:calc(100% - 20px); }
 }
+
+.site-announcement{position:fixed;top:0;left:0;right:0;z-index:1000;padding:10px 16px;text-align:center;background:#171426;border-bottom:1px solid #3a2d5a;color:#fff;font-weight:600}
+.maintenance-overlay{position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;background:rgba(5,5,10,.96);padding:20px}
+.maintenance-overlay.hidden,.site-announcement.hidden{display:none!important}
+.maintenance-card{width:min(520px,100%);text-align:center;padding:36px 24px;border:1px solid #33284c;border-radius:20px;background:#11111c;box-shadow:0 20px 80px rgba(0,0,0,.5)}
+.maintenance-icon{font-size:48px}.maintenance-card h2{margin:12px 0 8px}.maintenance-card p{color:#aaa;margin:0 0 12px}

@@ -483,7 +483,27 @@ syncPoints();
 
 // Online bridge: if Supabase is configured, load the player's cloud balance/history.
 // If it is not configured yet, the original local prototype continues to work unchanged.
+async function applySiteSettings() {
+  try {
+    const settings = await online.getSiteSettings();
+    const announcement = String(settings.announcement || '').trim();
+    const banner = $('#siteAnnouncement');
+    const maintenance = $('#maintenanceOverlay');
+    const maintenanceText = $('#maintenanceAnnouncement');
+    if (banner) {
+      banner.textContent = announcement;
+      banner.classList.toggle('hidden', !announcement);
+    }
+    if (maintenanceText) maintenanceText.textContent = announcement;
+    if (maintenance) maintenance.classList.toggle('hidden', !settings.maintenance_mode);
+    if (settings.maintenance_mode) document.body.classList.add('site-maintenance');
+  } catch (err) {
+    console.warn('Site settings unavailable:', err);
+  }
+}
+
 online.init().then(async profile => {
+  applySiteSettings();
   if (!profile) return;
   if (Number.isFinite(Number(profile.coins))) {
     points = Number(profile.coins);

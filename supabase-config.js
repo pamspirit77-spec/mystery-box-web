@@ -3,8 +3,8 @@
 // SUPABASE_URL and SUPABASE_ANON_KEY environment variables.
 // IMPORTANT: Never put a Supabase secret/service_role key in browser code.
 
-export const SUPABASE_URL = 'PASTE_YOUR_SUPABASE_PROJECT_URL_HERE';
-export const SUPABASE_ANON_KEY = 'PASTE_YOUR_SUPABASE_PUBLISHABLE_OR_ANON_KEY_HERE';
+export const SUPABASE_URL = 'https://bcuxkbkxppsjnagdruje.supabase.co';
+export const SUPABASE_ANON_KEY = 'sb_publishable_XMY8CrLj56JogslXpGhjQQ_6IHKb0pZ';
 
 export const SUPABASE_ENABLED =
   SUPABASE_URL.startsWith('https://') &&
