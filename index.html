@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Mystery Box 3D</title>
+  <link rel="stylesheet" href="styles.css">
+  <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;600;700&display=swap" rel="stylesheet">
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+        "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+      }
+    }
+  </script>
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar">
+      <div class="logo">
+        <div class="logo-box">🎁</div>
+        <strong>MYSTERY</strong>
+        <span>BOX 3D</span>
+      </div>
+      <nav>
+        <button class="nav active" data-page="home">🏠 <span>หน้าแรก</span></button>
+        <button class="nav" data-page="boxes">📦 <span>กล่องสุ่ม</span></button>
+        <button class="nav" data-page="rewards">🏆 <span>รางวัล</span></button>
+        <button class="nav" data-page="history">📜 <span>ประวัติ</span></button>
+        <button class="nav" data-page="points">🪙 <span>เติมแต้ม</span></button>
+      </nav>
+      <div class="sidebar-bottom">
+        <div class="small-label">แต้มคงเหลือ</div>
+        <div class="balance">🪙 <strong id="sidePoints">24</strong></div>
+        <button class="side-add" id="addPoints">+ เติมแต้ม</button>
+      </div>
+    </aside>
+
+    <main class="main">
+      <header class="topbar">
+        <div class="welcome">
+          <div class="avatar">👤</div>
+          <div>ยินดีต้อนรับ, <b>Player_1024</b> <span class="level">VIP 2</span></div>
+        </div>
+        <div class="top-actions">
+          <div class="top-points">🪙 <strong id="topPoints">24</strong></div>
+          <button class="plus" id="addPoints2">+</button>
+          <button class="icon-btn" id="soundBtn">🔊</button>
+        </div>
+      </header>
+
+      <section class="hero">
+        <div class="hero-copy">
+          <div class="eyebrow">LIMITED TIME EVENT</div>
+          <h1>สุ่มกล่อง <span>3D ลุ้นรางวัลใหญ่</span></h1>
+          <p>เปิดกล่องสุ่มลุ้นรับไอเทมระดับ LEGENDARY พร้อมระบบแสดงผลแบบ 3D Real-time</p>
+          <div class="hero-tags">
+            <span>🔥 iPhone 15 Pro Max</span>
+            <span>🎧 AirPods Pro 2</span>
+            <span>⚡ สุ่มได้ 24 ชม.</span>
+          </div>
+        </div>
+        <div class="hero-scene">
+          <canvas id="heroCanvas"></canvas>
+          <div class="scene-caption">หมุนเพื่อดูโมเดล 3D แบบ interactive</div>
+        </div>
+      </section>
+
+      <section class="content">
+        <div class="section-head">
+          <h2>เลือกกล่องสุ่ม</h2>
+          <span class="demo">DEMO MODE</span>
+        </div>
+        <div class="box-grid" id="boxGrid"></div>
+      </section>
+
+      <section class="bottom-grid">
+        <div class="winners-card">
+          <div class="section-head" style="padding: 15px 15px 0;">
+            <h3>ผู้โชคดี 24 ชม. ที่ผ่านมา</h3>
+          </div>
+          <div class="winners-list" id="winnersList"></div>
+        </div>
+
+        <div class="inventory">
+          <div class="section-head">
+            <h3>คลังรางวัลของคุณ</h3>
+            <button class="mini-link" id="viewAll">ดูทั้งหมด</button>
+          </div>
+          <div class="inventory-grid" id="inventoryGrid"></div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <div class="modal hidden" id="openModal">
+    <div class="modal-backdrop"></div>
+    <div class="open-card">
+      <button class="modal-close" id="closeModal">×</button>
+      <div class="open-head">
+        <div>
+          <h2 id="modalTitle">กล่องเลเจนด์</h2>
+          <span class="rarity legendary" id="modalRarity">LEGENDARY</span>
+        </div>
+      </div>
+      <div class="open-scene">
+        <canvas id="openCanvas"></canvas>
+        <div class="vignette"></div>
+        <div class="opening-flash" id="flash"></div>
+        <div class="spark-layer" id="sparkLayer"></div>
+        
+        <div class="floating-reward-overlay" id="floatingOverlay">
+          <span class="rarity" id="floatRarity">LEGENDARY</span>
+          <h3 id="floatName">iPhone 15 Pro Max</h3>
+          <p id="floatSub">สุ่มสำเร็จได้ระดับ LEGENDARY</p>
+        </div>
+      </div>
+
+      <div class="amount-selector" id="amountSelector">
+        <button class="amount-btn active" data-count="1">1 ครั้ง</button>
+        <button class="amount-btn" data-count="5">5 ครั้ง</button>
+        <button class="amount-btn" data-count="10">10 ครั้ง</button>
+        <button class="amount-btn" data-count="20">20 ครั้ง</button>
+        <button class="amount-btn" data-count="30">30 ครั้ง</button>
+        <button class="amount-btn" data-count="50">50 ครั้ง</button>
+        <button class="amount-btn" data-count="100">100 ครั้ง</button>
+      </div>
+
+      <button class="open-btn" id="rollBtn">เปิดกล่อง <span id="rollCost">🪙 5</span></button>
+    </div>
+  </div>
+
+  <div class="modal hidden" id="resultModal">
+    <div class="modal-backdrop"></div>
+    <div class="modal-card">
+      <button class="modal-close" id="closeResultModal">×</button>
+      <h2>🏆 รางวัลที่ได้ทั้งหมด</h2>
+      <p style="font-size: 13px; color: #aaa; margin-bottom: 12px;">รายการรางวัลที่คุณสุ่มได้รับในการเปิดครั้งนี้</p>
+      <div class="result-list" id="resultList"></div>
+      <button class="open-btn" id="claimResultBtn" style="margin-top: 15px;">รับรางวัลทั้งหมดเข้าคลัง</button>
+    </div>
+  </div>
+
+  <div class="modal hidden" id="historyModal">
+    <div class="modal-backdrop"></div>
+    <div class="modal-card wide history-modal-card">
+      <button class="modal-close" id="closeHistoryModal">×</button>
+      <div class="modal-head-row">
+        <div>
+          <h2>📜 ประวัติการสุ่ม</h2>
+          <p class="history-retention">เก็บประวัติการสุ่มย้อนหลัง 7 วัน และล้างรายการที่เก่ากว่า 7 วันอัตโนมัติ</p>
+        </div>
+        <button class="claim-all-btn history-clear-btn" id="clearHistoryBtn">ล้างประวัติ</button>
+      </div>
+      <div class="history-list" id="historyList"></div>
+    </div>
+  </div>
+
+  <div class="modal hidden" id="inventoryModal">
+    <div class="modal-backdrop"></div>
+    <div class="modal-card wide">
+      <button class="modal-close" id="closeInventoryModal">×</button>
+      <div class="modal-head-row">
+        <h2>📦 คลังรางวัลทั้งหมดของคุณ</h2>
+        <button class="claim-all-btn" id="claimAllBtn">🎁 ขอรับรางวัลทั้งหมด</button>
+      </div>
+      <div class="full-inventory-list" id="fullInventoryList"></div>
+    </div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+  <script type="module" src="app.js"></script>
+</body>
+</html>
