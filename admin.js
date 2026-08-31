@@ -128,24 +128,45 @@ function bindBoxAdminEvents(){
    if(b.rewards.length<=1){alert('แต่ละกล่องต้องมีรางวัลอย่างน้อย 1 ชิ้น');return;}
    b.rewards.splice(i,1); renderBoxAdmin();
  });
- $$('[data-reward-upload]').forEach(input=>input.onchange=async()=>{
+ async function imageFileToDataUrl(file){
+ const MAX_SIDE=900, MAX_BYTES=220*1024;
+ const sourceUrl=URL.createObjectURL(file);
+ try{
+   const img=new Image();
+   await new Promise((resolve,reject)=>{img.onload=resolve;img.onerror=()=>reject(new Error('อ่านรูปภาพไม่สำเร็จ'));img.src=sourceUrl;});
+   const scale=Math.min(1,MAX_SIDE/Math.max(img.naturalWidth||img.width,img.naturalHeight||img.height));
+   const w=Math.max(1,Math.round((img.naturalWidth||img.width)*scale));
+   const h=Math.max(1,Math.round((img.naturalHeight||img.height)*scale));
+   const canvas=document.createElement('canvas'); canvas.width=w; canvas.height=h;
+   const ctx=canvas.getContext('2d');
+   if(!ctx) throw new Error('เบราว์เซอร์ไม่รองรับการประมวลผลรูปภาพ');
+   ctx.drawImage(img,0,0,w,h);
+   // WebP is compact enough to keep the JSONB payload small. Fall back to JPEG.
+   let quality=0.82, dataUrl=canvas.toDataURL('image/webp',quality);
+   if(!dataUrl.startsWith('data:image/webp')) dataUrl=canvas.toDataURL('image/jpeg',quality);
+   // Reduce quality until the value is comfortably below the JSON/request size limit.
+   while(dataUrl.length>MAX_BYTES*1.37 && quality>0.45){
+     quality-=0.08;
+     const mime=dataUrl.startsWith('data:image/webp')?'image/webp':'image/jpeg';
+     dataUrl=canvas.toDataURL(mime,quality);
+   }
+   if(dataUrl.length>MAX_BYTES*1.37) throw new Error('รูปใหญ่เกินไปหลังย่อรูป กรุณาเลือกรูปที่เล็กลง');
+   return dataUrl;
+ }finally{ URL.revokeObjectURL(sourceUrl); }
+}
+
+$$('[data-reward-upload]').forEach(input=>input.onchange=async()=>{
    const file=input.files?.[0]; if(!file) return;
    if(!file.type.startsWith('image/')){alert('กรุณาเลือกไฟล์รูปภาพ');input.value='';return;}
-   if(file.size>8*1024*1024){alert('รูปใหญ่เกิน 8MB');input.value='';return;}
+   if(file.size>15*1024*1024){alert('รูปใหญ่เกิน 15MB');input.value='';return;}
    const row=input.closest('.reward-admin-row');
-   const old=input.closest('.reward-admin-main')?.querySelector('[data-reward-image-url]')?.value||'';
    input.disabled=true;
    try{
-     const safe=String(file.name||'reward').replace(/[^a-zA-Z0-9._-]/g,'_');
-     const path=`${Date.now()}_${crypto.randomUUID()}_${safe}`;
-     const {error}=await getClient().storage.from('box-reward-images').upload(path,file,{cacheControl:'31536000',upsert:false,contentType:file.type});
-     if(error) throw error;
-     const {data}=getClient().storage.from('box-reward-images').getPublicUrl(path);
-     const hidden=row.querySelector('[data-reward-image-url]'); if(hidden) hidden.value=data.publicUrl;
-     const preview=row.querySelector('.reward-admin-image'); if(preview) preview.innerHTML=rewardImageHtml(data.publicUrl,'รางวัล');
-     const note=row.querySelector('.reward-file-note'); if(note) note.textContent='แนบรูปแล้ว • เปลี่ยนรูปได้';
-     if(old && old!==data.publicUrl) { /* old public object is intentionally left untouched */ }
-   }catch(err){alert(err?.message||'อัปโหลดรูปไม่สำเร็จ');input.value='';}
+     const dataUrl=await imageFileToDataUrl(file);
+     const hidden=row.querySelector('[data-reward-image-url]'); if(hidden) hidden.value=dataUrl;
+     const preview=row.querySelector('.reward-admin-image'); if(preview) preview.innerHTML=rewardImageHtml(dataUrl,'รางวัล');
+     const note=row.querySelector('.reward-file-note'); if(note) note.textContent='เลือกรูปแล้ว • กดบันทึกเพื่อยืนยัน';
+   }catch(err){alert(err?.message||'เตรียมรูปไม่สำเร็จ');input.value='';}
    finally{input.disabled=false;}
  });
 }
