@@ -14,9 +14,13 @@ let points = 24;
 let selected = 4;
 let rollCount = 1;
 
-// คลังรางวัลของผู้ใช้ — ผู้เล่นใหม่ต้องเริ่มจากคลังว่าง
-// รางวัลจะถูกเพิ่มเข้าคลังเฉพาะเมื่อมีการสุ่มสำเร็จเท่านั้น
-let rewards = [];
+// คลังรางวัลของผู้ใช้
+let rewards = [
+  {id: 1, name:'AirPods Pro 2', rarity:'EPIC', icon:'🎧'},
+  {id: 2, name:'เสื้อฮู้ด', rarity:'UNCOMMON', icon:'👕'},
+  {id: 3, name:'ข้าวกล่อง', rarity:'COMMON', icon:'🍔'},
+  {id: 4, name:'iPhone 15 Pro Max', rarity:'LEGENDARY', icon:'📱'}
+];
 
 // รายการรางวัลล่าสุดที่สุ่มได้จากการเปิดครั้งนี้
 let lastRolledItems = [];
@@ -24,6 +28,7 @@ let lastRolledItems = [];
 const EXPIRE_TIME = 24 * 60 * 60 * 1000;
 const HISTORY_EXPIRE_TIME = 7 * 24 * 60 * 60 * 1000;
 const HISTORY_STORAGE_KEY = 'mystery_box_roll_history';
+let activeUserId = null;
 
 const initialMockWinners = [
   {id:1, username:'OpChan_Live', prizeName:'iPhone 15 Pro Max', rarity:'LEGENDARY', icon:'📱', boxName:'กล่องเลเจนด์', timestamp: Date.now() - 100000},
@@ -543,6 +548,9 @@ loginForm?.addEventListener('submit', async (e) => {
 
   try {
     const profile = await online.signIn(email, password);
+    activeUserId = online.user?.id || null;
+    rollHistory = [];
+    localStorage.removeItem(HISTORY_STORAGE_KEY);
     showGame(profile, online.user);
     if (Number.isFinite(Number(profile?.coins))) {
       points = Number(profile.coins);
@@ -595,6 +603,9 @@ registerForm?.addEventListener('submit', async (e) => {
       throw new Error('บัญชีถูกสร้างแล้ว แต่ Supabase ยังเปิดการยืนยันอีเมลอยู่ กรุณาปิด Confirm email ใน Authentication → Providers → Email แล้วลองสมัครใหม่');
     }
     online.user = data.user;
+    activeUserId = data.user?.id || null;
+    rollHistory = [];
+    localStorage.removeItem(HISTORY_STORAGE_KEY);
     const profile = await online.loadProfile();
     showGame(profile, data.user);
     if (Number.isFinite(Number(profile?.coins))) {
@@ -619,6 +630,10 @@ $('#logoutBtn')?.addEventListener('click', async () => {
   if (btn) btn.disabled = true;
   try {
     await online.signOut();
+    activeUserId = null;
+    points = 0;
+    rollHistory = [];
+    localStorage.removeItem(HISTORY_STORAGE_KEY);
     showLoggedOut();
   } catch (err) {
     toast(err?.message || 'ออกจากระบบไม่สำเร็จ');
@@ -652,6 +667,9 @@ online.init().then(async profile => {
     showLoggedOut();
     return;
   }
+  activeUserId = online.user?.id || null;
+  rollHistory = [];
+  localStorage.removeItem(HISTORY_STORAGE_KEY);
   showGame(profile, online.user);
   await applySiteSettings();
 
@@ -852,7 +870,7 @@ $('#claimResultBtn')?.addEventListener('click', () => {
 
 const rollBtn = $('#rollBtn');
 if(rollBtn) {
-  rollBtn.onclick = () => {
+  rollBtn.onclick = async () => {
     const b = boxes[selected];
     const totalPrice = b.price * rollCount;
     
@@ -918,8 +936,20 @@ if(rollBtn) {
     hasClaimed = false;
     points -= totalPrice;
     syncPoints();
-    online.saveCoins(points);
-    
+
+    // Save the new balance before continuing with the roll animation.
+    // This prevents a page refresh from restoring the old balance.
+    try {
+      await online.saveCoins(points);
+    } catch (err) {
+      points += totalPrice;
+      syncPoints();
+      rolling = false;
+      hasClaimed = true;
+      toast(err?.message || 'บันทึกเหรียญไม่สำเร็จ กรุณาลองใหม่');
+      return;
+    }
+
     rollBtn.disabled = true;
     
     if(!openScene) return;
@@ -1157,6 +1187,10 @@ $('#accountPageLogout')?.addEventListener('click', async () => {
   if (btn) { btn.disabled = true; btn.textContent = 'กำลังออกจากระบบ...'; }
   try {
     await online.signOut();
+    activeUserId = null;
+    points = 0;
+    rollHistory = [];
+    localStorage.removeItem(HISTORY_STORAGE_KEY);
     showLoggedOut();
   } catch (err) {
     toast(err?.message || 'ออกจากระบบไม่สำเร็จ');

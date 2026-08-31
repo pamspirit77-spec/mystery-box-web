@@ -44,9 +44,17 @@ class OnlineDB {
 
   async signOut() {
     if (!this.client) return;
-    const { error } = await this.client.auth.signOut();
+    const oldUserId = this.user?.id || null;
+    const { error } = await this.client.auth.signOut({ scope: 'local' });
     if (error) throw error;
     this.user = null;
+    // Remove only this app's Supabase auth cache so a newly registered
+    // account can never inherit the previous browser session.
+    try {
+      const prefix = `sb-${new URL(SUPABASE_URL).hostname.split('.')[0]}-auth-token`;
+      localStorage.removeItem(prefix);
+    } catch (_) {}
+    return oldUserId;
   }
 
   async loadProfile() {
@@ -84,12 +92,20 @@ class OnlineDB {
   }
 
   async saveCoins(coins) {
-    if (!this.client || !this.user) return;
-    const { error } = await this.client
+    if (!this.client || !this.user) return false;
+    const userId = this.user.id;
+    const newCoins = Math.max(0, Math.floor(coins));
+    const { data, error } = await this.client
       .from('profiles')
-      .update({ coins: Math.max(0, Math.floor(coins)) })
-      .eq('id', this.user.id);
-    if (error) console.warn('Supabase coins sync failed:', error);
+      .update({ coins: newCoins, updated_at: new Date().toISOString() })
+      .eq('id', userId)
+      .select('id, coins')
+      .maybeSingle();
+    if (error) throw error;
+    if (!data || data.id !== userId || Number(data.coins) !== newCoins) {
+      throw new Error('บันทึกเหรียญไม่สำเร็จ กรุณาลองใหม่');
+    }
+    return true;
   }
 
 
