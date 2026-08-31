@@ -165,19 +165,37 @@ async function saveOneBox(b){
    p_rewards:b.rewards
  };
 
- // Preferred path: SECURITY DEFINER RPC. This is the reliable write path
- // because it performs the admin check server-side and is not blocked by
- // client-side table RLS/schema-cache quirks.
- const rpc=await getClient().rpc('admin_save_box_settings_v2',payload);
- if(!rpc.error) return rpc.data;
+ const c=getClient();
 
- // Compatibility fallback for installations that still have the older direct
- // RLS policy but have not yet installed the v2 RPC.
- const row={...b,updated_at:new Date().toISOString()};
- delete row.updated_by;
- const {data,error}=await getClient().from('box_settings').upsert(row,{onConflict:'id'}).select('*').maybeSingle();
- if(!error && data) return data;
- throw new Error(rpc.error?.message || error?.message || 'บันทึกข้อมูลไม่สำเร็จ');
+ // IMPORTANT: BOX_SETTINGS_SETUP.sql creates this RPC. Use it first so the
+ // admin page works with the database schema that is already deployed.
+ // This avoids the previous failure where the page called a v2 RPC that may
+ // not exist in the live project.
+ let first=await c.rpc('admin_save_box_settings',payload);
+ if(!first.error && first.data) return first.data;
+
+ // Support projects that installed the newer save-fix SQL instead.
+ const firstMissing=/does not exist|could not find the function|not found/i.test(String(first.error?.message||''));
+ if(firstMissing){
+   const second=await c.rpc('admin_save_box_settings_v2',payload);
+   if(!second.error && second.data) return second.data;
+   first=second;
+ }
+
+ // Last compatibility path for projects that explicitly enabled direct admin
+ // writes. Never silently report success when Supabase rejected the write.
+ const row={
+   id:String(b.id), name:b.name, en:b.en||'',
+   price:Math.max(0,Math.floor(Number(b.price)||0)),
+   rarity:b.rarity||'COMMON', color:Number(b.color)||9080486,
+   accent:Number(b.accent)||7119497, icon:b.icon||'🎁', rewards:b.rewards,
+   updated_at:new Date().toISOString()
+ };
+ const direct=await c.from('box_settings').upsert(row,{onConflict:'id'}).select('*').maybeSingle();
+ if(!direct.error && direct.data) return direct.data;
+
+ const detail=first.error?.message || direct.error?.message || 'บันทึกข้อมูลไม่สำเร็จ';
+ throw new Error(`กล่อง ${b.id}: ${detail}`);
 }
 
 async function saveBoxSettings(){
