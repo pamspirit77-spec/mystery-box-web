@@ -252,7 +252,10 @@ class OnlineDB {
       .maybeSingle();
 
     if (error) throw error;
-    return Array.isArray(data?.items) ? data.items : [];
+    // null means the account has no inventory row yet. Keep that distinct
+    // from an existing row whose items array is intentionally empty.
+    if (!data) return null;
+    return Array.isArray(data.items) ? data.items : [];
   }
 
   async saveInventory(items) {
@@ -260,15 +263,26 @@ class OnlineDB {
     const currentUser = await this.refreshAuthenticatedUser();
     if (!currentUser) return false;
 
-    const { error } = await this.client
+    const payload = {
+      user_id: currentUser.id,
+      items: Array.isArray(items) ? items : [],
+      updated_at: new Date().toISOString()
+    };
+
+    const { data, error } = await this.client
       .from('player_inventory')
-      .upsert({
-        user_id: currentUser.id,
-        items: Array.isArray(items) ? items : [],
-        updated_at: new Date().toISOString()
-      }, { onConflict: 'user_id' });
+      .upsert(payload, { onConflict: 'user_id' })
+      .select('user_id, items')
+      .maybeSingle();
 
     if (error) throw error;
+    if (!data || data.user_id !== currentUser.id) {
+      throw new Error('บันทึกคลังรางวัลไม่สำเร็จ');
+    }
+    const savedItems = Array.isArray(data.items) ? data.items : [];
+    if (JSON.stringify(savedItems) !== JSON.stringify(payload.items)) {
+      throw new Error('ข้อมูลคลังรางวัลที่บันทึกไม่ตรงกับข้อมูลล่าสุด');
+    }
     return true;
   }
 

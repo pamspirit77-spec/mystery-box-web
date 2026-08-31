@@ -405,22 +405,82 @@ const openCanvas = $('#openCanvas');
 let openScene = null;
 if(openCanvas) openScene = mountScene(openCanvas, boxes[4], true);
 
-async function saveCloudInventory() {
+function getInventoryCacheKey() {
+  const userId = online?.user?.id;
+  return userId ? `mystery_box_pending_inventory_${userId}` : null;
+}
+
+function cacheInventoryLocally(items) {
+  const key = getInventoryCacheKey();
+  if (!key) return;
   try {
-    await online.saveInventory(rewards);
+    localStorage.setItem(key, JSON.stringify(Array.isArray(items) ? items : []));
+  } catch (err) {
+    console.warn('Local inventory cache unavailable:', err);
+  }
+}
+
+function readInventoryCache() {
+  const key = getInventoryCacheKey();
+  if (!key) return null;
+  try {
+    const raw = localStorage.getItem(key);
+    if (raw === null) return null;
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : null;
+  } catch (_) {
+    return null;
+  }
+}
+
+async function saveCloudInventory() {
+  // Keep a per-account local copy first. This prevents a refresh from
+  // clearing a reward if the network request is interrupted. Supabase is
+  // still the source of truth whenever the save succeeds.
+  cacheInventoryLocally(rewards);
+  try {
+    const saved = await online.saveInventory(rewards);
+    if (saved !== true) throw new Error('บันทึกคลังรางวัลไม่สำเร็จ');
+    // A successful empty save is important after the user requests a reward:
+    // clear the matching local cache only after Supabase has accepted it.
+    cacheInventoryLocally(rewards);
+    return true;
   } catch (err) {
     console.warn('Online inventory save unavailable:', err);
+    return false;
   }
 }
 
 async function loadCloudInventory() {
   try {
     const cloudInventory = await online.getInventory();
-    rewards = Array.isArray(cloudInventory) ? cloudInventory : [];
-    renderInventory();
+    if (Array.isArray(cloudInventory)) {
+      rewards = cloudInventory;
+      cacheInventoryLocally(rewards);
+      renderInventory();
+      return true;
+    }
+
+    // No player_inventory row yet. If a previous reward was generated while
+    // the first cloud save was interrupted, keep the per-account local copy
+    // and retry it instead of treating the missing row as an empty inventory.
   } catch (err) {
     console.warn('Online inventory load unavailable:', err);
   }
+
+  // If Supabase is temporarily unavailable, restore this account's own
+  // pending inventory instead of replacing it with an empty array.
+  const cached = readInventoryCache();
+  if (cached !== null) {
+    rewards = cached;
+    renderInventory();
+    // Retry the cloud write in the background so the inventory becomes
+    // persistent again as soon as the connection/RLS issue is resolved.
+    if (online?.user) saveCloudInventory().catch(() => {});
+    return false;
+  }
+
+  return false;
 }
 
 // แสดงผลคลังรางวัลที่หน้าแรก
@@ -1123,7 +1183,7 @@ if(rollBtn) {
         const openStartTime = performance.now();
         const openDuration = 1200;
 
-        function animatePopup(popupNow) {
+        async function animatePopup(popupNow) {
           const popupElapsed = popupNow - openStartTime;
           const popProgress = Math.min(1, popupElapsed / openDuration);
           const easeOutBack = Math.sin(popProgress * Math.PI / 2);
@@ -1137,14 +1197,19 @@ if(rollBtn) {
           if (popProgress < 1) {
             requestAnimationFrame(animatePopup);
           } else {
-            // บันทึกรางวัลทั้งหมดลงคลัง
+            // บันทึกรางวัลทั้งหมดลงคลังทันที และต้องรอให้การบันทึกเสร็จ
+            // ก่อนถือว่ารางวัลถูกบันทึกเรียบร้อย เพื่อให้กดรีเฟรชเมื่อไรก็ยังอยู่
+            // จนกว่าจะมีการขอรับรางวัล
             addRollHistory(lastRolledItems, b.name);
             lastRolledItems.forEach(item => {
               rewards.unshift(item);
               addWinnerRecord(item.name, b.rarity, b.icon, b.name);
             });
-            await saveCloudInventory();
+            const inventorySaved = await saveCloudInventory();
             renderInventory();
+            if (!inventorySaved) {
+              toast('รางวัลถูกเก็บไว้แล้ว แต่กำลังรอบันทึกออนไลน์');
+            }
             
             if($('#floatRarity')) {
               $('#floatRarity').textContent = b.rarity;
