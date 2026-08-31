@@ -8,7 +8,7 @@ let client=null, topups=[], users=[];
 let userPage=1, userPageSize=20, userTotal=0;
 
 function escapeHtml(v=''){return String(v).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[c]));}
-function getClient(){if(!SUPABASE_ENABLED)throw new Error('ยังไม่ได้ตั้งค่า Supabase');if(!client)client=createClient(SUPABASE_URL,SUPABASE_ANON_KEY,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}});return client;}
+function getClient(){if(!SUPABASE_ENABLED)throw new Error('ยังไม่ได้ตั้งค่า Supabase');if(!client)client=createClient(SUPABASE_URL,SUPABASE_ANON_KEY,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true,storageKey:'mystery-box-admin-auth'}});return client;}
 
 async function ensureAdmin(){
  const c=getClient(),{data:{session}}=await c.auth.getSession();

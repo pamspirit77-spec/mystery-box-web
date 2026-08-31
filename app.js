@@ -623,6 +623,7 @@ $('#logoutBtn')?.addEventListener('click', async () => {
   if (btn) btn.disabled = true;
   try {
     await online.signOut();
+    stopLiveBalanceSync();
     showLoggedOut();
   } catch (err) {
     toast(err?.message || 'ออกจากระบบไม่สำเร็จ');
@@ -651,6 +652,35 @@ async function applySiteSettings() {
   }
 }
 
+let liveBalanceTimer = null;
+
+function startLiveBalanceSync() {
+  if (liveBalanceTimer) clearInterval(liveBalanceTimer);
+  liveBalanceTimer = setInterval(async () => {
+    try {
+      if (!online.user) return;
+      const currentUser = await online.refreshAuthenticatedUser();
+      if (!currentUser) return;
+      const profile = await online.getCurrentProfile();
+      if (!profile || currentUser.id !== profile.id) return;
+      const nextCoins = Number(profile.coins);
+      if (Number.isFinite(nextCoins) && nextCoins !== points) {
+        points = nextCoins;
+        syncPoints();
+      }
+    } catch (err) {
+      console.warn('Live balance sync unavailable:', err);
+    }
+  }, 2000);
+}
+
+function stopLiveBalanceSync() {
+  if (liveBalanceTimer) {
+    clearInterval(liveBalanceTimer);
+    liveBalanceTimer = null;
+  }
+}
+
 online.init().then(async profile => {
   if (!online.user) {
     showLoggedOut();
@@ -663,6 +693,7 @@ online.init().then(async profile => {
     points = Number(profile.coins);
     syncPoints();
   }
+  startLiveBalanceSync();
   try {
     const cloudHistory = await online.getRollHistory();
     if (cloudHistory.length) {
@@ -1169,6 +1200,7 @@ $('#accountPageLogout')?.addEventListener('click', async () => {
   if (btn) { btn.disabled = true; btn.textContent = 'กำลังออกจากระบบ...'; }
   try {
     await online.signOut();
+    stopLiveBalanceSync();
     showLoggedOut();
   } catch (err) {
     toast(err?.message || 'ออกจากระบบไม่สำเร็จ');

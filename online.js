@@ -30,7 +30,7 @@ class OnlineDB {
     if (!this.enabled) return null;
 
     this.client = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-      auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true }
+      auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true, storageKey: 'mystery-box-player-auth' }
     });
 
     const { data: { session } } = await this.client.auth.getSession();
@@ -111,7 +111,7 @@ class OnlineDB {
       const profile = {
         id: this.user.id,
         username: this.user.user_metadata?.username || `User_${this.user.id.slice(0, 8)}`,
-        coins: 24
+        coins: 0
       };
       const { data: created, error: createError } = await this.client
         .from('profiles').insert(profile).select().single();
@@ -119,6 +119,19 @@ class OnlineDB {
       return created;
     }
     return data;
+  }
+
+  async getCurrentProfile() {
+    if (!this.client) return null;
+    const currentUser = await this.refreshAuthenticatedUser();
+    if (!currentUser) return null;
+    const { data, error } = await this.client
+      .from('profiles')
+      .select('id, username, coins')
+      .eq('id', currentUser.id)
+      .maybeSingle();
+    if (error) throw error;
+    return data || null;
   }
 
   async getSiteSettings() {
