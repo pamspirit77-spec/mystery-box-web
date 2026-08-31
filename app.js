@@ -1563,7 +1563,11 @@ const battleState = {
   onlineReady: false,
   gameOver: false,
   turnOwner: 'host',
-  canMove: false
+  canMove: false,
+  angle: 48,
+  power: 72,
+  score: 0,
+  combo: 0
 };
 
 const battleWeapons = {
@@ -1624,6 +1628,24 @@ function slotLeft(index) {
   return `${10 + index * 20}%`;
 }
 
+function updateAimPreview() {
+  const arena = $('#battleArena');
+  const line = $('#aimLine');
+  const dot = $('#aimDot');
+  const angle = Number(battleState.angle || 48);
+  const power = Number(battleState.power || 72);
+  if (!arena || !line || !dot) return;
+  const playerX = 10 + battleState.playerPos * 20;
+  const enemyX = 10 + battleState.enemyPos * 20;
+  const dir = enemyX >= playerX ? 1 : -1;
+  const displayAngle = -Math.max(20, Math.min(75, angle)) * dir;
+  line.style.setProperty('--aim-x', `${playerX}%`);
+  line.style.setProperty('--aim-deg', `${displayAngle}deg`);
+  line.style.width = `${70 + power * .75}px`;
+  dot.style.left = `${Math.max(4, Math.min(92, enemyX))}%`;
+  dot.style.top = `${Math.max(8, 38 - angle * .34)}%`;
+}
+
 function updateBattlePositions() {
   const player = $('#playerFighter');
   const enemy = $('#enemyFighter');
@@ -1636,20 +1658,29 @@ function updateBattlePositions() {
   $$('.position-slot[data-player-slot]').forEach(x => x.classList.toggle('occupied', Number(x.dataset.playerSlot) === battleState.playerPos));
   $$('.position-slot[data-enemy-slot]').forEach(x => x.classList.toggle('occupied', Number(x.dataset.enemySlot) === battleState.enemyPos));
   $$('.choose-position').forEach(x => x.classList.toggle('active', Number(x.dataset.playerPosition) === battleState.playerPos));
+  updateAimPreview();
 }
 
 function setPositionButtons(enabled) {
   $$('.choose-position').forEach(btn => { btn.disabled = !enabled; });
   const hint = $('#positionHint');
-  if (hint) hint.textContent = enabled ? 'เลือกจุดใหม่ก่อนปากลับ' : 'เลือกได้หลังคู่ต่อสู้ปาเสร็จ';
+  if (hint) hint.textContent = enabled ? 'คู่ต่อสู้เพิ่งปา — ย้ายจุดได้เลย' : 'เลือกได้หลังคู่ต่อสู้ปาเสร็จ';
 }
 
 function battleStatus() {
   const round = $('#battleRound');
   if (round) round.textContent = `TURN ${battleState.turn}`;
   const throwBtn = $('#battleThrowBtn');
-  if (throwBtn) throwBtn.disabled = battleState.phase !== 'player' || battleState.gameOver;
+  const playerTurn = battleState.phase === 'player' && !battleState.gameOver;
+  if (throwBtn) throwBtn.disabled = !playerTurn;
   setPositionButtons(battleState.phase === 'move' && !battleState.gameOver);
+  const banner = $('#turnBanner');
+  if (banner) banner.textContent = battleState.gameOver ? 'BATTLE OVER' : battleState.phase === 'player' ? 'YOUR TURN' : battleState.phase === 'move' ? 'DODGE!' : 'ENEMY TURN';
+  const combo = $('#battleCombo');
+  const score = $('#battleScore');
+  if (combo) combo.textContent = battleState.combo;
+  if (score) score.textContent = battleState.score;
+  updateAimPreview();
 }
 
 function playBattleSound(kind) {
@@ -1668,26 +1699,33 @@ function playBattleSound(kind) {
   } catch (_) {}
 }
 
-function animateBattleProjectile(fromSide, fromPos, toSide, toPos, icon, done) {
+function animateBattleProjectile(fromSide, fromPos, toSide, toPos, icon, done, angle=battleState.angle, power=battleState.power) {
   const arena = $('#battleArena');
   const layer = $('#projectileLayer');
   if (!arena || !layer) { done?.(); return; }
   const p = document.createElement('div');
-  p.className = 'battle-projectile';
+  p.className = `battle-projectile ${icon === '🏹' ? 'arrow' : ''}`;
   p.textContent = icon;
-  const startY = fromSide === 'player' ? 76 : 24;
-  const endY = toSide === 'player' ? 76 : 24;
-  p.style.left = slotLeft(fromPos);
-  p.style.top = `${startY}%`;
-  p.style.transform = 'translate(-50%,-50%) rotate(-15deg)';
   layer.appendChild(p);
-  requestAnimationFrame(() => {
-    p.style.transform = `translate(-50%,-50%) rotate(${fromSide === 'player' ? -15 : 165}deg) translateY(-${Math.abs(endY-startY)*1.1}px) translateX(${(toPos-fromPos)*2}px)`;
-    p.style.left = slotLeft(toPos);
-    p.style.top = `${endY}%`;
-  });
-  setTimeout(() => { p.classList.add('hit'); playBattleSound('hit'); }, 520);
-  setTimeout(() => { p.remove(); done?.(); }, 760);
+  const rect = arena.getBoundingClientRect();
+  const startX = (10 + fromPos * 20) / 100 * rect.width;
+  const endX = (10 + toPos * 20) / 100 * rect.width;
+  const startY = (fromSide === 'player' ? .69 : .31) * rect.height;
+  const endY = (toSide === 'player' ? .69 : .31) * rect.height;
+  const dx = endX - startX;
+  const lift = Math.max(70, Math.min(220, 55 + Number(power) * 1.15 + Number(angle) * .7));
+  const duration = Math.max(620, Math.min(1100, 560 + Math.abs(dx) * 1.2 + Number(power) * 3));
+  const t0 = performance.now();
+  function frame(now){
+    const t = Math.min(1,(now-t0)/duration);
+    const x = startX + dx*t;
+    const y = startY + (endY-startY)*t - Math.sin(Math.PI*t)*lift;
+    const slope = Math.atan2((endY-startY) - Math.sin(Math.PI*(t+.015))*lift + Math.sin(Math.PI*t)*lift, dx || 1) * 180/Math.PI;
+    p.style.left = `${x}px`; p.style.top = `${y}px`; p.style.transform = `translate(-50%,-50%) rotate(${slope + (fromSide==='player'?0:180)}deg)`;
+    if (t < 1) requestAnimationFrame(frame);
+    else { p.classList.add('hit'); playBattleSound('hit'); setTimeout(()=>{p.remove(); done?.();},180); }
+  }
+  requestAnimationFrame(frame);
 }
 
 function flashFighter(id) {
@@ -1705,75 +1743,79 @@ function randomEnemyMove() {
   updateBattlePositions();
 }
 
+function showImpact(text) {
+  const el = $('#impactText');
+  if (!el) return;
+  el.textContent = text;
+  el.classList.remove('show'); void el.offsetWidth; el.classList.add('show');
+}
+
 function finishBattle(won) {
   battleState.gameOver = true;
   battleState.phase = 'done';
+  battleState.combo = won ? battleState.combo + 1 : 0;
   battleStatus();
   const restart = $('#battleRestartBtn');
   if (restart) restart.classList.remove('hidden');
   if (won) {
     const rewardGold = 120 + Math.floor(Math.random()*81);
     const rewardGems = 10 + Math.floor(Math.random()*11);
-    battleState.gold += rewardGold;
-    battleState.gems += rewardGems;
+    battleState.gold += rewardGold; battleState.gems += rewardGems;
+    battleState.score += 100 + battleState.combo * 25;
     battleState.level = Math.min(99, battleState.level + (Math.random() < .25 ? 1 : 0));
-    saveBattleMeta();
+    saveBattleMeta(); showImpact('KO!');
     battleMessage(`🏆 ชนะ! +${rewardGold} ทอง +${rewardGems} คริสตัล`);
-  } else {
-    battleMessage('💀 แพ้การต่อสู้ — กดเริ่มด่านใหม่เพื่อสู้ใหม่');
-  }
+  } else { showImpact('DEFEAT'); battleMessage('💀 แพ้การต่อสู้ — กดเริ่มด่านใหม่'); }
 }
 
 function enemyTurnPVE() {
   if (battleState.gameOver || battleState.mode !== 'pve') return;
-  battleState.phase = 'enemy';
-  battleStatus();
-  randomEnemyMove();
-  battleMessage(`บอตย้ายไปจุด ${battleState.enemyPos + 1} แล้วกำลังปา...`);
-  const icon = battleWeapons[battleState.weapon]?.icon || '🏹';
+  battleState.phase = 'enemy'; battleStatus();
   setTimeout(() => {
     if (battleState.gameOver) return;
-    animateBattleProjectile('enemy', battleState.enemyPos, 'player', battleState.playerPos, icon, () => {
-      const dmg = 12 + Math.floor(Math.random()*12);
-      setBattleHp('playerHp', battleState.playerHp - dmg);
-      flashFighter('#playerFighter');
-      if (battleState.playerHp <= 0) return finishBattle(false);
-      battleState.turn += 1;
-      battleState.phase = 'move';
-      battleStatus();
-      battleMessage(`โดน ${dmg} ดาเมจ — เลือกจุดยืนใหม่ได้แล้ว`);
-    });
-  }, 450);
+    randomEnemyMove();
+    battleMessage(`บอตหลบไปจุด ${battleState.enemyPos + 1} แล้วเล็งกลับมา...`);
+    const weapon = battleWeapons.spear;
+    const enemyAngle = 40 + Math.floor(Math.random()*24);
+    const enemyPower = 58 + Math.floor(Math.random()*35);
+    setTimeout(() => {
+      if (battleState.gameOver) return;
+      battleMessage(`⚔️ บอตปา ${weapon.name} มาที่จุด ${battleState.playerPos + 1}`);
+      animateBattleProjectile('enemy', battleState.enemyPos, 'player', battleState.playerPos, weapon.icon, () => {
+        const dmg = 10 + Math.floor(Math.random()*15);
+        setBattleHp('playerHp', battleState.playerHp - dmg); flashFighter('#playerFighter'); showImpact(`-${dmg}`);
+        if (battleState.playerHp <= 0) return finishBattle(false);
+        battleState.turn += 1; battleState.phase = 'move'; battleState.canMove = true;
+        battleStatus(); battleMessage(`โดน ${dmg} ดาเมจ — หลบไปจุดใหม่ 1–5 ได้เลย`);
+      }, enemyAngle, enemyPower);
+    }, 380);
+  }, 300);
 }
 
 function playerAttack() {
   if (battleState.gameOver || battleState.phase !== 'player') return;
   if (battleState.mode === 'pvp' && battleState.roomRole === 'guest') {
-    online.sendBattleMessage(battleState.roomChannel, {type:'guest_action', action:'attack', weapon:battleState.weapon}).catch(()=>{});
-    battleMessage('ส่งคำสั่งโจมตีให้ผู้สร้างห้องแล้ว...');
-    return;
+    online.sendBattleMessage(battleState.roomChannel, {type:'guest_action', action:'attack', weapon:battleState.weapon, angle:battleState.angle, power:battleState.power}).catch(()=>{});
+    battleMessage('ส่งการปาให้คู่ต่อสู้...'); return;
   }
-  battleState.phase = 'enemy';
-  battleStatus();
+  battleState.phase = 'enemy'; battleStatus();
   const weapon = battleWeapons[battleState.weapon];
-  const dmg = weapon.base + battleState.weaponPower + Math.floor(Math.random()*8);
-  battleMessage(`${weapon.name} พุ่งไปที่จุด ${battleState.enemyPos + 1}!`);
-  playBattleSound('throw');
+  const distance = Math.abs(battleState.enemyPos - battleState.playerPos);
+  const accuracy = Math.max(.55, 1 - Math.abs(battleState.angle - 48) / 90);
+  const dmg = Math.round((weapon.base + battleState.weaponPower + battleState.power*.12) * accuracy + Math.random()*6);
+  battleMessage(`${weapon.name} พุ่งไปที่จุด ${battleState.enemyPos + 1}!`); playBattleSound('throw');
   animateBattleProjectile('player', battleState.playerPos, 'enemy', battleState.enemyPos, weapon.icon, () => {
-    setBattleHp('enemyHp', battleState.enemyHp - dmg);
-    flashFighter('#enemyFighter');
+    setBattleHp('enemyHp', battleState.enemyHp - dmg); flashFighter('#enemyFighter'); showImpact(`-${dmg}`);
+    if (dmg >= weapon.base + 15) battleState.combo += 1; else battleState.combo = 0;
+    battleState.score += dmg;
     if (battleState.enemyHp <= 0) return finishBattle(true);
     if (battleState.mode === 'pvp') {
-      battleState.turnOwner = 'guest';
-      battleState.phase = 'wait';
-      battleState.canMove = true;
-      battleStatus();
-      battleMessage(`โจมตีสำเร็จ ${dmg} ดาเมจ — รอคู่ต่อสู้ขยับและปา`);
-      broadcastBattleState();
-      return;
+      battleState.turnOwner = 'guest'; battleState.phase = 'wait'; battleState.canMove = true; battleStatus();
+      battleMessage(`โจมตี ${dmg} ดาเมจ — รอคู่ต่อสู้ย้ายจุดและปา`); broadcastBattleState(); return;
     }
+    // Bowmasters-style: after the hit, the bot chooses a new location before firing back.
     enemyTurnPVE();
-  });
+  }, battleState.angle, battleState.power);
 }
 
 function chooseBattlePosition(pos) {
@@ -1805,6 +1847,9 @@ function resetBattleRound() {
   battleState.gameOver = false;
   battleState.turnOwner = 'host';
   battleState.canMove = false;
+  battleState.angle = 48; battleState.power = 72; battleState.score = 0; battleState.combo = 0;
+  const angle = $('#angleInput'); const power = $('#powerInput'); if (angle) angle.value = 48; if (power) power.value = 72;
+  const angleValue = $('#angleValue'); const powerValue = $('#powerValue'); if (angleValue) angleValue.textContent = '48°'; if (powerValue) powerValue.textContent = '72%';
   const restart = $('#battleRestartBtn');
   if (restart) restart.classList.add('hidden');
   const name = $('#enemyName');
@@ -1939,7 +1984,7 @@ async function handleBattleOnlineMessage(msg) {
         battleStatus();
         battleMessage(`โดน ${dmg} ดาเมจ — เลือกจุดยืนใหม่ได้แล้ว`);
         await broadcastBattleState();
-      });
+      }, Number(msg.angle || 48), Number(msg.power || 72));
     }
   }
 }
@@ -1990,6 +2035,8 @@ function showBattlePage() {
 $('#enterGameBtn')?.addEventListener('click', () => document.querySelector('.nav[data-page="game"]')?.click());
 $('#battleBackHome')?.addEventListener('click', () => document.querySelector('.nav[data-page="home"]')?.click());
 $('#battleThrowBtn')?.addEventListener('click', playerAttack);
+$('#angleInput')?.addEventListener('input', e => { battleState.angle = Math.max(20, Math.min(75, Number(e.target.value)||48)); const v=$('#angleValue'); if(v) v.textContent=`${battleState.angle}°`; updateAimPreview(); });
+$('#powerInput')?.addEventListener('input', e => { battleState.power = Math.max(35, Math.min(100, Number(e.target.value)||72)); const v=$('#powerValue'); if(v) v.textContent=`${battleState.power}%`; updateAimPreview(); });
 $('#battleRestartBtn')?.addEventListener('click', resetBattleRound);
 $$('.choose-position').forEach(btn => btn.addEventListener('click', () => chooseBattlePosition(Number(btn.dataset.playerPosition))));
 $$('.weapon-btn').forEach(btn => btn.addEventListener('click', () => {

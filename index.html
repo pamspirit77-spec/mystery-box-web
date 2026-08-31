@@ -150,9 +150,9 @@
       <section class="battle-page hidden" id="gamePage">
         <div class="battle-page-head">
           <div>
-            <div class="eyebrow">BATTLE ARENA</div>
-            <h1>เกมต่อสู้ปาอาวุธ</h1>
-            <p>เลือกจุดยืน 1–5 หลบการโจมตี แล้วปากลับเป็นจังหวะ</p>
+            <div class="eyebrow">BOWMASTER BATTLE</div>
+            <h1>สนามประลอง</h1>
+            <p>เล็ง • กำลัง • ปา • หลบ ด้วยการย้ายจุดยืน 1–5</p>
           </div>
           <button class="battle-back-btn" id="battleBackHome" type="button">← กลับหน้าแรก</button>
         </div>
@@ -160,104 +160,67 @@
         <div class="battle-layout">
           <div class="battle-stage-wrap">
             <div class="battle-mode-row">
-              <button class="battle-mode active" data-battle-mode="pve" type="button">🤖 PVE ฟาร์มบอต</button>
+              <button class="battle-mode active" data-battle-mode="pve" type="button">🤖 PVE ฟาร์ม</button>
               <button class="battle-mode" data-battle-mode="pvp" type="button">🌐 PVP ออนไลน์</button>
             </div>
 
             <div class="battle-arena" id="battleArena">
-              <div class="arena-bg-glow"></div>
-              <div class="arena-top-info">
-                <div class="fighter-card enemy-card">
-                  <div class="fighter-avatar enemy-avatar">👹</div>
-                  <div><b id="enemyName">Shadow Bot</b><small>LV. 5</small></div>
-                </div>
+              <div class="desert-sky"><i class="sun"></i><i class="cloud cloud-a"></i><i class="cloud cloud-b"></i><i class="mountain m-a"></i><i class="mountain m-b"></i></div>
+              <div class="sand-back"><i class="cactus c1"></i><i class="cactus c2"></i><i class="rock r1"></i><i class="rock r2"></i></div>
+              <div class="arena-ui-top">
+                <div class="fighter-card enemy-card"><div class="fighter-avatar enemy-avatar">👹</div><div><b id="enemyName">Shadow Bot</b><small>LV. 5</small></div></div>
                 <div class="round-badge" id="battleRound">TURN 1</div>
+                <div class="fighter-card mini-score"><span>🏆</span><b id="battleScore">0</b></div>
+              </div>
+              <div class="hp-row enemy-hp-row"><span id="enemyHpText">100 / 100</span><div class="hp-bar"><i id="enemyHpBar"></i></div></div>
+
+              <div class="battle-world" id="battleWorld">
+                <div class="rope-line enemy-rope"></div>
+                <div class="rope-line player-rope"></div>
+                <div class="position-track enemy-field" id="enemyField">
+                  <div class="position-slot" data-enemy-slot="0"><span>1</span></div><div class="position-slot" data-enemy-slot="1"><span>2</span></div><div class="position-slot" data-enemy-slot="2"><span>3</span></div><div class="position-slot" data-enemy-slot="3"><span>4</span></div><div class="position-slot" data-enemy-slot="4"><span>5</span></div>
+                  <div class="fighter enemy-fighter" id="enemyFighter"><div class="shadow"></div><div class="weapon-badge">🪃</div><div class="fighter-art enemy-art"><span class="head">👹</span><span class="body"></span><span class="leg l"></span><span class="leg r"></span></div><b id="enemyPositionLabel">จุด 3</b></div>
+                </div>
+
+                <div class="aim-zone" id="aimZone">
+                  <div class="aim-line" id="aimLine"></div><div class="aim-dot" id="aimDot">+</div>
+                </div>
+                <div class="battle-message" id="battleMessage">เล็งให้ดี แล้วกดปา!</div>
+
+                <div class="position-track player-field" id="playerField">
+                  <div class="position-slot" data-player-slot="0"><span>1</span></div><div class="position-slot" data-player-slot="1"><span>2</span></div><div class="position-slot" data-player-slot="2"><span>3</span></div><div class="position-slot" data-player-slot="3"><span>4</span></div><div class="position-slot" data-player-slot="4"><span>5</span></div>
+                  <div class="fighter player-fighter" id="playerFighter"><div class="shadow"></div><div class="weapon-badge">🏹</div><div class="fighter-art player-art"><span class="head">🧙</span><span class="body"></span><span class="leg l"></span><span class="leg r"></span></div><b id="playerPositionLabel">จุด 3</b></div>
+                </div>
+                <div class="impact-text" id="impactText"></div>
+                <div class="projectile-layer" id="projectileLayer"></div>
               </div>
 
-              <div class="hp-row enemy-hp-row">
-                <span id="enemyHpText">100 / 100</span>
-                <div class="hp-bar"><i id="enemyHpBar"></i></div>
-              </div>
-
-              <div class="position-field enemy-field" id="enemyField">
-                <div class="field-line"></div>
-                <div class="position-slot" data-enemy-slot="0"><span>1</span></div>
-                <div class="position-slot" data-enemy-slot="1"><span>2</span></div>
-                <div class="position-slot" data-enemy-slot="2"><span>3</span></div>
-                <div class="position-slot" data-enemy-slot="3"><span>4</span></div>
-                <div class="position-slot" data-enemy-slot="4"><span>5</span></div>
-                <div class="fighter enemy-fighter" id="enemyFighter"><div class="weapon-badge">🪃</div><div class="fighter-body">👹</div><b id="enemyPositionLabel">จุด 3</b></div>
-              </div>
-
-              <div class="battle-divider"><span>⚔</span><i></i><span>⚔</span></div>
-              <div class="battle-message" id="battleMessage">เริ่มการต่อสู้ — เลือกอาวุธแล้วกดปา</div>
-
-              <div class="position-field player-field" id="playerField">
-                <div class="field-line"></div>
-                <div class="position-slot" data-player-slot="0"><span>1</span></div>
-                <div class="position-slot" data-player-slot="1"><span>2</span></div>
-                <div class="position-slot" data-player-slot="2"><span>3</span></div>
-                <div class="position-slot" data-player-slot="3"><span>4</span></div>
-                <div class="position-slot" data-player-slot="4"><span>5</span></div>
-                <div class="fighter player-fighter" id="playerFighter"><div class="weapon-badge">🏹</div><div class="fighter-body">🧙</div><b id="playerPositionLabel">จุด 3</b></div>
-              </div>
-
-              <div class="hp-row player-hp-row">
-                <div class="hp-bar"><i id="playerHpBar"></i></div>
-                <span id="playerHpText">100 / 100</span>
-              </div>
-
-              <div class="fighter-card player-card">
-                <div class="fighter-avatar player-avatar">🧙</div>
-                <div><b id="playerName">ผู้เล่น</b><small>LV. 5</small></div>
-              </div>
-
-              <div class="projectile-layer" id="projectileLayer"></div>
+              <div class="hp-row player-hp-row"><div class="hp-bar"><i id="playerHpBar"></i></div><span id="playerHpText">100 / 100</span></div>
+              <div class="fighter-card player-card"><div class="fighter-avatar player-avatar">🧙</div><div><b id="playerName">ผู้เล่น</b><small>LV. 5</small></div><div class="combo-pill">x<span id="battleCombo">0</span></div></div>
+              <div class="turn-banner" id="turnBanner">YOUR TURN</div>
             </div>
 
             <div class="battle-controls">
               <div class="weapon-row">
-                <button class="weapon-btn active" data-weapon="bow" type="button">🏹<span>ธนู</span><small>DMG 20</small></button>
-                <button class="weapon-btn" data-weapon="spear" type="button">🔱<span>หอก</span><small>DMG 28</small></button>
-                <button class="weapon-btn" data-weapon="boomerang" type="button">🪃<span>บูมเมอแรง</span><small>DMG 24</small></button>
+                <button class="weapon-btn active" data-weapon="bow" type="button"><strong>🏹</strong><span>ธนู</span><small>DMG 20</small></button>
+                <button class="weapon-btn" data-weapon="spear" type="button"><strong>🔱</strong><span>หอก</span><small>DMG 28</small></button>
+                <button class="weapon-btn" data-weapon="boomerang" type="button"><strong>🪃</strong><span>บูมเมอแรง</span><small>DMG 24</small></button>
               </div>
-              <div class="position-control">
-                <div><b>เลือกจุดยืน</b><small id="positionHint">เลือกได้หลังบอตปาเสร็จ</small></div>
-                <div class="position-buttons">
-                  <button class="choose-position" data-player-position="0" type="button">1</button>
-                  <button class="choose-position" data-player-position="1" type="button">2</button>
-                  <button class="choose-position active" data-player-position="2" type="button">3</button>
-                  <button class="choose-position" data-player-position="3" type="button">4</button>
-                  <button class="choose-position" data-player-position="4" type="button">5</button>
-                </div>
+              <div class="aim-controls">
+                <div class="aim-stat"><span>ANGLE</span><b id="angleValue">48°</b><input id="angleInput" type="range" min="20" max="75" value="48"></div>
+                <div class="aim-stat"><span>POWER</span><b id="powerValue">72%</b><input id="powerInput" type="range" min="35" max="100" value="72"></div>
               </div>
+              <div class="position-control"><div><b>เปลี่ยนจุดยืน</b><small id="positionHint">เลือกได้หลังคู่ต่อสู้ปาเสร็จ</small></div><div class="position-buttons"><button class="choose-position" data-player-position="0" type="button">1</button><button class="choose-position" data-player-position="1" type="button">2</button><button class="choose-position active" data-player-position="2" type="button">3</button><button class="choose-position" data-player-position="3" type="button">4</button><button class="choose-position" data-player-position="4" type="button">5</button></div></div>
               <button class="battle-throw-btn" id="battleThrowBtn" type="button">🏹 ปาอาวุธ</button>
               <button class="battle-restart-btn hidden" id="battleRestartBtn" type="button">↻ เริ่มด่านใหม่</button>
             </div>
 
-            <div class="online-room-panel hidden" id="onlineRoomPanel">
-              <div><b>ห้อง PVP ออนไลน์</b><small id="onlineRoomStatus">สร้างห้องหรือเข้าห้องด้วยรหัส 6 ตัว</small></div>
-              <div class="room-actions">
-                <button id="createBattleRoom" type="button">สร้างห้อง</button>
-                <input id="battleRoomCodeInput" maxlength="6" placeholder="รหัสห้อง" inputmode="text">
-                <button id="joinBattleRoom" type="button">เข้าห้อง</button>
-              </div>
-              <div class="room-code hidden" id="battleRoomCode"></div>
-            </div>
+            <div class="online-room-panel hidden" id="onlineRoomPanel"><div><b>ห้อง PVP ออนไลน์</b><small id="onlineRoomStatus">สร้างห้องหรือเข้าห้องด้วยรหัส 6 ตัว</small></div><div class="room-actions"><button id="createBattleRoom" type="button">สร้างห้อง</button><input id="battleRoomCodeInput" maxlength="6" placeholder="รหัสห้อง" inputmode="text"><button id="joinBattleRoom" type="button">เข้าห้อง</button></div><div class="room-code hidden" id="battleRoomCode"></div></div>
           </div>
 
           <aside class="battle-systems">
-            <div class="battle-resource-card">
-              <div><span>💎 คริสตัล</span><b id="battleGems">300</b></div>
-              <div><span>🪙 ทอง</span><b id="battleGold">1,000</b></div>
-            </div>
-            <div class="battle-system-tabs">
-              <button class="system-tab active" data-system="gacha" type="button">🎲 กาชา</button>
-              <button class="system-tab" data-system="upgrade" type="button">⬆️ อัปเกรด</button>
-              <button class="system-tab" data-system="forge" type="button">🔨 ตีบวก</button>
-              <button class="system-tab" data-system="items" type="button">🎒 ไอเทม</button>
-              <button class="system-tab" data-system="shop" type="button">🛒 ร้านค้า</button>
-            </div>
+            <div class="battle-resource-card"><div><span>💎 คริสตัล</span><b id="battleGems">300</b></div><div><span>🪙 ทอง</span><b id="battleGold">1,000</b></div></div>
+            <div class="battle-system-tabs"><button class="system-tab active" data-system="gacha" type="button">🎲 กาชา</button><button class="system-tab" data-system="upgrade" type="button">⬆️ อัปเกรด</button><button class="system-tab" data-system="forge" type="button">🔨 ตีบวก</button><button class="system-tab" data-system="items" type="button">🎒 ไอเทม</button><button class="system-tab" data-system="shop" type="button">🛒 ร้านค้า</button></div>
             <div class="system-panel" id="battleSystemPanel"></div>
           </aside>
         </div>
