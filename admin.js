@@ -200,19 +200,67 @@ async function saveOneBox(b){
 
 async function saveBoxSettings(){
  const btn=$('#saveBoxesBtn'); const msg=$('#boxMessage');
- const ok=window.confirm('คุณต้องการบันทึกการตั้งค่ากล่องและของรางวัลทั้งหมดใช่ไหม?\n\nเมื่อยืนยันแล้ว ชื่อ ราคา อัตราดรอป รูปภาพ และของรางวัลจะถูกบันทึกและนำไปใช้ในเกมทันที');
+ const ok=window.confirm('คุณต้องการบันทึกการตั้งค่ากล่องและของรางวัลทั้งหมดใช่ไหม?\n\nเมื่อยืนยันแล้ว ชื่อ ราคา อัตราดรอป รูปภาพ และของรางวัลจะถูกบันทึกลงฐานข้อมูลจริง');
  if(!ok) return;
  if(btn) btn.disabled=true;
- if(msg) msg.textContent='กำลังบันทึก...';
+ if(msg) msg.textContent='กำลังตรวจสอบข้อมูล...';
  try{
    const rows=collectBoxAdmin();
-   for(let i=0;i<rows.length;i++){
-     await saveOneBox(rows[i]);
-     if(msg) msg.textContent=`กำลังบันทึกกล่อง ${i+1}/${rows.length}...`;
+   // Validate every box before sending anything to Supabase.
+   for(const b of rows){
+     const total=b.rewards.reduce((sum,r)=>sum+Number(r.drop_rate||0),0);
+     if(!b.name) throw new Error(`กล่อง ${b.id}: กรุณาใส่ชื่อกล่อง`);
+     if(!b.rewards.length) throw new Error(`กล่อง ${b.name}: ต้องมีรางวัลอย่างน้อย 1 ชิ้น`);
+     if(b.rewards.some(r=>!r.name)) throw new Error(`กล่อง ${b.name}: ชื่อรางวัลห้ามว่าง`);
+     if(b.rewards.some(r=>!Number.isFinite(Number(r.drop_rate)) || Number(r.drop_rate)<0)) throw new Error(`กล่อง ${b.name}: อัตราดรอปไม่ถูกต้อง`);
+     if(Math.abs(total-100)>0.001) throw new Error(`กล่อง ${b.name}: อัตราดรอปรวมต้องเท่ากับ 100% (ตอนนี้ ${total.toFixed(2)}%)`);
    }
-   await loadBoxSettings();
-   if(msg) msg.textContent='บันทึกสำเร็จ ✓ ค่าจะแสดงในเกมทันที';
-   setTimeout(()=>{if(msg)msg.textContent='';},4000);
+
+   const payload={
+     p_boxes: rows.map(b=>({
+       id:String(b.id), name:b.name, en:b.en||'',
+       price:Math.max(0,Math.floor(Number(b.price)||0)),
+       rarity:b.rarity||'COMMON', color:Number(b.color)||9080486,
+       accent:Number(b.accent)||7119497, icon:b.icon||'🎁',
+       rewards:Array.isArray(b.rewards)?b.rewards.map(r=>({
+         id:String(r.id), name:String(r.name||'').trim(),
+         rarity:r.rarity||b.rarity||'COMMON',
+         drop_rate:Number(r.drop_rate)||0, image_url:r.image_url||''
+       })) : []
+     }))
+   };
+
+   if(msg) msg.textContent='กำลังบันทึกลงฐานข้อมูล...';
+   const c=getClient();
+   let result=await c.rpc('admin_save_all_box_settings',payload);
+
+   // If the new atomic RPC has not been installed yet, use the existing
+   // per-box RPC as a compatibility fallback.
+   if(result.error){
+     console.warn('admin_save_all_box_settings unavailable, fallback:',result.error);
+     for(let i=0;i<rows.length;i++){
+       if(msg) msg.textContent=`กำลังบันทึกกล่อง ${i+1}/${rows.length}...`;
+       await saveOneBox(rows[i]);
+     }
+   }
+
+   // Read the database again and verify the values that were just saved.
+   if(msg) msg.textContent='กำลังตรวจสอบข้อมูลที่บันทึกจริง...';
+   const verify=await c.from('box_settings').select('id,name,en,price,rarity,color,accent,icon,rewards').order('id');
+   if(verify.error) throw verify.error;
+   const saved=verify.data||[];
+   for(const wanted of rows){
+     const actual=saved.find(x=>x.id===wanted.id);
+     if(!actual) throw new Error(`ไม่พบ ${wanted.id} ในฐานข้อมูลหลังบันทึก`);
+     if(String(actual.name)!==String(wanted.name) || Number(actual.price)!==Number(wanted.price) || JSON.stringify(actual.rewards||[])!==JSON.stringify(wanted.rewards||[])){
+       throw new Error(`ตรวจสอบหลังบันทึกไม่ผ่านสำหรับ ${wanted.id} — ฐานข้อมูลยังไม่ตรงกับค่าที่กรอก`);
+     }
+   }
+
+   boxSettings=saved.map(b=>({...b,rewards:Array.isArray(b.rewards)?b.rewards:[]}));
+   renderBoxAdmin();
+   if(msg) msg.textContent='บันทึกสำเร็จ ✓ ค่าถูกบันทึกในฐานข้อมูลและตรวจสอบแล้ว';
+   setTimeout(()=>{if(msg)msg.textContent='';},5000);
  }catch(err){
    console.error('saveBoxSettings:',err);
    if(msg) msg.textContent=`บันทึกไม่สำเร็จ: ${err?.message||'เกิดข้อผิดพลาด'}`;
