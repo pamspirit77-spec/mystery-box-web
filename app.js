@@ -1462,13 +1462,14 @@ topupForm?.addEventListener('submit', async (event) => {
 
 
 function showAccountPage() {
-  ['.hero', '.content', '.bottom-grid'].forEach(sel => document.querySelector(sel)?.classList.add('hidden'));
+  ['.hero', '.content', '.bottom-grid', '#fishGamePage'].forEach(sel => document.querySelector(sel)?.classList.add('hidden'));
   $('#accountPage')?.classList.remove('hidden');
   window.scrollTo({top: 0, behavior: 'smooth'});
 }
 
 function showHomePage() {
   ['.hero', '.content', '.bottom-grid'].forEach(sel => document.querySelector(sel)?.classList.remove('hidden'));
+  $('#fishGamePage')?.classList.add('hidden');
   $('#accountPage')?.classList.add('hidden');
 }
 
@@ -1484,8 +1485,147 @@ $$('.nav').forEach(n => n.onclick = () => {
     $('#historyModal')?.classList.remove('hidden');
   }
   else if(p === 'boxes') { showHomePage(); document.querySelector('.content')?.scrollIntoView({behavior: 'smooth'}); }
+  else if(p === 'fight') { ['.hero','.content','.bottom-grid','#accountPage'].forEach(sel=>document.querySelector(sel)?.classList.add('hidden')); $('#fishGamePage')?.classList.remove('hidden'); window.scrollTo({top:0,behavior:'smooth'}); renderFishStats(); resetBattle(); }
   else if(p === 'home') { showHomePage(); document.querySelector('.hero')?.scrollIntoView({behavior: 'smooth'}); }
 });
+
+
+/* ================= BETTA AUTO BATTLE ================= */
+const fishGamePage = $('#fishGamePage');
+let fishMode = 'pve';
+let fishLevel = Number(localStorage.getItem('betta_level') || 1);
+let fishExp = Number(localStorage.getItem('betta_exp') || 0);
+let fishWins = Number(localStorage.getItem('betta_wins') || 0);
+let fishLosses = Number(localStorage.getItem('betta_losses') || 0);
+let fishLoot = Number(localStorage.getItem('betta_loot') || 0);
+let fishAttack = 20 + (fishLevel - 1) * 5;
+let fishDefense = 10 + (fishLevel - 1) * 3;
+let fishMaxHp = 120 + (fishLevel - 1) * 12;
+let fishSpeed = 12 + (fishLevel - 1);
+let battleTimer = null;
+let battleRunning = false;
+let playerHp = fishMaxHp, enemyHp = 100;
+let enemyMaxHp = 100;
+
+function saveFishProgress(){
+  localStorage.setItem('betta_level', fishLevel);
+  localStorage.setItem('betta_exp', fishExp);
+  localStorage.setItem('betta_wins', fishWins);
+  localStorage.setItem('betta_losses', fishLosses);
+  localStorage.setItem('betta_loot', fishLoot);
+}
+function renderFishStats(){
+  fishAttack = 20 + (fishLevel - 1) * 5;
+  fishDefense = 10 + (fishLevel - 1) * 3;
+  fishMaxHp = 120 + (fishLevel - 1) * 12;
+  fishSpeed = 12 + (fishLevel - 1);
+  const els = {
+    fishLevel, fishAttack, fishDefense, fishHp: fishMaxHp, fishSpeed,
+    fishWins, fishLosses, fishLoot, fishCoins: points
+  };
+  Object.entries(els).forEach(([id,val])=>{const e=$('#'+id);if(e)e.textContent=Number(val).toLocaleString();});
+  const need=fishLevel*100;
+  const xp=$('#fishExp'); if(xp) xp.textContent=`${fishExp}/${need}`;
+  const bar=$('#fishXpBar'); if(bar) bar.style.width=Math.min(100,(fishExp/need)*100)+'%';
+  const cost=fishLevel*20; const ce=$('#upgradeCost'); if(ce) ce.textContent=cost.toLocaleString();
+  const nm=$('#fishName'); if(nm) nm.textContent=fishLevel>=10?'นักสู้ราชันย์':fishLevel>=5?'นักสู้ชั้นสูง':'นักสู้สีชาด';
+  const bn=$('#playerNameBattle'); if(bn) bn.textContent=nm?.textContent||'นักสู้สีชาด';
+}
+function setFishMode(mode){
+  fishMode=mode;
+  $$('.fish-mode-card').forEach(b=>b.classList.toggle('active',b.dataset.fishMode===mode));
+  const label=$('#arenaModeLabel'); if(label) label.textContent=mode==='pve'?'PVE • ฟาร์มของ':'PVP • จับคู่ผู้เล่น';
+  resetBattle();
+}
+function resetBattle(){
+  if(battleTimer){clearInterval(battleTimer);battleTimer=null;}
+  battleRunning=false;
+  playerHp=fishMaxHp;
+  enemyMaxHp=fishMode==='pve' ? 100 + Math.floor(fishLevel*8) : 125 + Math.floor(fishLevel*12);
+  enemyHp=enemyMaxHp;
+  const names=fishMode==='pve'?['ปลาป่าทอง','ปลากัดนักล่า','ปลากัดเกราะเหล็ก']:['Rival_Aqua','BettaKing','RedFighter'];
+  const en=$('#enemyNameBattle');if(en)en.textContent=names[Math.floor(Math.random()*names.length)];
+  const st=$('#arenaStatus');if(st)st.textContent='พร้อมต่อสู้';
+  const log=$('#battleLog');if(log)log.textContent='กด “เริ่มต่อสู้” เพื่อเริ่ม Auto Battle';
+  const btn=$('#startBattleBtn');if(btn){btn.disabled=false;btn.textContent='⚔️ เริ่มต่อสู้';}
+  updateHpBars();
+}
+function updateHpBars(){
+  const pb=$('#playerHpBar'),eb=$('#enemyHpBar');
+  if(pb)pb.style.width=Math.max(0,playerHp/fishMaxHp*100)+'%';
+  if(eb)eb.style.width=Math.max(0,enemyHp/enemyMaxHp*100)+'%';
+  const pt=$('#playerHpText');if(pt)pt.textContent=`${Math.max(0,Math.ceil(playerHp))}/${fishMaxHp}`;
+  const et=$('#enemyHpText');if(et)et.textContent=`${Math.max(0,Math.ceil(enemyHp))}/${enemyMaxHp}`;
+}
+function hitFx(side,damage){
+  const fx=$('#battleFx');if(!fx)return;
+  const el=document.createElement('div');el.className='hit-fx '+side;el.textContent='-'+damage;
+  el.style.left=side==='player'?'28%':'70%';el.style.top=(35+Math.random()*18)+'%';
+  fx.appendChild(el);setTimeout(()=>el.remove(),600);
+}
+function logBattle(text){const e=$('#battleLog');if(e)e.textContent=text;}
+function attackAnimation(side){
+  const el=$(side==='player'?'#playerFighter':'#enemyFighter');
+  if(!el)return;
+  el.classList.remove('attacking-left','attacking-right');
+  void el.offsetWidth;
+  el.classList.add(side==='player'?'attacking-left':'attacking-right');
+}
+function finishBattle(playerWon){
+  if(battleTimer){clearInterval(battleTimer);battleTimer=null;}
+  battleRunning=false;
+  const status=$('#arenaStatus');if(status)status.textContent=playerWon?'🏆 ชนะ!':'💀 แพ้';
+  const btn=$('#startBattleBtn');if(btn){btn.disabled=false;btn.textContent=playerWon?'⚔️ ต่อสู้อีกครั้ง':'↻ ลองใหม่';}
+  if(playerWon){
+    fishWins++;
+    const gain=fishMode==='pve'?25:40;
+    fishLoot += fishMode==='pve'?1:0;
+    fishExp += gain;
+    logBattle(fishMode==='pve'?`ชนะ! ได้ EXP +${gain} และของฟาร์ม +1`:`ชนะคู่แข่ง! ได้ EXP +${gain}`);
+    const need=fishLevel*100;
+    if(fishExp>=need){fishExp-=need;fishLevel++;logBattle(`🎉 เลเวลอัป! ตอนนี้ Lv.${fishLevel}`);}
+  }else{
+    fishLosses++;
+    logBattle('ปลาของคุณแพ้ในการต่อสู้ ลองอัปเกรดแล้วกลับมาใหม่');
+  }
+  saveFishProgress();renderFishStats();
+}
+function startBattle(){
+  if(battleRunning)return;
+  resetBattle();
+  battleRunning=true;
+  const status=$('#arenaStatus');if(status)status.textContent=fishMode==='pvp'?'🔎 กำลังจับคู่...':'⚔️ กำลังต่อสู้';
+  const btn=$('#startBattleBtn');if(btn){btn.disabled=true;btn.textContent='⚔️ กำลังต่อสู้...';}
+  let tick=0;
+  setTimeout(()=>{
+    if(!battleRunning)return;
+    logBattle(fishMode==='pvp'?'จับคู่สำเร็จ • เริ่ม Auto Battle':'เริ่ม Auto Battle • ปลากำลังเข้าปะทะ');
+    const interval=Math.max(650,1200-(fishSpeed*20));
+    battleTimer=setInterval(()=>{
+      if(!battleRunning)return;
+      tick++;
+      const playerDamage=Math.max(5,Math.round(fishAttack*(0.8+Math.random()*0.4)));
+      const enemyDamage=Math.max(4,Math.round((fishMode==='pve'?16:22)*(0.8+Math.random()*0.4)-fishDefense*.25));
+      enemyHp-=playerDamage;playerHp-=enemyDamage;
+      attackAnimation('player');attackAnimation('enemy');
+      hitFx('enemy',playerDamage);hitFx('player',enemyDamage);updateHpBars();
+      logBattle(`การโจมตีครั้งที่ ${tick} • คุณ -${enemyDamage} HP / คู่ต่อสู้ -${playerDamage} HP`);
+      if(enemyHp<=0 || playerHp<=0) finishBattle(enemyHp<=0);
+    },interval);
+  },fishMode==='pvp'?900:250);
+}
+$$('.fish-mode-card').forEach(b=>b.addEventListener('click',()=>setFishMode(b.dataset.fishMode)));
+$('#startBattleBtn')?.addEventListener('click',startBattle);
+$('#resetBattleBtn')?.addEventListener('click',resetBattle);
+$('#fishUpgradeBtn')?.addEventListener('click',()=>{
+  const cost=fishLevel*20;
+  if(points<cost){toast(`เหรียญไม่พอ ต้องใช้ ${cost} เหรียญ`);return;}
+  points-=cost;syncPoints();
+  fishLevel++;fishExp=0;saveFishProgress();renderFishStats();resetBattle();
+  toast(`อัปเกรดปลาสำเร็จ! เป็น Lv.${fishLevel}`);
+});
+$('#fishBackBtn')?.addEventListener('click',()=>document.querySelector('.nav[data-page="home"]')?.click());
+renderFishStats();resetBattle();
 
 $('#accountPageLogout')?.addEventListener('click', async () => {
   const btn = $('#accountPageLogout');

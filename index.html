@@ -81,6 +81,7 @@
       <nav>
         <button class="nav active" data-page="home">🏠 <span>หน้าแรก</span></button>
         <button class="nav" data-page="boxes">📦 <span>กล่องสุ่ม</span></button>
+        <button class="nav" data-page="fight">🐟 <span>เข้าเกม</span></button>
         <button class="nav" data-page="rewards">🏆 <span>รางวัล</span></button>
         <button class="nav" data-page="history">📜 <span>ประวัติ</span></button>
         <button class="nav" data-page="account">👤 <span>บัญชี / ออกจากระบบ</span></button>
@@ -142,6 +143,86 @@
             <button class="mini-link" id="viewAll">ดูทั้งหมด</button>
           </div>
           <div class="inventory-grid" id="inventoryGrid"></div>
+        </div>
+      </section>
+
+
+      <section class="fish-game-page hidden" id="fishGamePage">
+        <div class="fish-game-head">
+          <div>
+            <div class="eyebrow">BETTA ARENA</div>
+            <h1>🐟 สนามปลากัด</h1>
+            <p>อัปเกรดปลาของคุณ แล้วปล่อยให้การต่อสู้ดำเนินแบบอัตโนมัติ</p>
+          </div>
+          <button class="fish-back-btn" id="fishBackBtn" type="button">← กลับหน้ากล่องสุ่ม</button>
+        </div>
+
+        <div class="fish-mode-grid">
+          <button class="fish-mode-card active" data-fish-mode="pve" type="button">
+            <span class="fish-mode-icon">⚔️</span>
+            <span><b>PVE</b><small>ฟาร์มของ • ต่อสู้กับ NPC</small></span>
+          </button>
+          <button class="fish-mode-card" data-fish-mode="pvp" type="button">
+            <span class="fish-mode-icon">🏆</span>
+            <span><b>PVP</b><small>ต่อสู้ผู้เล่น • Auto Battle</small></span>
+          </button>
+        </div>
+
+        <div class="fish-game-layout">
+          <aside class="fish-stats-card">
+            <div class="fish-card-title"><span>🐠</span> ปลากัดของฉัน</div>
+            <div class="fish-preview-wrap">
+              <div class="betta-css my-fish" id="myFishPreview"><span></span></div>
+            </div>
+            <h2 id="fishName">นักสู้สีชาด</h2>
+            <div class="fish-level-row"><span>Lv.<b id="fishLevel">1</b></span><span>EXP <b id="fishExp">0/100</b></span></div>
+            <div class="fish-xp"><i id="fishXpBar"></i></div>
+            <div class="fish-stat-list">
+              <div><span>⚔️ พลังโจมตี</span><b id="fishAttack">20</b></div>
+              <div><span>🛡️ พลังป้องกัน</span><b id="fishDefense">10</b></div>
+              <div><span>❤️ พลังชีวิต</span><b id="fishHp">120</b></div>
+              <div><span>⚡ ความเร็ว</span><b id="fishSpeed">12</b></div>
+            </div>
+            <button class="fish-upgrade-btn" id="fishUpgradeBtn" type="button">⬆️ อัปเกรดปลา <span>🪙 <b id="upgradeCost">20</b></span></button>
+            <div class="fish-upgrade-note">อัปเกรดเพิ่มค่าสเตตัสแบบถาวร</div>
+          </aside>
+
+          <section class="fish-arena-card">
+            <div class="arena-topbar">
+              <div class="arena-mode-label" id="arenaModeLabel">PVE • ฟาร์มของ</div>
+              <div class="arena-status" id="arenaStatus">พร้อมต่อสู้</div>
+            </div>
+
+            <div class="battle-arena" id="battleArena">
+              <div class="arena-bubble bubble-1"></div><div class="arena-bubble bubble-2"></div><div class="arena-bubble bubble-3"></div>
+              <div class="arena-ground"></div>
+              <div class="arena-fighter player-fighter" id="playerFighter">
+                <div class="hp-label"><b id="playerNameBattle">นักสู้สีชาด</b><span id="playerHpText">120/120</span></div>
+                <div class="hp-bar"><i id="playerHpBar"></i></div>
+                <div class="betta-css my-fish battle-fish"><span></span></div>
+              </div>
+              <div class="battle-vs">VS</div>
+              <div class="arena-fighter enemy-fighter" id="enemyFighter">
+                <div class="hp-label"><b id="enemyNameBattle">ปลาป่าทอง</b><span id="enemyHpText">100/100</span></div>
+                <div class="hp-bar enemy-hp"><i id="enemyHpBar"></i></div>
+                <div class="betta-css enemy-fish battle-fish"><span></span></div>
+              </div>
+              <div class="battle-fx" id="battleFx"></div>
+              <div class="battle-log" id="battleLog">กด “เริ่มต่อสู้” เพื่อเริ่ม Auto Battle</div>
+            </div>
+
+            <div class="arena-controls">
+              <button class="start-battle-btn" id="startBattleBtn" type="button">⚔️ เริ่มต่อสู้</button>
+              <button class="reset-battle-btn" id="resetBattleBtn" type="button">↻ รีเซ็ต</button>
+            </div>
+          </section>
+        </div>
+
+        <div class="fish-game-footer">
+          <div><span>🏆 ชนะ</span><b id="fishWins">0</b></div>
+          <div><span>💀 แพ้</span><b id="fishLosses">0</b></div>
+          <div><span>🎁 ของฟาร์ม</span><b id="fishLoot">0</b></div>
+          <div><span>🪙 เหรียญใช้ได้</span><b id="fishCoins">0</b></div>
         </div>
       </section>
 
