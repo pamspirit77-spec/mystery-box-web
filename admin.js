@@ -59,7 +59,7 @@ function renderBoxAdmin(){
 }
 
 function renderRewardRow(b,r,ri){
- return `<div class="reward-admin-row" data-reward-index="${ri}">
+ return `<div class="reward-admin-row" data-reward-index="${ri}" data-reward-id="${escapeHtml(r.id||makeRewardId(b.id))}">
    <div class="reward-admin-image">${rewardImageHtml(r.image_url,r.name)}</div>
    <div class="reward-admin-main">
      <label>ชื่อรางวัล<input data-reward-field="name" value="${escapeHtml(r.name||'')}"></label>
@@ -77,14 +77,19 @@ function collectBoxAdmin(){
    const card=$(`.box-admin-card[data-box-id="${CSS.escape(b.id)}"]`);
    if(!card) return b;
    const getField=n=>card.querySelector(`[data-box-field="${n}"]`)?.value ?? '';
-   const rewards=[...card.querySelectorAll('.reward-admin-row')].map((row,ri)=>({
-     id: row.dataset.rewardId || (b.rewards?.[ri]?.id || makeRewardId(b.id)),
-     name: row.querySelector('[data-reward-field="name"]')?.value.trim() || '',
-     rarity: row.querySelector('[data-reward-field="rarity"]')?.value || b.rarity || 'COMMON',
-     drop_rate: Number(row.querySelector('[data-reward-field="drop_rate"]')?.value || 0),
-     image_url: row.querySelector('[data-reward-image-url]')?.value || ''
-   }));
-   return {...b,name:getField('name').trim(),en:getField('en').trim(),price:Number(getField('price')||0),rarity:getField('rarity')||b.rarity,rewards};
+   const rewards=[...card.querySelectorAll('.reward-admin-row')].map((row,ri)=>{
+     const rawRate=row.querySelector('[data-reward-field="drop_rate"]')?.value ?? '0';
+     const rate=Number(rawRate);
+     return {
+       id: row.dataset.rewardId || (b.rewards?.[ri]?.id || makeRewardId(b.id)),
+       name: row.querySelector('[data-reward-field="name"]')?.value.trim() || '',
+       rarity: row.querySelector('[data-reward-field="rarity"]')?.value || b.rarity || 'COMMON',
+       drop_rate: Number.isFinite(rate) && rate >= 0 ? rate : 0,
+       image_url: row.querySelector('[data-reward-image-url]')?.value || ''
+     };
+   });
+   const rawPrice=Number(getField('price'));
+   return {...b,name:getField('name').trim(),en:getField('en').trim(),price:Number.isFinite(rawPrice)?Math.max(0,Math.floor(rawPrice)):0,rarity:getField('rarity')||b.rarity,rewards};
  });
 }
 
@@ -140,31 +145,39 @@ async function loadBoxSettings(){
  renderBoxAdmin();
 }
 
+async function saveOneBox(b, index, totalCount){
+ const total=b.rewards.reduce((s,r)=>s+Number(r.drop_rate||0),0);
+ if(!b.name) throw new Error(`กล่อง ${b.id}: กรุณาใส่ชื่อกล่อง`);
+ if(!b.rewards.length) throw new Error(`กล่อง ${b.name}: ต้องมีรางวัลอย่างน้อย 1 ชิ้น`);
+ if(b.rewards.some(r=>!r.name)) throw new Error(`กล่อง ${b.name}: ชื่อรางวัลห้ามว่าง`);
+ if(b.rewards.some(r=>!Number.isFinite(Number(r.drop_rate)) || Number(r.drop_rate)<0)) throw new Error(`กล่อง ${b.name}: อัตราดรอปไม่ถูกต้อง`);
+ if(Math.abs(total-100)>0.001) throw new Error(`กล่อง ${b.name}: อัตราดรอปรวมต้องเท่ากับ 100% (ตอนนี้ ${total.toFixed(2)}%)`);
+ const payload={p_id:String(b.id),p_name:b.name,p_en:b.en||'',p_price:Math.max(0,Math.floor(Number(b.price)||0)),p_rarity:b.rarity||'COMMON',p_color:Number(b.color)||9080486,p_accent:Number(b.accent)||7119497,p_icon:b.icon||'🎁',p_rewards:b.rewards};
+ let result=await getClient().rpc('admin_save_box_settings_v2',payload);
+ if(result.error && /admin_save_box_settings_v2|Could not find the function/i.test(result.error.message||'')){
+   result=await getClient().rpc('admin_save_box_settings',payload);
+ }
+ if(result.error) throw result.error;
+ return result.data;
+}
+
 async function saveBoxSettings(){
  const btn=$('#saveBoxesBtn'); const msg=$('#boxMessage');
  if(btn) btn.disabled=true;
  if(msg) msg.textContent='กำลังบันทึก...';
  try{
    const rows=collectBoxAdmin();
-   for(const b of rows){
-     if(!b.name) throw new Error(`กล่อง ${b.id}: กรุณาใส่ชื่อกล่อง`);
-     if(!b.rewards.length) throw new Error(`กล่อง ${b.name}: ต้องมีรางวัลอย่างน้อย 1 ชิ้น`);
-     const total=b.rewards.reduce((s,r)=>s+Number(r.drop_rate||0),0);
-     if(total<=0) throw new Error(`กล่อง ${b.name}: อัตราดรอปรวมต้องมากกว่า 0`);
-     if(Math.abs(total-100)>0.001) throw new Error(`กล่อง ${b.name}: อัตราดรอปรวมต้องเท่ากับ 100% (ตอนนี้ ${total.toFixed(2)}%)`);
-     if(b.rewards.some(r=>!r.name)) throw new Error(`กล่อง ${b.name}: ชื่อรางวัลห้ามว่าง`);
-     const {data,error}=await getClient().rpc('admin_save_box_settings',{
-       p_id:b.id,p_name:b.name,p_en:b.en,p_price:Math.max(0,Math.floor(b.price||0)),p_rarity:b.rarity,
-       p_color:Number(b.color||DEFAULT_BOX_COLORS[rows.indexOf(b)]||9080486),p_accent:Number(b.accent||DEFAULT_BOX_ACCENTS[rows.indexOf(b)]||7119497),p_icon:b.icon||'🎁',p_rewards:b.rewards
-     });
-     if(error) throw error;
-     if(data) b={...data,rewards:Array.isArray(data.rewards)?data.rewards:[]};
+   for(let i=0;i<rows.length;i++){
+     await saveOneBox(rows[i],i,rows.length);
+     if(msg) msg.textContent=`กำลังบันทึกกล่อง ${i+1}/${rows.length}...`;
    }
    await loadBoxSettings();
-   if(msg) msg.textContent='บันทึกการตั้งค่ากล่องทั้งหมดแล้ว';
-   setTimeout(()=>{if(msg)msg.textContent='';},2500);
- }catch(err){if(msg)msg.textContent=err?.message||'บันทึกไม่สำเร็จ';}
- finally{if(btn)btn.disabled=false;}
+   if(msg) msg.textContent='บันทึกการตั้งค่ากล่องทั้งหมดแล้ว ✓';
+   setTimeout(()=>{if(msg)msg.textContent='';},3000);
+ }catch(err){
+   console.error('saveBoxSettings:',err);
+   if(msg) msg.textContent=`บันทึกไม่สำเร็จ: ${err?.message||'เกิดข้อผิดพลาด'}`;
+ }finally{if(btn)btn.disabled=false;}
 }
 
 function renderStats(){
