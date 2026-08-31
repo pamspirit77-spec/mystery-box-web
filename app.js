@@ -445,6 +445,7 @@ function openInventoryModal() {
       btn.onclick = () => {
         const id = Number(btn.dataset.id);
         rewards = rewards.filter(item => item.id !== id);
+        saveCloudInventory();
         renderInventory();
         openInventoryModal(); // render ใหม่
         toast('รางวัลจะถูกส่งภายใน 24 ชั่วโมง');
@@ -464,6 +465,7 @@ if(claimAllBtn) {
       return;
     }
     rewards = [];
+    saveCloudInventory();
     renderInventory();
     openInventoryModal();
     toast('รางวัลจะถูกส่งภายใน 24 ชั่วโมง');
