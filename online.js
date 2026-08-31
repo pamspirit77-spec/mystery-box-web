@@ -8,6 +8,24 @@ class OnlineDB {
     this.enabled = SUPABASE_ENABLED;
   }
 
+  async refreshAuthenticatedUser() {
+    if (!this.client) {
+      this.user = null;
+      return null;
+    }
+
+    // Always ask Supabase for the current authenticated user immediately
+    // before account-sensitive operations. Do not rely on a stale cached
+    // this.user value after logout/login/register.
+    const { data, error } = await this.client.auth.getUser();
+    if (error) {
+      this.user = null;
+      throw error;
+    }
+    this.user = data?.user ?? null;
+    return this.user;
+  }
+
   async init() {
     if (!this.enabled) return null;
 
@@ -17,6 +35,9 @@ class OnlineDB {
 
     const { data: { session } } = await this.client.auth.getSession();
     this.user = session?.user ?? null;
+    if (this.user) {
+      try { await this.refreshAuthenticatedUser(); } catch (_) { this.user = null; }
+    }
 
     // No anonymous account: the real account system will use Supabase Auth.
     // This keeps the game usable locally until Login/Register is connected.
@@ -26,12 +47,12 @@ class OnlineDB {
   async signUp(email, password, username = '') {
     if (!this.client) throw new Error('Supabase is not configured');
 
-    // A new registration must never inherit the previous account's session.
-    // This is especially important when the user registers immediately after
-    // logging out in the same browser.
-    // Always clear any persisted local Auth session before creating a new account.
-    // This prevents a previous account from being restored after a refresh.
-    await this.signOut();
+    // A new registration must never inherit any previous account session.
+    // Read the real Supabase session first instead of trusting cached state.
+    const { data: sessionData } = await this.client.auth.getSession();
+    if (sessionData?.session) {
+      await this.signOut();
+    }
 
     const { data, error } = await this.client.auth.signUp({
       email,
@@ -40,6 +61,9 @@ class OnlineDB {
     });
     if (error) throw error;
     this.user = data?.user ?? null;
+    if (data?.session) {
+      await this.refreshAuthenticatedUser();
+    }
     return data;
   }
 
@@ -47,7 +71,7 @@ class OnlineDB {
     if (!this.client) throw new Error('Supabase is not configured');
     const { data, error } = await this.client.auth.signInWithPassword({ email, password });
     if (error) throw error;
-    this.user = data.user;
+    await this.refreshAuthenticatedUser();
     return await this.loadProfile();
   }
 
@@ -109,37 +133,33 @@ class OnlineDB {
   }
 
   async saveCoins(coins) {
-    if (!this.client || !this.user) return false;
+    if (!this.client) return false;
 
-    const userId = this.user.id;
-    const newCoins = Math.max(0, Math.floor(Number(coins)));
+    const currentUser = await this.refreshAuthenticatedUser();
+    if (!currentUser) return false;
 
-    // Update only the coins column. Do not request the updated row here.
-    // Some existing profiles tables do not have updated_at, and requesting
-    // a row can also fail when PostgREST/RLS returns no representation.
-    const { error } = await this.client
+    const userId = currentUser.id;
+    const newCoins = Math.max(0, Math.floor(coins));
+
+    // Update only the coins column. Do not use .single()/.select() here:
+    // RLS can allow the UPDATE while PostgREST returns no row, which caused
+    // the game to report "Cannot coerce the result to a single JSON object".
+    const { data, error } = await this.client
       .from('profiles')
-      .update({ coins: newCoins })
-      .eq('id', userId);
+      .update({ coins: newCoins, updated_at: new Date().toISOString() })
+      .eq('id', userId)
+      .select('id, coins')
+      .maybeSingle();
 
     if (error) {
       console.warn('Supabase coins sync failed:', error);
       throw error;
     }
 
-    // Verify by reading the same user's profile. This makes sure the new
-    // balance is really stored before the game continues the roll.
-    const { data: profile, error: verifyError } = await this.client
-      .from('profiles')
-      .select('id, coins')
-      .eq('id', userId)
-      .maybeSingle();
-
-    if (verifyError) {
-      console.warn('Supabase coins verify failed:', verifyError);
-      throw verifyError;
-    }
-    if (!profile || profile.id !== userId || Number(profile.coins) !== newCoins) {
+    // UPDATE can return no row when RLS blocks the target row. Treat that as
+    // a failed save instead of allowing the game to continue with a local-only
+    // balance that will come back after refresh.
+    if (!data || data.id !== userId || Number(data.coins) !== newCoins) {
       throw new Error('บันทึกเหรียญไม่สำเร็จ');
     }
 
@@ -148,23 +168,30 @@ class OnlineDB {
 
 
   async submitTopup(payload) {
-    if (!this.client || !this.user) throw new Error('กรุณาเข้าสู่ระบบก่อนเติมเงิน');
+    if (!this.client) throw new Error('กรุณาเข้าสู่ระบบก่อนเติมเงิน');
+    const currentUser = await this.refreshAuthenticatedUser();
+    if (!currentUser) throw new Error('กรุณาเข้าสู่ระบบก่อนเติมเงิน');
     const { data, error } = await this.client.from('topup_requests').insert({
-      user_id: this.user.id,
+      user_id: currentUser.id,
       method: payload.method,
       amount: payload.amount,
       wallet_link: payload.walletLink || null,
       card_code: payload.cardCode || null,
       proof_image: payload.proofPath || null
-    }).select('id').single();
+    }).select('id, user_id').single();
     if (error) throw error;
+    if (!data || data.user_id !== currentUser.id) {
+      throw new Error('คำขอเติมเงินไม่ตรงกับบัญชีปัจจุบัน');
+    }
     return data;
   }
 
   async uploadTopupProof(file) {
-    if (!this.client || !this.user) throw new Error('กรุณาเข้าสู่ระบบก่อนเติมเงิน');
+    if (!this.client) throw new Error('กรุณาเข้าสู่ระบบก่อนเติมเงิน');
+    const currentUser = await this.refreshAuthenticatedUser();
+    if (!currentUser) throw new Error('กรุณาเข้าสู่ระบบก่อนเติมเงิน');
     const safeName = String(file.name || 'proof').replace(/[^a-zA-Z0-9._-]/g, '_');
-    const path = `${this.user.id}/${Date.now()}_${crypto.randomUUID()}_${safeName}`;
+    const path = `${currentUser.id}/${Date.now()}_${crypto.randomUUID()}_${safeName}`;
     const { error } = await this.client.storage.from('topup-proofs').upload(path, file, {
       cacheControl: '3600', upsert: false, contentType: file.type || 'image/jpeg'
     });
@@ -173,18 +200,22 @@ class OnlineDB {
   }
 
   async getMyTopups() {
-    if (!this.client || !this.user) return [];
+    if (!this.client) return [];
+    const currentUser = await this.refreshAuthenticatedUser();
+    if (!currentUser) return [];
     const { data, error } = await this.client.from('topup_requests')
       .select('id, method, amount, status, created_at, reviewed_at')
-      .eq('user_id', this.user.id).order('created_at', { ascending:false }).limit(20);
+      .eq('user_id', currentUser.id).order('created_at', { ascending:false }).limit(20);
     if (error) throw error;
     return data || [];
   }
 
   async addRollHistory(items, boxName, timestamp = Date.now()) {
-    if (!this.client || !this.user || !Array.isArray(items)) return;
+    if (!this.client || !Array.isArray(items)) return;
+    const currentUser = await this.refreshAuthenticatedUser();
+    if (!currentUser) return;
     const rows = items.map(item => ({
-      user_id: this.user.id,
+      user_id: currentUser.id,
       item_name: item.name,
       rarity: item.rarity,
       icon: item.icon,
@@ -197,12 +228,14 @@ class OnlineDB {
   }
 
   async getRollHistory() {
-    if (!this.client || !this.user) return [];
+    if (!this.client) return [];
+    const currentUser = await this.refreshAuthenticatedUser();
+    if (!currentUser) return [];
     const cutoff = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
     const { data, error } = await this.client
       .from('gacha_history')
       .select('id, item_name, rarity, icon, box_name, rolled_at')
-      .eq('user_id', this.user.id)
+      .eq('user_id', currentUser.id)
       .gte('rolled_at', cutoff)
       .order('rolled_at', { ascending: false });
     if (error) throw error;
