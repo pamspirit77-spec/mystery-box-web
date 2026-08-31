@@ -153,60 +153,44 @@ async function saveOneBox(b){
  if(b.rewards.some(r=>!Number.isFinite(Number(r.drop_rate)) || Number(r.drop_rate)<0)) throw new Error(`กล่อง ${b.name}: อัตราดรอปไม่ถูกต้อง`);
  if(Math.abs(total-100)>0.001) throw new Error(`กล่อง ${b.name}: อัตราดรอปรวมต้องเท่ากับ 100% (ตอนนี้ ${total.toFixed(2)}%)`);
 
- const payload={
-   p_id:String(b.id),
-   p_name:b.name,
-   p_en:b.en||'',
-   p_price:Math.max(0,Math.floor(Number(b.price)||0)),
-   p_rarity:b.rarity||'COMMON',
-   p_color:Number(b.color)||9080486,
-   p_accent:Number(b.accent)||7119497,
-   p_icon:b.icon||'🎁',
-   p_rewards:b.rewards
+ const row={
+   id:String(b.id),
+   name:String(b.name).trim(),
+   en:String(b.en||'').trim(),
+   price:Math.max(0,Math.floor(Number(b.price)||0)),
+   rarity:b.rarity||'COMMON',
+   color:Number(b.color)||9080486,
+   accent:Number(b.accent)||7119497,
+   icon:b.icon||'🎁',
+   rewards:Array.isArray(b.rewards)?b.rewards.map(r=>({
+     id:String(r.id),
+     name:String(r.name||'').trim(),
+     rarity:r.rarity||b.rarity||'COMMON',
+     drop_rate:Number(r.drop_rate)||0,
+     image_url:String(r.image_url||'')
+   })):[],
+   updated_at:new Date().toISOString(),
+   updated_by:null
  };
 
  const c=getClient();
-
- // IMPORTANT: BOX_SETTINGS_SETUP.sql creates this RPC. Use it first so the
- // admin page works with the database schema that is already deployed.
- // This avoids the previous failure where the page called a v2 RPC that may
- // not exist in the live project.
- let first=await c.rpc('admin_save_box_settings',payload);
- if(!first.error && first.data) return first.data;
-
- // Support projects that installed the newer save-fix SQL instead.
- const firstMissing=/does not exist|could not find the function|not found/i.test(String(first.error?.message||''));
- if(firstMissing){
-   const second=await c.rpc('admin_save_box_settings_v2',payload);
-   if(!second.error && second.data) return second.data;
-   first=second;
- }
-
- // Last compatibility path for projects that explicitly enabled direct admin
- // writes. Never silently report success when Supabase rejected the write.
- const row={
-   id:String(b.id), name:b.name, en:b.en||'',
-   price:Math.max(0,Math.floor(Number(b.price)||0)),
-   rarity:b.rarity||'COMMON', color:Number(b.color)||9080486,
-   accent:Number(b.accent)||7119497, icon:b.icon||'🎁', rewards:b.rewards,
-   updated_at:new Date().toISOString()
- };
- const direct=await c.from('box_settings').upsert(row,{onConflict:'id'}).select('*').maybeSingle();
- if(!direct.error && direct.data) return direct.data;
-
- const detail=first.error?.message || direct.error?.message || 'บันทึกข้อมูลไม่สำเร็จ';
- throw new Error(`กล่อง ${b.id}: ${detail}`);
+ // Direct database write. RLS below is restricted to admin_users, so this
+ // does not depend on any RPC name/version being installed.
+ const {data,error}=await c.from('box_settings').upsert(row,{onConflict:'id'}).select('*').single();
+ if(error) throw new Error(`กล่อง ${b.id}: ${error.message||'บันทึกไม่สำเร็จ'}`);
+ if(!data || data.id!==b.id) throw new Error(`กล่อง ${b.id}: ไม่ได้รับข้อมูลยืนยันจากฐานข้อมูล`);
+ return data;
 }
 
 async function saveBoxSettings(){
  const btn=$('#saveBoxesBtn'); const msg=$('#boxMessage');
- const ok=window.confirm('คุณต้องการบันทึกการตั้งค่ากล่องและของรางวัลทั้งหมดใช่ไหม?\n\nเมื่อยืนยันแล้ว ชื่อ ราคา อัตราดรอป รูปภาพ และของรางวัลจะถูกบันทึกลงฐานข้อมูลจริง');
+ const ok=window.confirm('คุณต้องการบันทึกการตั้งค่ากล่องและของรางวัลทั้งหมดใช่ไหม?\n\nเมื่อกดยืนยัน ระบบจะบันทึกลงฐานข้อมูลจริง แล้วรีเฟรชหน้าแอดมิน');
  if(!ok) return;
  if(btn) btn.disabled=true;
- if(msg) msg.textContent='กำลังตรวจสอบข้อมูล...';
+ if(msg) msg.textContent='กำลังบันทึก...';
  try{
    const rows=collectBoxAdmin();
-   // Validate every box before sending anything to Supabase.
+   // Validate everything before writing anything.
    for(const b of rows){
      const total=b.rewards.reduce((sum,r)=>sum+Number(r.drop_rate||0),0);
      if(!b.name) throw new Error(`กล่อง ${b.id}: กรุณาใส่ชื่อกล่อง`);
@@ -216,55 +200,37 @@ async function saveBoxSettings(){
      if(Math.abs(total-100)>0.001) throw new Error(`กล่อง ${b.name}: อัตราดรอปรวมต้องเท่ากับ 100% (ตอนนี้ ${total.toFixed(2)}%)`);
    }
 
-   const payload={
-     p_boxes: rows.map(b=>({
-       id:String(b.id), name:b.name, en:b.en||'',
-       price:Math.max(0,Math.floor(Number(b.price)||0)),
-       rarity:b.rarity||'COMMON', color:Number(b.color)||9080486,
-       accent:Number(b.accent)||7119497, icon:b.icon||'🎁',
-       rewards:Array.isArray(b.rewards)?b.rewards.map(r=>({
-         id:String(r.id), name:String(r.name||'').trim(),
-         rarity:r.rarity||b.rarity||'COMMON',
-         drop_rate:Number(r.drop_rate)||0, image_url:r.image_url||''
-       })) : []
-     }))
-   };
-
-   if(msg) msg.textContent='กำลังบันทึกลงฐานข้อมูล...';
    const c=getClient();
-   let result=await c.rpc('admin_save_all_box_settings',payload);
-
-   // If the new atomic RPC has not been installed yet, use the existing
-   // per-box RPC as a compatibility fallback.
-   if(result.error){
-     console.warn('admin_save_all_box_settings unavailable, fallback:',result.error);
-     for(let i=0;i<rows.length;i++){
-       if(msg) msg.textContent=`กำลังบันทึกกล่อง ${i+1}/${rows.length}...`;
-       await saveOneBox(rows[i]);
-     }
+   for(let i=0;i<rows.length;i++){
+     if(msg) msg.textContent=`กำลังบันทึกกล่อง ${i+1}/${rows.length}...`;
+     await saveOneBox(rows[i]);
    }
 
-   // Read the database again and verify the values that were just saved.
-   if(msg) msg.textContent='กำลังตรวจสอบข้อมูลที่บันทึกจริง...';
+   // Read the rows back from the real database before allowing the refresh.
+   if(msg) msg.textContent='กำลังตรวจสอบข้อมูลที่บันทึก...';
    const verify=await c.from('box_settings').select('id,name,en,price,rarity,color,accent,icon,rewards').order('id');
    if(verify.error) throw verify.error;
    const saved=verify.data||[];
    for(const wanted of rows){
      const actual=saved.find(x=>x.id===wanted.id);
      if(!actual) throw new Error(`ไม่พบ ${wanted.id} ในฐานข้อมูลหลังบันทึก`);
-     if(String(actual.name)!==String(wanted.name) || Number(actual.price)!==Number(wanted.price) || JSON.stringify(actual.rewards||[])!==JSON.stringify(wanted.rewards||[])){
-       throw new Error(`ตรวจสอบหลังบันทึกไม่ผ่านสำหรับ ${wanted.id} — ฐานข้อมูลยังไม่ตรงกับค่าที่กรอก`);
+     if(String(actual.name)!==String(wanted.name) ||
+        String(actual.en||'')!==String(wanted.en||'') ||
+        Number(actual.price)!==Number(wanted.price) ||
+        String(actual.rarity)!==String(wanted.rarity) ||
+        JSON.stringify(actual.rewards||[])!==JSON.stringify(wanted.rewards||[])){
+       throw new Error(`ตรวจสอบหลังบันทึกไม่ผ่านสำหรับ ${wanted.id}`);
      }
    }
 
-   boxSettings=saved.map(b=>({...b,rewards:Array.isArray(b.rewards)?b.rewards:[]}));
-   renderBoxAdmin();
-   if(msg) msg.textContent='บันทึกสำเร็จ ✓ ค่าถูกบันทึกในฐานข้อมูลและตรวจสอบแล้ว';
-   setTimeout(()=>{if(msg)msg.textContent='';},5000);
+   // The requested behavior: once the database write and verification both
+   // succeed, reset the Admin page. Supabase auth persists across reloads.
+   window.location.reload();
  }catch(err){
    console.error('saveBoxSettings:',err);
    if(msg) msg.textContent=`บันทึกไม่สำเร็จ: ${err?.message||'เกิดข้อผิดพลาด'}`;
- }finally{if(btn)btn.disabled=false;}
+   if(btn) btn.disabled=false;
+ }
 }
 
 function renderStats(){
