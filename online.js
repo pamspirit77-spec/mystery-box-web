@@ -43,10 +43,23 @@ class OnlineDB {
   }
 
   async signOut() {
-    if (!this.client) return;
-    const { error } = await this.client.auth.signOut({ scope: 'local' });
+    if (!this.client) {
+      this.user = null;
+      return;
+    }
+
+    // Sign out globally so the previous account cannot be restored on refresh.
+    const { error } = await this.client.auth.signOut({ scope: 'global' });
     if (error) throw error;
+
     this.user = null;
+
+    // Verify that Supabase no longer has an active session.
+    const { data: { session } } = await this.client.auth.getSession();
+    if (session) {
+      await this.client.auth.signOut({ scope: 'local' });
+      this.user = null;
+    }
   }
 
   async loadProfile() {
@@ -83,27 +96,27 @@ class OnlineDB {
     return data || { maintenance_mode: false, announcement: '' };
   }
 
-  async spendCoins(amount) {
-    if (!this.client || !this.user) throw new Error('กรุณาเข้าสู่ระบบก่อนสุ่ม');
-    const cost = Math.max(0, Math.floor(Number(amount) || 0));
-    if (cost <= 0) {
-      const profile = await this.loadProfile();
-      return Number(profile?.coins || 0);
-    }
-    const { data, error } = await this.client.rpc('spend_my_coins', { p_amount: cost });
-    if (error) throw new Error('บันทึกเหรียญไม่สำเร็จ: ' + (error.message || 'ไม่สามารถอัปเดตยอดเหรียญได้'));
-    return Number(data);
-  }
-
   async saveCoins(coins) {
-    // Kept for compatibility with other existing code. Gameplay spending uses spendCoins().
-    if (!this.client || !this.user) return;
-    const next = Math.max(0, Math.floor(Number(coins) || 0));
-    const { error } = await this.client
+    if (!this.client || !this.user) {
+      throw new Error('กรุณาเข้าสู่ระบบก่อนบันทึกเหรียญ');
+    }
+
+    const userId = this.user.id;
+    const newCoins = Math.max(0, Math.floor(coins));
+
+    const { data, error } = await this.client
       .from('profiles')
-      .update({ coins: next })
-      .eq('id', this.user.id);
+      .update({ coins: newCoins, updated_at: new Date().toISOString() })
+      .eq('id', userId)
+      .select('id, coins')
+      .single();
+
     if (error) throw error;
+    if (!data || data.id !== userId || Number(data.coins) !== newCoins) {
+      throw new Error('บันทึกเหรียญไม่สำเร็จ');
+    }
+
+    return data;
   }
 
 

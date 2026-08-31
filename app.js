@@ -14,13 +14,9 @@ let points = 24;
 let selected = 4;
 let rollCount = 1;
 
-// คลังรางวัลของผู้ใช้
-let rewards = [
-  {id: 1, name:'AirPods Pro 2', rarity:'EPIC', icon:'🎧'},
-  {id: 2, name:'เสื้อฮู้ด', rarity:'UNCOMMON', icon:'👕'},
-  {id: 3, name:'ข้าวกล่อง', rarity:'COMMON', icon:'🍔'},
-  {id: 4, name:'iPhone 15 Pro Max', rarity:'LEGENDARY', icon:'📱'}
-];
+// คลังรางวัลของผู้ใช้ — ผู้เล่นใหม่ต้องเริ่มจากคลังว่าง
+// รางวัลจะถูกเพิ่มเข้าคลังเฉพาะเมื่อมีการสุ่มสำเร็จเท่านั้น
+let rewards = [];
 
 // รายการรางวัลล่าสุดที่สุ่มได้จากการเปิดครั้งนี้
 let lastRolledItems = [];
@@ -856,7 +852,7 @@ $('#claimResultBtn')?.addEventListener('click', () => {
 
 const rollBtn = $('#rollBtn');
 if(rollBtn) {
-  rollBtn.onclick = () => {
+  rollBtn.onclick = async () => {
     const b = boxes[selected];
     const totalPrice = b.price * rollCount;
     
@@ -918,22 +914,23 @@ if(rollBtn) {
       return;
     }
     
-    // Deduct coins on the server first. If the database update fails, do not start the roll.
-    rolling = true;
-    hasClaimed = false;
-    rollBtn.disabled = true;
+    // บันทึกยอดเหรียญลง Supabase ให้สำเร็จก่อนเริ่มสุ่ม
+    // เพื่อป้องกันรีเฟรชแล้วเหรียญเด้งกลับไปยอดเดิม
+    const newPoints = points - totalPrice;
     try {
-      const newBalance = await online.spendCoins(totalPrice);
-      points = Number.isFinite(newBalance) ? newBalance : Math.max(0, points - totalPrice);
-      syncPoints();
+      await online.saveCoins(newPoints);
     } catch (err) {
-      rolling = false;
-      hasClaimed = true;
-      rollBtn.disabled = false;
+      console.error('Save coins failed:', err);
       toast(err?.message || 'บันทึกเหรียญไม่สำเร็จ');
       return;
     }
-    
+
+    rolling = true;
+    hasClaimed = false;
+    points = newPoints;
+    syncPoints();
+
+    rollBtn.disabled = true;
     
     if(!openScene) return;
     openScene.isOpening = true;
