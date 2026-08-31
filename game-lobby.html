@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Game Lobby</title>
+  <link rel="stylesheet" href="game-lobby.css">
+  <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+  <main class="lobby-shell">
+    <header class="lobby-topbar">
+      <div class="brand">
+        <div class="brand-icon">🎮</div>
+        <div>
+          <strong>GAME LOBBY</strong>
+          <span>พื้นที่เกม</span>
+        </div>
+      </div>
+      <div class="user-area">
+        <span id="username">กำลังโหลด...</span>
+        <button id="backMysteryBox" type="button">🎁 กลับ Mystery Box</button>
+      </div>
+    </header>
+
+    <section class="lobby-content">
+      <div class="lobby-hero">
+        <div class="eyebrow">GAME LOBBY</div>
+        <h1>พื้นที่สำหรับเกมของคุณ</h1>
+        <p>หน้านี้แยกออกจากระบบ Mystery Box และเตรียมไว้สำหรับเพิ่มเกมในขั้นตอนถัดไป</p>
+      </div>
+
+      <section class="game-slot">
+        <div class="game-icon">🎮</div>
+        <div class="game-slot-copy">
+          <span class="coming-soon">COMING SOON</span>
+          <h2>เกมใหม่</h2>
+          <p>ยังไม่มีระบบเกมในหน้านี้ในตอนนี้</p>
+        </div>
+      </section>
+    </section>
+  </main>
+
+  <div id="authGuard" class="guard hidden">
+    <div class="guard-card">
+      <div class="guard-icon">🔐</div>
+      <h2>ต้องเข้าสู่ระบบก่อน</h2>
+      <p>กำลังพากลับไปหน้า Mystery Box...</p>
+    </div>
+  </div>
+
+  <script type="module" src="game-lobby.js"></script>
+</body>
+</html>
