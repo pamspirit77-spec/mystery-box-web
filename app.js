@@ -113,131 +113,6 @@ function toast(t) {
   setTimeout(() => e.classList.remove('show'), 2500);
 }
 
-
-// ============================================================
-// Sound effects — added only for UI clicks and box opening.
-// Uses Web Audio API so no external audio files are required.
-// ============================================================
-let sfxEnabled = true;
-let sfxContext = null;
-let spinSound = null;
-
-function getSfxContext() {
-  if (!sfxEnabled) return null;
-  if (!sfxContext) {
-    const Ctx = window.AudioContext || window.webkitAudioContext;
-    if (!Ctx) return null;
-    sfxContext = new Ctx();
-  }
-  if (sfxContext.state === 'suspended') sfxContext.resume().catch(() => {});
-  return sfxContext;
-}
-
-function playMenuClick() {
-  const ctx = getSfxContext();
-  if (!ctx) return;
-  const now = ctx.currentTime;
-  const osc = ctx.createOscillator();
-  const gain = ctx.createGain();
-  osc.type = 'sine';
-  osc.frequency.setValueAtTime(520, now);
-  osc.frequency.exponentialRampToValueAtTime(760, now + 0.045);
-  gain.gain.setValueAtTime(0.0001, now);
-  gain.gain.exponentialRampToValueAtTime(0.055, now + 0.008);
-  gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.075);
-  osc.connect(gain).connect(ctx.destination);
-  osc.start(now);
-  osc.stop(now + 0.08);
-}
-
-function startSpinSound() {
-  stopSpinSound();
-  const ctx = getSfxContext();
-  if (!ctx) return;
-
-  const master = ctx.createGain();
-  master.gain.setValueAtTime(0.0001, ctx.currentTime);
-  master.gain.exponentialRampToValueAtTime(0.055, ctx.currentTime + 0.08);
-  master.connect(ctx.destination);
-
-  const osc = ctx.createOscillator();
-  const lfo = ctx.createOscillator();
-  const lfoGain = ctx.createGain();
-  osc.type = 'sawtooth';
-  osc.frequency.setValueAtTime(115, ctx.currentTime);
-  lfo.type = 'sine';
-  lfo.frequency.value = 8;
-  lfoGain.gain.value = 38;
-  lfo.connect(lfoGain).connect(osc.frequency);
-  osc.connect(master);
-  osc.start();
-  lfo.start();
-
-  spinSound = { master, osc, lfo };
-}
-
-function stopSpinSound() {
-  if (!spinSound || !sfxContext) return;
-  const now = sfxContext.currentTime;
-  const { master, osc, lfo } = spinSound;
-  master.gain.cancelScheduledValues(now);
-  master.gain.setValueAtTime(Math.max(master.gain.value, 0.0001), now);
-  master.gain.exponentialRampToValueAtTime(0.0001, now + 0.08);
-  try { osc.stop(now + 0.09); } catch (_) {}
-  try { lfo.stop(now + 0.09); } catch (_) {}
-  spinSound = null;
-}
-
-function playBoxOpenSound() {
-  const ctx = getSfxContext();
-  if (!ctx) return;
-  const now = ctx.currentTime;
-
-  // Short mechanical release / lid-open noise.
-  const bufferSize = Math.floor(ctx.sampleRate * 0.32);
-  const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
-  const data = buffer.getChannelData(0);
-  for (let i = 0; i < bufferSize; i++) {
-    const t = i / bufferSize;
-    data[i] = (Math.random() * 2 - 1) * Math.pow(1 - t, 2.2);
-  }
-  const noise = ctx.createBufferSource();
-  const noiseFilter = ctx.createBiquadFilter();
-  const noiseGain = ctx.createGain();
-  noise.buffer = buffer;
-  noiseFilter.type = 'bandpass';
-  noiseFilter.frequency.setValueAtTime(1450, now);
-  noiseFilter.Q.value = 0.9;
-  noiseGain.gain.setValueAtTime(0.0001, now);
-  noiseGain.gain.exponentialRampToValueAtTime(0.14, now + 0.018);
-  noiseGain.gain.exponentialRampToValueAtTime(0.0001, now + 0.30);
-  noise.connect(noiseFilter).connect(noiseGain).connect(ctx.destination);
-  noise.start(now);
-  noise.stop(now + 0.32);
-
-  // Bright reveal chime.
-  [660, 880, 1175].forEach((freq, i) => {
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
-    const t = now + i * 0.075;
-    osc.type = 'sine';
-    osc.frequency.setValueAtTime(freq, t);
-    gain.gain.setValueAtTime(0.0001, t);
-    gain.gain.exponentialRampToValueAtTime(0.075, t + 0.012);
-    gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.42);
-    osc.connect(gain).connect(ctx.destination);
-    osc.start(t);
-    osc.stop(t + 0.44);
-  });
-}
-
-function toggleSfx() {
-  sfxEnabled = !sfxEnabled;
-  if (!sfxEnabled) stopSpinSound();
-  else getSfxContext();
-  if (soundBtn) soundBtn.textContent = sfxEnabled ? '🔊' : '🔇';
-}
-
 function boxMarkup(b, i) {
   return `<article class="box-card ${i===4?'legend':''}" data-i="${i}">
     <span class="price">🪙 ${b.price}</span>
@@ -924,7 +799,6 @@ function resetRollBtnState(b) {
   hasClaimed = true;
   rolling = false;
   if(openScene) openScene.isOpening = false;
-  stopSpinSound();
   const overlay = $('#floatingOverlay');
   if(overlay) overlay.classList.remove('active');
 }
@@ -963,7 +837,6 @@ function setSelected(i) {
 // เลือกจำนวนครั้งที่จะเปิด
 $$('.amount-btn').forEach(btn => {
   btn.onclick = () => {
-    playMenuClick();
     if(rolling || !hasClaimed) return;
     $$('.amount-btn').forEach(b => b.classList.remove('active'));
     btn.classList.add('active');
@@ -972,6 +845,80 @@ $$('.amount-btn').forEach(btn => {
     resetRollBtnState(b);
   };
 });
+
+// Opening-box sound effects only: short "ฟุ๊ง" pulses during spin + bright "ฟิ๊ง" when the lid opens.
+let boxSoundCtx = null;
+let boxSpinSoundTimer = null;
+
+function getBoxSoundContext() {
+  try {
+    if (!boxSoundCtx) boxSoundCtx = new (window.AudioContext || window.webkitAudioContext)();
+    if (boxSoundCtx.state === 'suspended') boxSoundCtx.resume();
+    return boxSoundCtx;
+  } catch (_) {
+    return null;
+  }
+}
+
+function playSpinWhoosh() {
+  const ctx = getBoxSoundContext();
+  if (!ctx) return;
+
+  const now = ctx.currentTime;
+  const osc = ctx.createOscillator();
+  const gain = ctx.createGain();
+  const filter = ctx.createBiquadFilter();
+
+  osc.type = 'sine';
+  osc.frequency.setValueAtTime(420, now);
+  osc.frequency.exponentialRampToValueAtTime(150, now + 0.16);
+  filter.type = 'lowpass';
+  filter.frequency.setValueAtTime(1800, now);
+  filter.frequency.exponentialRampToValueAtTime(700, now + 0.16);
+  gain.gain.setValueAtTime(0.0001, now);
+  gain.gain.exponentialRampToValueAtTime(0.055, now + 0.025);
+  gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.17);
+
+  osc.connect(filter);
+  filter.connect(gain);
+  gain.connect(ctx.destination);
+  osc.start(now);
+  osc.stop(now + 0.18);
+}
+
+function startBoxSpinSound() {
+  stopBoxSpinSound();
+  playSpinWhoosh();
+  boxSpinSoundTimer = setInterval(playSpinWhoosh, 320);
+}
+
+function stopBoxSpinSound() {
+  if (boxSpinSoundTimer) {
+    clearInterval(boxSpinSoundTimer);
+    boxSpinSoundTimer = null;
+  }
+}
+
+function playBoxOpenChime() {
+  const ctx = getBoxSoundContext();
+  if (!ctx) return;
+
+  const now = ctx.currentTime;
+  [880, 1320, 1760].forEach((freq, i) => {
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(freq, now + i * 0.035);
+    osc.frequency.exponentialRampToValueAtTime(freq * 1.08, now + i * 0.035 + 0.45);
+    gain.gain.setValueAtTime(0.0001, now + i * 0.035);
+    gain.gain.exponentialRampToValueAtTime(0.13 - i * 0.02, now + i * 0.035 + 0.025);
+    gain.gain.exponentialRampToValueAtTime(0.0001, now + i * 0.035 + 0.65);
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start(now + i * 0.035);
+    osc.stop(now + i * 0.035 + 0.68);
+  });
+}
 
 function openBox(i) {
   setSelected(i);
@@ -982,8 +929,8 @@ function openBox(i) {
   }, 30);
 }
 
-$$('.box-card').forEach(c => c.addEventListener('click', () => { playMenuClick(); openBox(+c.dataset.i); }));
-$$('[data-open]').forEach(b => b.addEventListener('click', () => { playMenuClick(); openBox(+b.dataset.open); }));
+$$('.box-card').forEach(c => c.addEventListener('click', () => openBox(+c.dataset.i)));
+$$('[data-open]').forEach(b => b.addEventListener('click', () => openBox(+b.dataset.open)));
 
 $('#closeModal')?.addEventListener('click', () => $('#openModal')?.classList.add('hidden'));
 
@@ -1093,7 +1040,6 @@ if(rollBtn) {
 
     rolling = true;
     hasClaimed = false;
-    startSpinSound();
     points = newPoints;
     syncPoints();
     
@@ -1136,6 +1082,7 @@ if(rollBtn) {
     const startTime = performance.now();
     const spinDuration = 2000; 
     const totalRounds = 6;     
+    startBoxSpinSound();
 
     function animateSpinAndOpen(now) {
       const elapsed = now - startTime;
@@ -1146,9 +1093,9 @@ if(rollBtn) {
         openScene.box.rotation.y = easeOut * (Math.PI * 2 * totalRounds);
         requestAnimationFrame(animateSpinAndOpen);
       } else {
+        stopBoxSpinSound();
         openScene.box.rotation.y = 0;
-        stopSpinSound();
-        playBoxOpenSound();
+        playBoxOpenChime();
 
         const openStartTime = performance.now();
         const openDuration = 1200;
@@ -1214,7 +1161,7 @@ if(rollBtn) {
 }
 
 const soundBtn = $('#soundBtn');
-if(soundBtn) soundBtn.onclick = () => { toggleSfx(); playMenuClick(); };
+if(soundBtn) soundBtn.onclick = () => toast('ระบบเสียงพร้อมใช้งานใน Prototype');
 
 // Top-up system: isolated from the existing box/3D/gameplay logic.
 const topupModal = $('#topupModal');
@@ -1317,7 +1264,6 @@ function showHomePage() {
 }
 
 $$('.nav').forEach(n => n.onclick = () => {
-  playMenuClick();
   $$('.nav').forEach(x => x.classList.remove('active'));
   n.classList.add('active');
   const p = n.dataset.page;
