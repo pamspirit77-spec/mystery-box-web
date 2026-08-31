@@ -1,29 +1,11 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { SUPABASE_URL, SUPABASE_ANON_KEY, SUPABASE_ENABLED } from './supabase-config.js';
 
-const AUTH_MARKER = 'mystery_box_auth_user_id';
-const LOGOUT_MARKER = 'mystery_box_logged_out';
-
 class OnlineDB {
   constructor() {
     this.client = null;
     this.user = null;
     this.enabled = SUPABASE_ENABLED;
-  }
-
-  clearBrowserAuthStorage() {
-    try {
-      const projectRef = new URL(SUPABASE_URL).hostname.split('.')[0];
-      const prefixes = [`sb-${projectRef}-auth-token`];
-      for (const storage of [localStorage, sessionStorage]) {
-        const keys = [];
-        for (let i = 0; i < storage.length; i++) {
-          const key = storage.key(i);
-          if (key && prefixes.some(prefix => key === prefix || key.startsWith(prefix + '-'))) keys.push(key);
-        }
-        keys.forEach(key => storage.removeItem(key));
-      }
-    } catch (_) {}
   }
 
   async init() {
@@ -33,35 +15,23 @@ class OnlineDB {
       auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true }
     });
 
-    // If the user explicitly logged out, never restore a previous browser session.
-    if (localStorage.getItem(LOGOUT_MARKER) === '1') {
-      try { await this.client.auth.signOut({ scope: 'local' }); } catch (_) {}
-      this.clearBrowserAuthStorage();
-      this.user = null;
-      return null;
-    }
-
     const { data: { session } } = await this.client.auth.getSession();
     this.user = session?.user ?? null;
 
-    if (!this.user) {
-      localStorage.removeItem(AUTH_MARKER);
-      return null;
-    }
-
-    localStorage.setItem(AUTH_MARKER, this.user.id);
-    return await this.loadProfile();
+    // No anonymous account: the real account system will use Supabase Auth.
+    // This keeps the game usable locally until Login/Register is connected.
+    return this.user ? await this.loadProfile() : null;
   }
 
   async signUp(email, password, username = '') {
     if (!this.client) throw new Error('Supabase is not configured');
 
-    // Always clear the currently persisted session before creating a different account.
-    try { await this.client.auth.signOut({ scope: 'local' }); } catch (_) {}
-    this.clearBrowserAuthStorage();
-    this.user = null;
-    localStorage.removeItem(AUTH_MARKER);
-    localStorage.removeItem(LOGOUT_MARKER);
+    // A new registration must never inherit the previous account's session.
+    // This is especially important when the user registers immediately after
+    // logging out in the same browser.
+    // Always clear any persisted local Auth session before creating a new account.
+    // This prevents a previous account from being restored after a refresh.
+    await this.signOut();
 
     const { data, error } = await this.client.auth.signUp({
       email,
@@ -69,20 +39,7 @@ class OnlineDB {
       options: { data: { username } }
     });
     if (error) throw error;
-
-    this.user = data?.session?.user || data?.user || null;
-
-    // Supabase can return a user without a session when email confirmation is enabled.
-    // Never keep or restore the previous account in that case.
-    if (!data?.session) {
-      this.user = null;
-      localStorage.setItem(LOGOUT_MARKER, '1');
-      this.clearBrowserAuthStorage();
-    } else {
-      localStorage.setItem(AUTH_MARKER, this.user.id);
-      localStorage.removeItem(LOGOUT_MARKER);
-    }
-
+    this.user = data?.user ?? null;
     return data;
   }
 
@@ -91,26 +48,30 @@ class OnlineDB {
     const { data, error } = await this.client.auth.signInWithPassword({ email, password });
     if (error) throw error;
     this.user = data.user;
-    localStorage.setItem(AUTH_MARKER, this.user.id);
-    localStorage.removeItem(LOGOUT_MARKER);
     return await this.loadProfile();
   }
 
   async signOut() {
-    if (this.client) {
-      try { await this.client.auth.signOut({ scope: 'local' }); } catch (error) {
-        // Even if Supabase's network call fails, remove the local session so refresh cannot restore it.
-        this.user = null;
-        localStorage.removeItem(AUTH_MARKER);
-        localStorage.setItem(LOGOUT_MARKER, '1');
-        this.clearBrowserAuthStorage();
-        throw error;
-      }
+    if (!this.client) {
+      this.user = null;
+      return;
     }
+
+    // Logout only this browser/device and remove the persisted Supabase session.
+    const { error } = await this.client.auth.signOut({ scope: 'local' });
+    if (error) throw error;
     this.user = null;
-    localStorage.removeItem(AUTH_MARKER);
-    localStorage.setItem(LOGOUT_MARKER, '1');
-    this.clearBrowserAuthStorage();
+
+    // Also remove the browser-persisted auth token for this Supabase project.
+    // This is deliberately limited to the Supabase auth key; game data/history
+    // in localStorage must not be touched.
+    try {
+      const projectRef = new URL(SUPABASE_URL).hostname.split('.')[0];
+      localStorage.removeItem(`sb-${projectRef}-auth-token`);
+      sessionStorage.removeItem(`sb-${projectRef}-auth-token`);
+    } catch (_) {}
+
+    this.user = null;
   }
 
   async loadProfile() {
@@ -148,14 +109,14 @@ class OnlineDB {
   }
 
   async saveCoins(coins) {
-    if (!this.client || !this.user) throw new Error('กรุณาเข้าสู่ระบบก่อนใช้เหรียญ');
+    if (!this.client || !this.user) return false;
 
     const userId = this.user.id;
     const newCoins = Math.max(0, Math.floor(Number(coins)));
-    if (!Number.isFinite(newCoins)) throw new Error('จำนวนเหรียญไม่ถูกต้อง');
 
-    // Update ONLY the coins column. No select(), no single(), and no updated_at.
-    // This avoids the PostgREST/RLS response error that previously blocked opening boxes.
+    // Update only the coins column. Do not request the updated row here.
+    // Some existing profiles tables do not have updated_at, and requesting
+    // a row can also fail when PostgREST/RLS returns no representation.
     const { error } = await this.client
       .from('profiles')
       .update({ coins: newCoins })
@@ -166,18 +127,19 @@ class OnlineDB {
       throw error;
     }
 
-    // Read back the balance using the same authenticated user to make sure the save stuck.
-    const { data: saved, error: verifyError } = await this.client
+    // Verify by reading the same user's profile. This makes sure the new
+    // balance is really stored before the game continues the roll.
+    const { data: profile, error: verifyError } = await this.client
       .from('profiles')
       .select('id, coins')
       .eq('id', userId)
       .maybeSingle();
 
     if (verifyError) {
-      console.warn('Supabase coins verification failed:', verifyError);
+      console.warn('Supabase coins verify failed:', verifyError);
       throw verifyError;
     }
-    if (!saved || saved.id !== userId || Number(saved.coins) !== newCoins) {
+    if (!profile || profile.id !== userId || Number(profile.coins) !== newCoins) {
       throw new Error('บันทึกเหรียญไม่สำเร็จ');
     }
 
