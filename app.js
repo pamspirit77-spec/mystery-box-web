@@ -558,6 +558,8 @@ loginForm?.addEventListener('submit', async (e) => {
     } catch (err) {
       console.warn('Online history load unavailable:', err);
     }
+    // Restart live balance polling after a manual login. Logout stops it.
+    startLiveBalanceSync();
     await applySiteSettings();
   } catch (err) {
     setAuthMessage('#loginMessage', err?.message || 'อีเมลหรือรหัสผ่านไม่ถูกต้อง');
@@ -605,6 +607,10 @@ registerForm?.addEventListener('submit', async (e) => {
       points = Number(profile.coins);
       syncPoints();
     }
+    // A newly registered account must also start the live balance sync.
+    // Without this, top-up approval would only appear after F5 because
+    // logout had stopped the previous account's polling timer.
+    startLiveBalanceSync();
     setAuthMessage('#registerMessage', '');
     await applySiteSettings();
   } catch (err) {
