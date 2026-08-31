@@ -244,8 +244,13 @@ class OnlineDB {
     if (!this.client) return [];
     const currentUser = await this.refreshAuthenticatedUser();
     if (!currentUser) return [];
-    const { data, error } = await this.client.from('player_inventory')
-      .select('items').eq('user_id', currentUser.id).maybeSingle();
+
+    const { data, error } = await this.client
+      .from('player_inventory')
+      .select('items')
+      .eq('user_id', currentUser.id)
+      .maybeSingle();
+
     if (error) throw error;
     return Array.isArray(data?.items) ? data.items : [];
   }
@@ -254,9 +259,15 @@ class OnlineDB {
     if (!this.client) return false;
     const currentUser = await this.refreshAuthenticatedUser();
     if (!currentUser) return false;
-    const { error } = await this.client.from('player_inventory').upsert({
-      user_id: currentUser.id, items: Array.isArray(items) ? items : [], updated_at: new Date().toISOString()
-    }, { onConflict: 'user_id' });
+
+    const { error } = await this.client
+      .from('player_inventory')
+      .upsert({
+        user_id: currentUser.id,
+        items: Array.isArray(items) ? items : [],
+        updated_at: new Date().toISOString()
+      }, { onConflict: 'user_id' });
+
     if (error) throw error;
     return true;
   }

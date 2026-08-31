@@ -405,6 +405,24 @@ const openCanvas = $('#openCanvas');
 let openScene = null;
 if(openCanvas) openScene = mountScene(openCanvas, boxes[4], true);
 
+async function saveCloudInventory() {
+  try {
+    await online.saveInventory(rewards);
+  } catch (err) {
+    console.warn('Online inventory save unavailable:', err);
+  }
+}
+
+async function loadCloudInventory() {
+  try {
+    const cloudInventory = await online.getInventory();
+    rewards = Array.isArray(cloudInventory) ? cloudInventory : [];
+    renderInventory();
+  } catch (err) {
+    console.warn('Online inventory load unavailable:', err);
+  }
+}
+
 // แสดงผลคลังรางวัลที่หน้าแรก
 function renderInventory() {
   const el = $('#inventoryGrid');
@@ -550,6 +568,7 @@ loginForm?.addEventListener('submit', async (e) => {
       points = Number(profile.coins);
       syncPoints();
     }
+    await loadCloudInventory();
     try {
       const cloudHistory = await online.getRollHistory();
       if (cloudHistory.length) {
@@ -609,6 +628,7 @@ registerForm?.addEventListener('submit', async (e) => {
       points = Number(profile.coins);
       syncPoints();
     }
+    await loadCloudInventory();
     // A newly registered account must also start the live balance sync.
     // Without this, top-up approval would only appear after F5 because
     // logout had stopped the previous account's polling timer.
@@ -701,6 +721,7 @@ online.init().then(async profile => {
     points = Number(profile.coins);
     syncPoints();
   }
+  await loadCloudInventory();
   startLiveBalanceSync();
   try {
     const cloudHistory = await online.getRollHistory();
@@ -1122,6 +1143,7 @@ if(rollBtn) {
               rewards.unshift(item);
               addWinnerRecord(item.name, b.rarity, b.icon, b.name);
             });
+            await saveCloudInventory();
             renderInventory();
             
             if($('#floatRarity')) {
