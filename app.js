@@ -14,13 +14,9 @@ let points = 24;
 let selected = 4;
 let rollCount = 1;
 
-// คลังรางวัลของผู้ใช้
-let rewards = [
-  {id: 1, name:'AirPods Pro 2', rarity:'EPIC', icon:'🎧'},
-  {id: 2, name:'เสื้อฮู้ด', rarity:'UNCOMMON', icon:'👕'},
-  {id: 3, name:'ข้าวกล่อง', rarity:'COMMON', icon:'🍔'},
-  {id: 4, name:'iPhone 15 Pro Max', rarity:'LEGENDARY', icon:'📱'}
-];
+// คลังรางวัลของผู้ใช้ — ผู้เล่นใหม่ต้องเริ่มจากคลังว่าง
+// รางวัลจะถูกเพิ่มเข้าคลังเฉพาะเมื่อมีการสุ่มสำเร็จเท่านั้น
+let rewards = [];
 
 // รายการรางวัลล่าสุดที่สุ่มได้จากการเปิดครั้งนี้
 let lastRolledItems = [];
