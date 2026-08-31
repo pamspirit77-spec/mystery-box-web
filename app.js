@@ -1468,6 +1468,7 @@ function showAccountPage() {
 }
 
 function showHomePage() {
+  document.body.classList.remove('battle-mode-active');
   ['.hero', '.content', '.bottom-grid'].forEach(sel => document.querySelector(sel)?.classList.remove('hidden'));
   $('#accountPage')?.classList.add('hidden');
   $('#gamePage')?.classList.add('hidden');
@@ -2022,6 +2023,7 @@ async function joinBattleRoom() {
 }
 
 function showBattlePage() {
+  document.body.classList.add('battle-mode-active');
   ['.hero','.content','.bottom-grid','#accountPage'].forEach(sel => document.querySelector(sel)?.classList.add('hidden'));
   $('#gamePage')?.classList.remove('hidden');
   loadBattleMeta();
@@ -2065,3 +2067,39 @@ loadBattleMeta();
 updateBattlePositions();
 renderBattleSystem('gacha');
 battleStatus();
+
+
+/* V25 touch/mouse aiming: drag from the player toward the enemy, release to throw. */
+(function initBattleDragAim(){
+  const arena = $('#battleArena');
+  if (!arena) return;
+  let dragging=false, startX=0, startY=0;
+  function updateFromPointer(ev){
+    const r=arena.getBoundingClientRect();
+    const x=ev.clientX-r.left, y=ev.clientY-r.top;
+    const px=(10+battleState.playerPos*20)/100*r.width;
+    const py=.69*r.height;
+    const dx=x-px, dy=py-y;
+    if(dx===0 && dy===0) return;
+    const deg=Math.max(20,Math.min(75,Math.round(Math.atan2(Math.abs(dy),Math.abs(dx))*180/Math.PI)));
+    const power=Math.max(35,Math.min(100,Math.round(Math.hypot(dx,dy)/Math.max(1,r.width)*180)));
+    battleState.angle=deg; battleState.power=power;
+    const a=$('#angleValue'), p=$('#powerValue'); if(a) a.textContent=`${deg}°`; if(p) p.textContent=`${power}%`;
+    const ai=$('#angleInput'), pi=$('#powerInput'); if(ai) ai.value=deg; if(pi) pi.value=power;
+    updateAimPreview();
+  }
+  arena.addEventListener('pointerdown',ev=>{
+    if(ev.target.closest('button,input')) return;
+    if(battleState.phase!=='player' || battleState.gameOver) return;
+    dragging=true; startX=ev.clientX; startY=ev.clientY;
+    try{arena.setPointerCapture(ev.pointerId)}catch(_){ }
+    updateFromPointer(ev);
+  });
+  arena.addEventListener('pointermove',ev=>{ if(dragging) updateFromPointer(ev); });
+  arena.addEventListener('pointerup',ev=>{
+    if(!dragging) return; dragging=false;
+    const moved=Math.hypot(ev.clientX-startX,ev.clientY-startY);
+    if(moved>12 && battleState.phase==='player' && !battleState.gameOver) playerAttack();
+  });
+  arena.addEventListener('pointercancel',()=>{dragging=false});
+})();
