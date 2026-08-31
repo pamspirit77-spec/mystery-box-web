@@ -3,8 +3,8 @@ import { SUPABASE_URL, SUPABASE_ANON_KEY, SUPABASE_ENABLED } from './supabase-co
 
 const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
 const loginPanel=$('#loginPanel'), adminPanel=$('#adminPanel'), loginForm=$('#loginForm');
-const loginMessage=$('#loginMessage'), statusEl=$('#adminStatus'), listEl=$('#topupList'), claimList=$('#claimList'), userList=$('#userList');
-let client=null, topups=[], claims=[], users=[];
+const loginMessage=$('#loginMessage'), statusEl=$('#adminStatus'), listEl=$('#topupList'), userList=$('#userList');
+let client=null, topups=[], users=[], rewardClaims=[];
 let userPage=1, userPageSize=20, userTotal=0;
 
 function escapeHtml(v=''){return String(v).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[c]));}
@@ -26,6 +26,69 @@ function filteredTopups(){
  const f=$('#topupFilter').value, q=$('#topupSearch').value.trim().toLowerCase();
  return topups.filter(r=>(f==='all'||r.status===f)&&(!q||`${r.username||''} ${r.user_id||''} ${r.id||''}`.toLowerCase().includes(q)));
 }
+function filteredClaims(){
+ const f=$('#claimFilter')?.value || 'all', q=$('#claimSearch')?.value.trim().toLowerCase() || '';
+ return rewardClaims.filter(r=>
+   (f==='all'||r.status===f) &&
+   (!q||`${r.username||''} ${r.user_id||''} ${r.email||''} ${r.id||''}`.toLowerCase().includes(q))
+ );
+}
+function renderClaims(){
+ const el=$('#claimList'); if(!el) return;
+ const rows=filteredClaims();
+ if(!rows.length){el.innerHTML='<div class="empty">ไม่พบคำขอรับรางวัล</div>';return;}
+ el.innerHTML=rows.map(r=>{
+   const items=Array.isArray(r.items)?r.items:[];
+   const itemsHtml=items.map(item=>`<div class="claim-item">
+      <span class="claim-icon">${escapeHtml(item.icon||'🎁')}</span>
+      <span class="claim-name">${escapeHtml(item.name||'-')}</span>
+      <span class="claim-rarity">${escapeHtml(item.rarity||'-')}</span>
+   </div>`).join('');
+   const statusText=r.status==='pending'?'รอตรวจสอบ':r.status==='approved'?'อนุมัติแล้ว':'ปฏิเสธแล้ว';
+   const actions=r.status==='pending'
+     ? `<div class="actions">
+          <button class="approve-btn" data-claim-action="approve" data-claim-id="${escapeHtml(r.id)}">✓ อนุมัติ</button>
+          <button class="reject-btn" data-claim-action="reject" data-claim-id="${escapeHtml(r.id)}">✕ ปฏิเสธ</button>
+        </div>`
+     : `<span class="status ${escapeHtml(r.status)}">${statusText}</span>`;
+   return `<article class="request-card">
+      <div class="request-head">
+        <div>
+          <h3>${escapeHtml(r.username||'ไม่มีชื่อ')}</h3>
+          <div class="meta">Email: ${escapeHtml(r.email||'-')}<br>UUID: ${escapeHtml(r.user_id||'-')}<br>${r.created_at?new Date(r.created_at).toLocaleString('th-TH'):'-'}</div>
+        </div>
+        <span class="status ${escapeHtml(r.status)}">${statusText}</span>
+      </div>
+      <div class="details-grid">
+        <div class="detail"><small>จำนวนรางวัล</small><b>${items.length}</b> ชิ้น</div>
+        <div class="detail" style="grid-column:span 2"><small>รางวัลที่ขอรับ</small><div class="claim-items">${itemsHtml||'<span>-</span>'}</div></div>
+      </div>
+      ${actions}
+   </article>`;
+ }).join('');
+ bindClaimEvents();
+}
+function bindClaimEvents(){
+ $$('[data-claim-action]').forEach(btn=>btn.onclick=async()=>{
+   const approve=btn.dataset.claimAction==='approve';
+   if(!confirm(approve?'ยืนยันอนุมัติการขอรับรางวัลนี้?':'ยืนยันปฏิเสธการขอรับรางวัลนี้?')) return;
+   btn.disabled=true;
+   const {error}=await getClient().rpc('admin_review_reward_claim',{
+     p_claim_id:btn.dataset.claimId,
+     p_approve:approve
+   });
+   if(error){alert(error.message);btn.disabled=false;return;}
+   await loadRewardClaims();
+ });
+}
+async function loadRewardClaims(){
+ const {data,error}=await getClient().rpc('admin_list_reward_claims');
+ if(error) throw error;
+ rewardClaims=data||[];
+ renderClaims();
+ renderStats();
+}
+
 function renderTopups(){
  const rows=filteredTopups();
  if(!rows.length){listEl.innerHTML='<div class="empty">ไม่พบรายการ</div>';return;}
@@ -50,53 +113,12 @@ function bindTopupEvents(){
  $$('[data-copy]').forEach(btn=>btn.onclick=async()=>{try{await navigator.clipboard.writeText(btn.dataset.copy);btn.textContent='คัดลอกแล้ว';}catch{alert('คัดลอกไม่สำเร็จ');}});
  $$('[data-proof]').forEach(a=>a.onclick=async e=>{e.preventDefault();const {data,error}=await getClient().storage.from('topup-proofs').createSignedUrl(a.dataset.proof,600);if(error){alert(error.message);return;}window.open(data.signedUrl,'_blank','noopener');});
 }
-function filteredClaims(){
- const f=$('#claimFilter').value, q=$('#claimSearch').value.trim().toLowerCase();
- return claims.filter(r=>(f==='all'||r.status===f)&&(!q||`${r.username||''} ${r.email||''} ${r.user_id||''} ${r.id||''}`.toLowerCase().includes(q)));
-}
-function renderClaims(){
- const rows=filteredClaims();
- if(!claimList) return;
- if(!rows.length){claimList.innerHTML='<div class="empty">ไม่พบคำขอรับรางวัล</div>';return;}
- claimList.innerHTML=rows.map(r=>{
-   const items=Array.isArray(r.items)?r.items:[];
-   const itemsHtml=items.length?items.map(item=>`<div class="claim-item"><span class="icon">${escapeHtml(item.icon||'🎁')}</span><div><b>${escapeHtml(item.name||'-')}</b><div class="meta">${escapeHtml(item.rarity||'')}</div></div></div>`).join(''):'<div class="meta">ไม่มีข้อมูลรางวัล</div>';
-   const action=r.status==='pending'?`<div class="actions"><button class="approve-btn" data-claim-action="approve" data-claim-id="${r.id}">✓ อนุมัติรับรางวัล</button><button class="reject-btn" data-claim-action="reject" data-claim-id="${r.id}">✕ ปฏิเสธ</button></div>`:`<span class="status ${escapeHtml(r.status)}">${r.status==='approved'?'อนุมัติแล้ว':'ปฏิเสธแล้ว'}</span>`;
-   return `<article class="request-card"><div class="request-head"><div><h3>${escapeHtml(r.username||'ไม่ทราบชื่อ')}</h3><div class="meta">Email: ${escapeHtml(r.email||'-')}<br>UUID: ${escapeHtml(r.user_id||'-')} • ${r.created_at?new Date(r.created_at).toLocaleString('th-TH'):'-'}</div></div><span class="status ${escapeHtml(r.status)}">${escapeHtml(r.status)}</span></div><div class="detail" style="margin-top:15px"><small>รางวัลที่ขอรับ (${items.length} ชิ้น)</small><div class="claim-items">${itemsHtml}</div></div>${r.reviewed_at?`<div class="meta" style="margin-top:10px">ตรวจสอบเมื่อ ${new Date(r.reviewed_at).toLocaleString('th-TH')}</div>`:''}${action}</article>`;
- }).join('');
- bindClaimEvents();
-}
-function bindClaimEvents(){
- $$('[data-claim-action]').forEach(btn=>btn.onclick=async()=>{
-   const approve=btn.dataset.claimAction==='approve';
-   if(!confirm(approve?'ยืนยันอนุมัติคำขอรับรางวัลนี้?':'ยืนยันปฏิเสธคำขอรับรางวัลนี้?'))return;
-   btn.disabled=true;
-   const {error}=await getClient().rpc('admin_review_reward_claim',{p_claim_id:Number(btn.dataset.claimId),p_approve:approve});
-   if(error){alert(error.message);btn.disabled=false;return;}
-   await loadAll();
- });
-}
 function renderUsers(){
  const q=$('#userSearch').value.trim().toLowerCase();
  const rows=users.filter(u=>!q||`${u.username||''} ${u.id||''} ${u.email||''}`.toLowerCase().includes(q));
  if(!rows.length){userList.innerHTML='<div class="empty">ไม่พบผู้เล่น</div>'; renderUserPagination(); return;}
- userList.innerHTML=rows.map((u,i)=>`<article class="user-card"><div class="user-main"><div><div class="user-number">#${((userPage-1)*userPageSize)+i+1}</div><b>${escapeHtml(u.username||'ไม่มีชื่อ')}</b><div class="meta">${escapeHtml(u.email||'')}<br>${escapeHtml(u.id)}<br>สมัครเมื่อ ${u.created_at?new Date(u.created_at).toLocaleString('th-TH'):'-'}</div></div><div><div class="coin">🪙 ${Number(u.coins||0).toLocaleString()}</div><div class="user-actions"><input type="number" min="1" max="1000000" value="1" data-coin-amount="${u.id}"><button class="add-coin-btn" data-coin-action="add" data-user-id="${u.id}">+ เพิ่มเหรียญ</button><button class="remove-coin-btn" data-coin-action="remove" data-user-id="${u.id}">− ลบเหรียญ</button></div></div></div></article>`).join('');
- bindUserCoinEvents();
+ userList.innerHTML=rows.map((u,i)=>`<article class="user-card"><div class="user-main"><div><div class="user-number">#${((userPage-1)*userPageSize)+i+1}</div><b>${escapeHtml(u.username||'ไม่มีชื่อ')}</b><div class="meta">${escapeHtml(u.email||'')}<br>${escapeHtml(u.id)}<br>สมัครเมื่อ ${u.created_at?new Date(u.created_at).toLocaleString('th-TH'):'-'}</div></div><div class="coin">🪙 ${Number(u.coins||0).toLocaleString()}</div></div></article>`).join('');
  renderUserPagination();
-}
-function bindUserCoinEvents(){
- $$('[data-coin-action]').forEach(btn=>btn.onclick=async()=>{
-   const input=$(`[data-coin-amount="${btn.dataset.userId}"]`);
-   const amount=Math.floor(Number(input?.value||0));
-   if(!Number.isInteger(amount)||amount<1||amount>1000000){alert('จำนวนเหรียญต้องอยู่ระหว่าง 1 ถึง 1,000,000');return;}
-   const add=btn.dataset.coinAction==='add';
-   if(!confirm(`${add?'เพิ่ม':'ลบ'} ${amount.toLocaleString()} เหรียญให้ผู้เล่นนี้?`))return;
-   btn.disabled=true;
-   const {data,error}=await getClient().rpc('admin_adjust_coins',{p_user_id:btn.dataset.userId,p_delta:add?amount:-amount});
-   if(error){alert(error.message);btn.disabled=false;return;}
-   alert(`ยอดเหรียญใหม่: ${Number(data||0).toLocaleString()}`);
-   await loadUsers();
- });
 }
 function renderUserPagination(){
  const el=$('#userPagination'); if(!el) return;
@@ -123,11 +145,8 @@ async function loadAll(){
  const a=await getClient().rpc('admin_list_topups');
  if(a.error)throw a.error;
  topups=a.data||[];
- const cr=await getClient().rpc('admin_list_reward_claims');
- if(cr.error)throw cr.error;
- claims=cr.data||[];
  renderTopups();
- renderClaims();
+ await loadRewardClaims();
  await loadUsers();
  await loadSite();
  statusEl.textContent=`พร้อมใช้งาน • ${topups.length} รายการเติมเงิน • ผู้เล่น ${userTotal.toLocaleString()} คน`;

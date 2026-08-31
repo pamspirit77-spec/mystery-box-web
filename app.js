@@ -518,25 +518,24 @@ function openInventoryModal() {
       </div>
     `).join('');
 
-    // ส่งคำขอรับรางวัลให้แอดมินก่อนนำรางวัลออกจากคลัง
+    // ผูก Event ให้ปุ่มกดขอรับรายชิ้น
     $$('.claim-single-btn').forEach(btn => {
       btn.onclick = async () => {
         const id = Number(btn.dataset.id);
-        const originalRewards = [...rewards];
+        const item = rewards.find(x => Number(x.id) === id);
+        if (!item) return;
         btn.disabled = true;
         try {
-          const result = await online.submitRewardClaim([id]);
-          rewards = result.remainingItems;
+          await online.createRewardClaim([id]);
+          rewards = rewards.filter(x => Number(x.id) !== id);
           cacheInventoryLocally(rewards);
           renderInventory();
           openInventoryModal();
           toast('ส่งคำขอรับรางวัลให้แอดมินแล้ว');
         } catch (err) {
+          console.error('Reward claim failed:', err);
           btn.disabled = false;
-          rewards = originalRewards;
-          renderInventory();
-          openInventoryModal();
-          toast(err.message || 'ส่งคำขอรับรางวัลไม่สำเร็จ');
+          toast(err?.message || 'ส่งคำขอรับรางวัลไม่สำเร็จ กรุณาลองใหม่');
         }
       };
     });
@@ -545,7 +544,7 @@ function openInventoryModal() {
   modal.classList.remove('hidden');
 }
 
-// ขอรับรางวัลทั้งหมดในคลัง — ส่งคำขอให้แอดมินก่อน
+// ขอรับรางวัลทั้งหมดในคลัง
 const claimAllBtn = $('#claimAllBtn');
 if(claimAllBtn) {
   claimAllBtn.onclick = async () => {
@@ -553,20 +552,17 @@ if(claimAllBtn) {
       toast('ไม่มีรางวัลในคลังให้ขอรับ');
       return;
     }
-    const originalRewards = [...rewards];
     claimAllBtn.disabled = true;
     try {
-      const result = await online.submitRewardClaim(originalRewards.map(item => item.id));
-      rewards = result.remainingItems;
+      await online.createRewardClaim(null);
+      rewards = [];
       cacheInventoryLocally(rewards);
       renderInventory();
       openInventoryModal();
       toast('ส่งคำขอรับรางวัลทั้งหมดให้แอดมินแล้ว');
     } catch (err) {
-      rewards = originalRewards;
-      renderInventory();
-      openInventoryModal();
-      toast(err.message || 'ส่งคำขอรับรางวัลไม่สำเร็จ');
+      console.error('Reward claim all failed:', err);
+      toast(err?.message || 'ส่งคำขอรับรางวัลไม่สำเร็จ กรุณาลองใหม่');
     } finally {
       claimAllBtn.disabled = false;
     }

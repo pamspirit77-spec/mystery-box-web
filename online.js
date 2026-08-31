@@ -286,22 +286,19 @@ class OnlineDB {
     return true;
   }
 
-  async submitRewardClaim(itemIds = []) {
-    if (!this.client) throw new Error('กรุณาเข้าสู่ระบบก่อนขอรับรางวัล');
+  async createRewardClaim(itemIds = null) {
+    if (!this.client) throw new Error('Supabase is not configured');
     const currentUser = await this.refreshAuthenticatedUser();
     if (!currentUser) throw new Error('กรุณาเข้าสู่ระบบก่อนขอรับรางวัล');
 
-    const ids = Array.isArray(itemIds) ? itemIds : [];
-    const { data, error } = await this.client.rpc('submit_reward_claim', {
-      p_item_ids: ids
-    });
-    if (error) throw error;
-    if (!data || !data.claim_id) throw new Error('ส่งคำขอรับรางวัลไม่สำเร็จ');
+    const payload = itemIds === null
+      ? { p_item_ids: null }
+      : { p_item_ids: Array.isArray(itemIds) ? itemIds.map(String) : [String(itemIds)] };
 
-    return {
-      claimId: data.claim_id,
-      remainingItems: Array.isArray(data.remaining_items) ? data.remaining_items : []
-    };
+    const { data, error } = await this.client.rpc('create_reward_claim', payload);
+    if (error) throw error;
+    if (!data) throw new Error('สร้างคำขอรับรางวัลไม่สำเร็จ');
+    return data;
   }
 
   async getRollHistory() {
