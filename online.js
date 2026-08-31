@@ -311,6 +311,35 @@ class OnlineDB {
     return data;
   }
 
+  getRealtimeClient() {
+    return this.client;
+  }
+
+  openBattleRoom(roomCode, onMessage) {
+    if (!this.client) throw new Error('ระบบออนไลน์ยังไม่ได้เชื่อมต่อ');
+    const safeCode = String(roomCode || '').toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 6);
+    if (safeCode.length !== 6) throw new Error('รหัสห้องต้องมี 6 ตัว');
+
+    const channel = this.client.channel(`battle-room-${safeCode}`, { config: { broadcast: { self: false } } });
+    channel.on('broadcast', { event: 'battle' }, payload => {
+      try { onMessage?.(payload?.payload || payload || {}); } catch (err) {
+        console.warn('Battle message handler failed:', err);
+      }
+    });
+    channel.subscribe();
+    return channel;
+  }
+
+  async sendBattleMessage(channel, payload) {
+    if (!channel) return;
+    await channel.send({ type: 'broadcast', event: 'battle', payload });
+  }
+
+  async closeBattleRoom(channel) {
+    if (!this.client || !channel) return;
+    try { await this.client.removeChannel(channel); } catch (_) {}
+  }
+
   async getRollHistory() {
     if (!this.client) return [];
     const currentUser = await this.refreshAuthenticatedUser();

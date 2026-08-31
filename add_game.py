@@ -1,46 +1,20 @@
 from pathlib import Path
-p=Path('/mnt/data/v30/index.html')
-s=p.read_text()
-s=s.replace('<button class="nav" data-page="boxes">📦 <span>กล่องสุ่ม</span></button>', '<button class="nav" data-page="boxes">📦 <span>กล่องสุ่ม</span></button>\n        <button class="nav" data-page="game">🐟 <span>เข้าเกม</span></button>')
-marker='      <section class="account-page hidden" id="accountPage">'
-insert=r'''      <section class="betta-page hidden" id="bettaPage">
-        <div class="betta-hero">
-          <div>
-            <div class="eyebrow">BETTA FRONTIER</div>
-            <h1>🐟 สนามปลากัด</h1>
-            <p>ทีมปลาของคุณจะเคลื่อนที่และต่อสู้แบบอัตโนมัติ เลือกด่าน อัปเกรดทีม แล้วส่งลงสนาม</p>
-          </div>
-          <div class="betta-player-card"><span>ทีมของฉัน</span><b id="bettaTeamPower">พลัง 120</b><small id="bettaTeamLevel">ทีมเลเวล 1</small></div>
-        </div>
-        <div class="betta-tabs">
-          <button class="betta-tab active" data-betta-mode="pve" type="button">⚔️ PVE ฟาร์ม</button>
-          <button class="betta-tab" data-betta-mode="pvp" type="button">🏆 PVP ออนไลน์</button>
-          <button class="betta-tab" data-betta-mode="team" type="button">🐠 ทีมของฉัน</button>
-        </div>
-        <div id="bettaPvePanel" class="betta-panel">
-          <div class="stage-head"><div><h2>เลือกด่าน</h2><p>ผ่านด่านเพื่อรับ EXP และเหรียญฟาร์ม</p></div><span id="bettaEnergy">⚡ 10/10</span></div>
-          <div class="stage-grid" id="bettaStageGrid"></div>
-        </div>
-        <div id="bettaPvpPanel" class="betta-panel hidden">
-          <div class="pvp-card"><div class="pvp-emblem">⚔️</div><h2>อารีน่า PVP</h2><p>จับคู่คู่ต่อสู้ แล้วปล่อยทีมเข้าประชิดและต่อสู้แบบอัตโนมัติ</p><div class="pvp-stats"><span>🏆 Rating <b id="bettaRating">1000</b></span><span>🔥 ชนะ <b id="bettaWins">0</b></span><span>💀 แพ้ <b id="bettaLosses">0</b></span></div><button class="betta-primary" id="bettaFindMatch" type="button">ค้นหาคู่ต่อสู้</button></div>
-        </div>
-        <div id="bettaTeamPanel" class="betta-panel hidden">
-          <div class="team-head"><div><h2>ทีมปลากัด</h2><p>อัปเกรดปลาเพื่อเพิ่มพลังโจมตีและความอึด</p></div><span id="bettaCoins">🪙 500</span></div>
-          <div class="fish-team-grid" id="bettaTeamGrid"></div>
-        </div>
-      </section>
 
-      <section class="betta-battle-page hidden" id="bettaBattlePage">
-        <div class="battle-topbar"><button class="betta-back" id="bettaBattleBack" type="button">← กลับ</button><div><b id="bettaBattleTitle">ด่าน 1</b><small id="bettaBattleMode">PVE</small></div><span id="bettaBattleTimer">00:00</span></div>
-        <div class="battle-arena" id="bettaArena">
-          <div class="arena-bg"><div class="water-light light1"></div><div class="water-light light2"></div><div class="sand"></div><div class="plant plant1">🌿</div><div class="plant plant2">🌱</div><div class="bubble b1"></div><div class="bubble b2"></div></div>
-          <div class="battle-hud player-hud"><div class="hud-name">🐟 <span id="bettaPlayerName">ทีมของฉัน</span></div><div class="hud-bar"><i id="bettaPlayerHp" style="width:100%"></i></div><small id="bettaPlayerHpText">100/100</small></div>
-          <div class="battle-hud enemy-hud"><div class="hud-name"><span id="bettaEnemyName">ศัตรู</span> 🐟</div><div class="hud-bar enemy"><i id="bettaEnemyHp" style="width:100%"></i></div><small id="bettaEnemyHpText">100/100</small></div>
-          <div class="lane" id="bettaLane"><div class="lane-unit player-unit" id="bettaPlayerUnit"><div class="fish-art player-fish"><div class="fish-tail"></div><div class="fish-body"></div><div class="fish-fin top"></div><div class="fish-fin bottom"></div><div class="fish-eye"></div></div><span class="unit-level" id="bettaPlayerUnitLevel">Lv.1</span></div><div class="lane-unit enemy-unit" id="bettaEnemyUnit"><div class="fish-art enemy-fish"><div class="fish-tail"></div><div class="fish-body"></div><div class="fish-fin top"></div><div class="fish-fin bottom"></div><div class="fish-eye"></div></div><span class="unit-level" id="bettaEnemyUnitLevel">Lv.1</span></div></div>
-          <div class="battle-log" id="bettaBattleLog" aria-live="polite"></div>
-          <div class="battle-result hidden" id="bettaBattleResult"><div class="result-icon" id="bettaResultIcon">🏆</div><h2 id="bettaResultTitle">ชนะ!</h2><p id="bettaResultText">ได้รับ EXP +20 และเหรียญ +30</p><button class="betta-primary" id="bettaResultBtn" type="button">กลับหน้าด่าน</button></div>
-        </div>
-      </section>
-'''
-s=s.replace(marker, insert+'\n'+marker)
-p.write_text(s)
+root=Path('/mnt/data/mystery_v22')
+idx=root/'index.html'
+html=idx.read_text()
+old='''      <nav>\n        <button class="nav active" data-page="home">🏠 <span>หน้าแรก</span></button>\n        <button class="nav" data-page="boxes">📦 <span>กล่องสุ่ม</span></button>'''
+new='''      <nav>\n        <button class="nav active" data-page="home">🏠 <span>หน้าแรก</span></button>\n        <button class="nav game-nav" data-page="game">🎮 <span>เข้าเกม</span></button>\n        <button class="nav" data-page="boxes">📦 <span>กล่องสุ่ม</span></button>'''
+assert old in html
+html=html.replace(old,new)
+
+old='''          <div class="hero-tags">\n            <span>🔥 iPhone 15 Pro Max</span>\n            <span>🎧 AirPods Pro 2</span>\n            <span>⚡ สุ่มได้ 24 ชม.</span>\n          </div>'''
+new='''          <div class="hero-tags">\n            <span>🔥 iPhone 15 Pro Max</span>\n            <span>🎧 AirPods Pro 2</span>\n            <span>⚡ สุ่มได้ 24 ชม.</span>\n          </div>\n          <button class="enter-game-btn" id="enterGameBtn" type="button">🎮 เข้าเกมต่อสู้</button>'''
+assert old in html
+html=html.replace(old,new)
+
+old='''      <section class="account-page hidden" id="accountPage">'''
+new='''      <section class="battle-page hidden" id="gamePage">\n        <div class="battle-page-head">\n          <div>\n            <div class="eyebrow">BATTLE ARENA</div>\n            <h1>เกมต่อสู้ปาอาวุธ</h1>\n            <p>เลือกจุดยืน 1–5 หลบการโจมตี แล้วปากลับเป็นจังหวะ</p>\n          </div>\n          <button class="battle-back-btn" id="battleBackHome" type="button">← กลับหน้าแรก</button>\n        </div>\n\n        <div class="battle-layout">\n          <div class="battle-stage-wrap">\n            <div class="battle-mode-row">\n              <button class="battle-mode active" data-battle-mode="pve" type="button">🤖 PVE ฟาร์มบอต</button>\n              <button class="battle-mode" data-battle-mode="pvp" type="button">🌐 PVP ออนไลน์</button>\n            </div>\n\n            <div class="battle-arena" id="battleArena">\n              <div class="arena-bg-glow"></div>\n              <div class="arena-top-info">\n                <div class="fighter-card enemy-card">\n                  <div class="fighter-avatar enemy-avatar">👹</div>\n                  <div><b id="enemyName">Shadow Bot</b><small>LV. 5</small></div>\n                </div>\n                <div class="round-badge" id="battleRound">TURN 1</div>\n              </div>\n\n              <div class="hp-row enemy-hp-row">\n                <span id="enemyHpText">100 / 100</span>\n                <div class="hp-bar"><i id="enemyHpBar"></i></div>\n              </div>\n\n              <div class="position-field enemy-field" id="enemyField">\n                <div class="field-line"></div>\n                <div class="position-slot" data-enemy-slot="0"><span>1</span></div>\n                <div class="position-slot" data-enemy-slot="1"><span>2</span></div>\n                <div class="position-slot" data-enemy-slot="2"><span>3</span></div>\n                <div class="position-slot" data-enemy-slot="3"><span>4</span></div>\n                <div class="position-slot" data-enemy-slot="4"><span>5</span></div>\n                <div class="fighter enemy-fighter" id="enemyFighter"><div class="weapon-badge">🪃</div><div class="fighter-body">👹</div><b id="enemyPositionLabel">จุด 3</b></div>\n              </div>\n\n              <div class="battle-divider"><span>⚔</span><i></i><span>⚔</span></div>\n              <div class="battle-message" id="battleMessage">เริ่มการต่อสู้ — เลือกอาวุธแล้วกดปา</div>\n\n              <div class="position-field player-field" id="playerField">\n                <div class="field-line"></div>\n                <div class="position-slot" data-player-slot="0"><span>1</span></div>\n                <div class="position-slot" data-player-slot="1"><span>2</span></div>\n                <div class="position-slot" data-player-slot="2"><span>3</span></div>\n                <div class="position-slot" data-player-slot="3"><span>4</span></div>\n                <div class="position-slot" data-player-slot="4"><span>5</span></div>\n                <div class="fighter player-fighter" id="playerFighter"><div class="weapon-badge">🏹</div><div class="fighter-body">🧙</div><b id="playerPositionLabel">จุด 3</b></div>\n              </div>\n\n              <div class="hp-row player-hp-row">\n                <div class="hp-bar"><i id="playerHpBar"></i></div>\n                <span id="playerHpText">100 / 100</span>\n              </div>\n\n              <div class="fighter-card player-card">\n                <div class="fighter-avatar player-avatar">🧙</div>\n                <div><b id="playerName">ผู้เล่น</b><small>LV. 5</small></div>\n              </div>\n\n              <div class="projectile-layer" id="projectileLayer"></div>\n            </div>\n\n            <div class="battle-controls">\n              <div class="weapon-row">\n                <button class="weapon-btn active" data-weapon="bow" type="button">🏹<span>ธนู</span><small>DMG 20</small></button>\n                <button class="weapon-btn" data-weapon="spear" type="button">🔱<span>หอก</span><small>DMG 28</small></button>\n                <button class="weapon-btn" data-weapon="boomerang" type="button">🪃<span>บูมเมอแรง</span><small>DMG 24</small></button>\n              </div>\n              <div class="position-control">\n                <div><b>เลือกจุดยืน</b><small id="positionHint">เลือกได้หลังบอตปาเสร็จ</small></div>\n                <div class="position-buttons">\n                  <button class="choose-position" data-player-position="0" type="button">1</button>\n                  <button class="choose-position" data-player-position="1" type="button">2</button>\n                  <button class="choose-position active" data-player-position="2" type="button">3</button>\n                  <button class="choose-position" data-player-position="3" type="button">4</button>\n                  <button class="choose-position" data-player-position="4" type="button">5</button>\n                </div>\n              </div>\n              <button class="battle-throw-btn" id="battleThrowBtn" type="button">🏹 ปาอาวุธ</button>\n              <button class="battle-restart-btn hidden" id="battleRestartBtn" type="button">↻ เริ่มด่านใหม่</button>\n            </div>\n\n            <div class="online-room-panel hidden" id="onlineRoomPanel">\n              <div><b>ห้อง PVP ออนไลน์</b><small id="onlineRoomStatus">สร้างห้องหรือเข้าห้องด้วยรหัส 6 ตัว</small></div>\n              <div class="room-actions">\n                <button id="createBattleRoom" type="button">สร้างห้อง</button>\n                <input id="battleRoomCodeInput" maxlength="6" placeholder="รหัสห้อง" inputmode="text">\n                <button id="joinBattleRoom" type="button">เข้าห้อง</button>\n              </div>\n              <div class="room-code hidden" id="battleRoomCode"></div>\n            </div>\n          </div>\n\n          <aside class="battle-systems">\n            <div class="battle-resource-card">\n              <div><span>💎 คริสตัล</span><b id="battleGems">300</b></div>\n              <div><span>🪙 ทอง</span><b id="battleGold">1,000</b></div>\n            </div>\n            <div class="battle-system-tabs">\n              <button class="system-tab active" data-system="gacha" type="button">🎲 กาชา</button>\n              <button class="system-tab" data-system="upgrade" type="button">⬆️ อัปเกรด</button>\n              <button class="system-tab" data-system="forge" type="button">🔨 ตีบวก</button>\n              <button class="system-tab" data-system="items" type="button">🎒 ไอเทม</button>\n              <button class="system-tab" data-system="shop" type="button">🛒 ร้านค้า</button>\n            </div>\n            <div class="system-panel" id="battleSystemPanel"></div>\n          </aside>\n        </div>\n      </section>\n\n      <section class="account-page hidden" id="accountPage">'''
+assert old in html
+html=html.replace(old,new)
+idx.write_text(html)

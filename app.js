@@ -1462,7 +1462,7 @@ topupForm?.addEventListener('submit', async (event) => {
 
 
 function showAccountPage() {
-  ['.hero', '.content', '.bottom-grid'].forEach(sel => document.querySelector(sel)?.classList.add('hidden'));
+  ['.hero', '.content', '.bottom-grid', '#gamePage'].forEach(sel => document.querySelector(sel)?.classList.add('hidden'));
   $('#accountPage')?.classList.remove('hidden');
   window.scrollTo({top: 0, behavior: 'smooth'});
 }
@@ -1470,6 +1470,7 @@ function showAccountPage() {
 function showHomePage() {
   ['.hero', '.content', '.bottom-grid'].forEach(sel => document.querySelector(sel)?.classList.remove('hidden'));
   $('#accountPage')?.classList.add('hidden');
+  $('#gamePage')?.classList.add('hidden');
 }
 
 $$('.nav').forEach(n => n.onclick = () => {
@@ -1477,6 +1478,7 @@ $$('.nav').forEach(n => n.onclick = () => {
   n.classList.add('active');
   const p = n.dataset.page;
   if(p === 'account') showAccountPage();
+  else if(p === 'game') showBattlePage();
   else if(p === 'rewards') { showHomePage(); openInventoryModal(); }
   else if(p === 'history') {
     showHomePage();
@@ -1535,134 +1537,484 @@ window.addEventListener('resize', () => scenes.forEach(o => {
   o.camera.aspect = o.renderer.domElement.clientWidth / o.renderer.domElement.clientHeight;
   o.camera.updateProjectionMatrix();
 }));
-// ===== Betta Frontier: lane auto-battle game =====
-const bettaState = {
+/* ==========================================================
+   Battle Arena - independent game layer.
+   The existing Mystery Box 3D opening flow above is untouched.
+   ========================================================== */
+const battleState = {
   mode: 'pve',
-  energy: 10,
-  rating: Number(localStorage.getItem('betta_rating') || 1000),
-  wins: Number(localStorage.getItem('betta_wins') || 0),
-  losses: Number(localStorage.getItem('betta_losses') || 0),
-  coins: Number(localStorage.getItem('betta_coins') || 500),
-  teamLevel: Number(localStorage.getItem('betta_team_level') || 1),
-  selectedStage: 1,
-  running: false,
-  raf: null,
-  timer: null,
-  battleStart: 0,
-  units: []
+  turn: 1,
+  phase: 'player',
+  playerHp: 100,
+  enemyHp: 100,
+  playerPos: 2,
+  enemyPos: 2,
+  weapon: 'bow',
+  enemyName: 'Shadow Bot',
+  gems: 300,
+  gold: 1000,
+  level: 5,
+  weaponLevel: 1,
+  weaponPower: 0,
+  enemyTimer: null,
+  room: '',
+  roomChannel: null,
+  roomRole: '',
+  onlineReady: false,
+  gameOver: false,
+  turnOwner: 'host',
+  canMove: false
 };
 
-const bettaFish = [
-  {id:'rose',name:'Rose Fighter',atk:34,def:18,hp:170,spd:82,cost:80,level:1},
-  {id:'ruby',name:'Ruby Fang',atk:42,def:14,hp:145,spd:95,cost:110,level:1},
-  {id:'pearl',name:'Pearl Guard',atk:25,def:28,hp:220,spd:68,cost:95,level:1}
-];
-try {
-  const saved = JSON.parse(localStorage.getItem('betta_fish_team') || 'null');
-  if (Array.isArray(saved)) saved.forEach((s,i)=>{ if (bettaFish[i]) Object.assign(bettaFish[i], s); });
-} catch (_) {}
+const battleWeapons = {
+  bow: { icon:'🏹', name:'ธนู', base:20 },
+  spear: { icon:'🔱', name:'หอก', base:28 },
+  boomerang: { icon:'🪃', name:'บูมเมอแรง', base:24 }
+};
 
-function saveBetta(){
-  localStorage.setItem('betta_rating', String(bettaState.rating));
-  localStorage.setItem('betta_wins', String(bettaState.wins));
-  localStorage.setItem('betta_losses', String(bettaState.losses));
-  localStorage.setItem('betta_coins', String(bettaState.coins));
-  localStorage.setItem('betta_team_level', String(bettaState.teamLevel));
-  localStorage.setItem('betta_fish_team', JSON.stringify(bettaFish));
+function battleStorageKey() {
+  return `mystery_battle_state_${online.user?.id || 'guest'}`;
 }
-function bettaShowPage(){
-  ['.hero','.content','.bottom-grid','.account-page','.betta-battle-page'].forEach(s=>document.querySelector(s)?.classList.add('hidden'));
-  $('#bettaPage')?.classList.remove('hidden');
-  renderBettaStages(); renderBettaTeam(); updateBettaStats(); window.scrollTo({top:0,behavior:'smooth'});
+
+function loadBattleMeta() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(battleStorageKey()) || 'null');
+    if (saved) {
+      battleState.gems = Number.isFinite(Number(saved.gems)) ? Number(saved.gems) : 300;
+      battleState.gold = Number.isFinite(Number(saved.gold)) ? Number(saved.gold) : 1000;
+      battleState.level = Number.isFinite(Number(saved.level)) ? Number(saved.level) : 5;
+      battleState.weaponLevel = Number.isFinite(Number(saved.weaponLevel)) ? Number(saved.weaponLevel) : 1;
+      battleState.weaponPower = Number.isFinite(Number(saved.weaponPower)) ? Number(saved.weaponPower) : 0;
+    }
+  } catch (_) {}
+  syncBattleResources();
 }
-function bettaBackHome(){
-  if (bettaState.running) stopBettaBattle();
-  $('#bettaBattlePage')?.classList.add('hidden');
-  bettaShowPage();
+
+function saveBattleMeta() {
+  localStorage.setItem(battleStorageKey(), JSON.stringify({
+    gems:battleState.gems, gold:battleState.gold, level:battleState.level,
+    weaponLevel:battleState.weaponLevel, weaponPower:battleState.weaponPower
+  }));
+  syncBattleResources();
 }
-function updateBettaStats(){
-  const power = bettaFish.reduce((n,f)=>n+f.atk+f.def+Math.floor(f.hp/5),0);
-  $('#bettaTeamPower') && ($('#bettaTeamPower').textContent=`พลัง ${power}`);
-  $('#bettaTeamLevel') && ($('#bettaTeamLevel').textContent=`ทีมเลเวล ${bettaState.teamLevel}`);
-  $('#bettaRating') && ($('#bettaRating').textContent=bettaState.rating);
-  $('#bettaWins') && ($('#bettaWins').textContent=bettaState.wins);
-  $('#bettaLosses') && ($('#bettaLosses').textContent=bettaState.losses);
-  $('#bettaCoins') && ($('#bettaCoins').textContent=`🪙 ${bettaState.coins}`);
-  $('#bettaEnergy') && ($('#bettaEnergy').textContent=`⚡ ${bettaState.energy}/10`);
+
+function syncBattleResources() {
+  const gems = $('#battleGems');
+  const gold = $('#battleGold');
+  if (gems) gems.textContent = battleState.gems.toLocaleString();
+  if (gold) gold.textContent = battleState.gold.toLocaleString();
 }
-function renderBettaStages(){
-  const el=$('#bettaStageGrid'); if(!el) return;
-  const stages=[
-    ['แนวปะการังเริ่มต้น','ฝูงปลานักสู้','30 EXP','ง่าย'],['อ่าวพระจันทร์','นักรบครีบเงิน','45 EXP','ปานกลาง'],['ถ้ำคราม','ราชาปลากัด','60 EXP','ยาก'],['สนามราชันย์','จ้าวแห่งสายน้ำ','90 EXP','โหด']
-  ];
-  el.innerHTML=stages.map((s,i)=>`<button type="button" class="stage-card ${i>0?'locked':''}" data-stage="${i+1}" ${i>0?'disabled':''}><span class="stage-num">STAGE ${i+1}</span><h3>🌊 ${s[0]}</h3><p>${s[1]} · รางวัล ${s[2]}</p><div class="stage-stars">${'★'.repeat(Math.min(3,i+1))}${'☆'.repeat(3-Math.min(3,i+1))} · ${s[3]}</div></button>`).join('');
-  el.querySelectorAll('.stage-card:not([disabled])').forEach(b=>b.addEventListener('click',()=>startBettaBattle(Number(b.dataset.stage),'PVE')));
+
+function battleMessage(text) {
+  const el = $('#battleMessage');
+  if (el) el.textContent = text;
 }
-function renderBettaTeam(){
-  const el=$('#bettaTeamGrid'); if(!el) return;
-  el.innerHTML=bettaFish.map((f,i)=>`<article class="fish-card"><div class="fish-preview"><div class="fish-art player-fish" style="transform:scale(1.12)"><div class="fish-tail"></div><div class="fish-body"></div><div class="fish-fin top"></div><div class="fish-fin bottom"></div><div class="fish-eye"></div></div></div><h3>${f.name}</h3><p>Lv.${f.level} · ${i===0?'สายสมดุล':i===1?'สายโจมตี':'สายแทงค์'}</p><div class="stat-row"><span>⚔️ ATK</span><b>${f.atk}</b></div><div class="stat-row"><span>🛡️ DEF</span><b>${f.def}</b></div><div class="stat-row"><span>❤️ HP</span><b>${f.hp}</b></div><button type="button" class="upgrade-btn" data-fish="${i}">⬆️ อัปเกรด · ${f.cost} 🪙</button></article>`).join('');
-  el.querySelectorAll('.upgrade-btn').forEach(btn=>btn.addEventListener('click',()=>upgradeBetta(Number(btn.dataset.fish))));
+
+function setBattleHp(which, value) {
+  const hp = Math.max(0, Math.min(100, value));
+  battleState[which] = hp;
+  const prefix = which === 'playerHp' ? 'player' : 'enemy';
+  const text = $(`#${prefix}HpText`);
+  const bar = $(`#${prefix}HpBar`);
+  if (text) text.textContent = `${hp} / 100`;
+  if (bar) bar.style.width = `${hp}%`;
 }
-function upgradeBetta(i){
-  const f=bettaFish[i]; if(!f) return;
-  if(bettaState.coins<f.cost){ toast('เหรียญเกมไม่พอสำหรับอัปเกรด'); return; }
-  bettaState.coins-=f.cost; f.level++; f.atk+=8; f.def+=5; f.hp+=35; f.cost=Math.ceil(f.cost*1.35); bettaState.teamLevel=Math.max(bettaState.teamLevel,Math.floor((bettaFish.reduce((n,x)=>n+x.level,0))/3)); saveBetta(); renderBettaTeam(); updateBettaStats(); toast(`${f.name} อัปเกรดเป็น Lv.${f.level} แล้ว`);
+
+function slotLeft(index) {
+  return `${10 + index * 20}%`;
 }
-function switchBettaMode(mode){
-  bettaState.mode=mode;
-  document.querySelectorAll('.betta-tab').forEach(x=>x.classList.toggle('active',x.dataset.bettaMode===mode));
-  $('#bettaPvePanel')?.classList.toggle('hidden',mode!=='pve');
-  $('#bettaPvpPanel')?.classList.toggle('hidden',mode!=='pvp');
-  $('#bettaTeamPanel')?.classList.toggle('hidden',mode!=='team');
-  updateBettaStats();
+
+function updateBattlePositions() {
+  const player = $('#playerFighter');
+  const enemy = $('#enemyFighter');
+  if (player) player.style.left = slotLeft(battleState.playerPos);
+  if (enemy) enemy.style.left = slotLeft(battleState.enemyPos);
+  const pl = $('#playerPositionLabel');
+  const el = $('#enemyPositionLabel');
+  if (pl) pl.textContent = `จุด ${battleState.playerPos + 1}`;
+  if (el) el.textContent = `จุด ${battleState.enemyPos + 1}`;
+  $$('.position-slot[data-player-slot]').forEach(x => x.classList.toggle('occupied', Number(x.dataset.playerSlot) === battleState.playerPos));
+  $$('.position-slot[data-enemy-slot]').forEach(x => x.classList.toggle('occupied', Number(x.dataset.enemySlot) === battleState.enemyPos));
+  $$('.choose-position').forEach(x => x.classList.toggle('active', Number(x.dataset.playerPosition) === battleState.playerPos));
 }
-function fishUnitHtml(side,index,name,level){
-  return `<div class="auto-unit ${side}-auto-unit" data-unit="${side}-${index}"><div class="fish-art ${side==='player'?'player-fish':'enemy-fish'}"><div class="fish-tail"></div><div class="fish-body"></div><div class="fish-fin top"></div><div class="fish-fin bottom"></div><div class="fish-eye"></div></div><span class="unit-level">${name} · Lv.${level}</span></div>`;
+
+function setPositionButtons(enabled) {
+  $$('.choose-position').forEach(btn => { btn.disabled = !enabled; });
+  const hint = $('#positionHint');
+  if (hint) hint.textContent = enabled ? 'เลือกจุดใหม่ก่อนปากลับ' : 'เลือกได้หลังคู่ต่อสู้ปาเสร็จ';
 }
-function makeEnemy(stage, pvp=false){
-  const scale=pvp ? 1.02 : (1 + stage*.13);
-  return bettaFish.map((f,i)=>({name:pvp?['Crimson AI','Azure AI','Night Guard'][i]:['Reef Scout','Ember Fin','Stone Fin'][i],level:Math.max(1,Math.floor(f.level*scale)),atk:Math.round(f.atk*scale*(pvp?1.0:0.88)),def:Math.round(f.def*scale),hp:Math.round(f.hp*scale*(pvp?1:1.05)),maxHp:Math.round(f.hp*scale*(pvp?1:1.05)),spd:f.spd*(pvp?1:0.92),side:'enemy',index:i,x:82-i*4,alive:true,nextAttack:0}));
+
+function battleStatus() {
+  const round = $('#battleRound');
+  if (round) round.textContent = `TURN ${battleState.turn}`;
+  const throwBtn = $('#battleThrowBtn');
+  if (throwBtn) throwBtn.disabled = battleState.phase !== 'player' || battleState.gameOver;
+  setPositionButtons(battleState.phase === 'move' && !battleState.gameOver);
 }
-function startBettaBattle(stage=1,mode='PVE'){
-  if(bettaState.running) return;
-  if(mode==='PVE' && bettaState.energy<=0){toast('พลังงานหมดแล้ว');return;}
-  if(mode==='PVE') bettaState.energy--;
-  bettaState.selectedStage=stage; bettaState.running=true; bettaState.battleStart=performance.now();
-  $('#bettaPage')?.classList.add('hidden'); $('#bettaBattlePage')?.classList.remove('hidden');
-  $('#bettaBattleTitle').textContent=mode==='PVP'?'PVP · Arena':`STAGE ${stage}`; $('#bettaBattleMode').textContent=mode;
-  $('#bettaBattleResult')?.classList.add('hidden');
-  const lane=$('#bettaLane');
-  lane.innerHTML=bettaFish.map((f,i)=>fishUnitHtml('player',i,f.name,f.level)).join('')+makeEnemy(stage,mode==='PVP').map((f,i)=>fishUnitHtml('enemy',i,f.name,f.level)).join('');
-  bettaState.units=[...bettaFish.map((f,i)=>({name:f.name,level:f.level,atk:f.atk,def:f.def,hp:f.hp,maxHp:f.hp,spd:f.spd,side:'player',index:i,x:7+i*3,alive:true,nextAttack:0})),...makeEnemy(stage,mode==='PVP')];
-  renderBattleUnits(); updateBattleHud(); addBattleLog('🐟 ทีมของคุณลงสนาม! กำลังเคลื่อนเข้าประชิด...');
-  cancelAnimationFrame(bettaState.raf); clearInterval(bettaState.timer); bettaState.timer=setInterval(updateBattleTimer,250); bettaState.raf=requestAnimationFrame(battleLoop);
+
+function playBattleSound(kind) {
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const now = ctx.currentTime;
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = kind === 'hit' ? 'square' : 'triangle';
+    osc.frequency.setValueAtTime(kind === 'hit' ? 130 : 360, now);
+    osc.frequency.exponentialRampToValueAtTime(kind === 'hit' ? 70 : 160, now + .16);
+    gain.gain.setValueAtTime(.0001, now);
+    gain.gain.exponentialRampToValueAtTime(.07, now + .02);
+    gain.gain.exponentialRampToValueAtTime(.0001, now + .18);
+    osc.connect(gain); gain.connect(ctx.destination); osc.start(now); osc.stop(now+.2);
+  } catch (_) {}
 }
-function updateBattleTimer(){const sec=Math.floor((performance.now()-bettaState.battleStart)/1000); const m=String(Math.floor(sec/60)).padStart(2,'0'),s=String(sec%60).padStart(2,'0'); if($('#bettaBattleTimer')) $('#bettaBattleTimer').textContent=`${m}:${s}`;}
-function addBattleLog(t){const el=$('#bettaBattleLog');if(el)el.textContent=t;}
-function battleLoop(now){
-  if(!bettaState.running)return;
-  const players=bettaState.units.filter(u=>u.side==='player'&&u.alive), enemies=bettaState.units.filter(u=>u.side==='enemy'&&u.alive);
-  if(!players.length||!enemies.length){finishBettaBattle(players.length>0);return;}
-  for(const u of bettaState.units){if(!u.alive)continue; const foes=u.side==='player'?enemies:players; const target=foes.reduce((best,x)=>!best||Math.abs(x.x-u.x)<Math.abs(best.x-u.x)?x:best,null); if(!target)continue;
-    const distance=Math.abs(target.x-u.x);
-    if(distance>10){u.x += (u.side==='player'?1:-1)*u.spd*0.000055; u.x=Math.max(3,Math.min(94,u.x));}
-    else if(now>=u.nextAttack){const raw=Math.max(6,u.atk-Math.round(target.def*.35)); const dmg=Math.round(raw*(0.88+Math.random()*.24)); target.hp=Math.max(0,target.hp-dmg); u.nextAttack=now+Math.max(520,1050-u.spd*2.2); addBattleLog(`${u.side==='player'?'🐟':'🔥'} ${u.name} กัด ${target.name} -${dmg} HP`); if(target.hp<=0){target.alive=false;addBattleLog(`${target.side==='player'?'💥':'⚡'} ${target.name} ถูกโค่น!`);}}
+
+function animateBattleProjectile(fromSide, fromPos, toSide, toPos, icon, done) {
+  const arena = $('#battleArena');
+  const layer = $('#projectileLayer');
+  if (!arena || !layer) { done?.(); return; }
+  const p = document.createElement('div');
+  p.className = 'battle-projectile';
+  p.textContent = icon;
+  const startY = fromSide === 'player' ? 76 : 24;
+  const endY = toSide === 'player' ? 76 : 24;
+  p.style.left = slotLeft(fromPos);
+  p.style.top = `${startY}%`;
+  p.style.transform = 'translate(-50%,-50%) rotate(-15deg)';
+  layer.appendChild(p);
+  requestAnimationFrame(() => {
+    p.style.transform = `translate(-50%,-50%) rotate(${fromSide === 'player' ? -15 : 165}deg) translateY(-${Math.abs(endY-startY)*1.1}px) translateX(${(toPos-fromPos)*2}px)`;
+    p.style.left = slotLeft(toPos);
+    p.style.top = `${endY}%`;
+  });
+  setTimeout(() => { p.classList.add('hit'); playBattleSound('hit'); }, 520);
+  setTimeout(() => { p.remove(); done?.(); }, 760);
+}
+
+function flashFighter(id) {
+  const el = $(id);
+  if (!el) return;
+  el.classList.remove('hit');
+  void el.offsetWidth;
+  el.classList.add('hit');
+  setTimeout(() => el.classList.remove('hit'), 320);
+}
+
+function randomEnemyMove() {
+  const options = [0,1,2,3,4].filter(x => x !== battleState.enemyPos);
+  battleState.enemyPos = options[Math.floor(Math.random() * options.length)];
+  updateBattlePositions();
+}
+
+function finishBattle(won) {
+  battleState.gameOver = true;
+  battleState.phase = 'done';
+  battleStatus();
+  const restart = $('#battleRestartBtn');
+  if (restart) restart.classList.remove('hidden');
+  if (won) {
+    const rewardGold = 120 + Math.floor(Math.random()*81);
+    const rewardGems = 10 + Math.floor(Math.random()*11);
+    battleState.gold += rewardGold;
+    battleState.gems += rewardGems;
+    battleState.level = Math.min(99, battleState.level + (Math.random() < .25 ? 1 : 0));
+    saveBattleMeta();
+    battleMessage(`🏆 ชนะ! +${rewardGold} ทอง +${rewardGems} คริสตัล`);
+  } else {
+    battleMessage('💀 แพ้การต่อสู้ — กดเริ่มด่านใหม่เพื่อสู้ใหม่');
   }
-  renderBattleUnits(); updateBattleHud(); bettaState.raf=requestAnimationFrame(battleLoop);
 }
-function renderBattleUnits(){bettaState.units.forEach(u=>{const el=document.querySelector(`[data-unit="${u.side}-${u.index}"]`);if(!el)return;el.style.left=`${u.x}%`;el.classList.toggle('unit-dead',!u.alive);el.classList.toggle('unit-attacking',u.alive&&bettaState.running);});}
-function updateBattleHud(){const p=bettaState.units.filter(u=>u.side==='player');const e=bettaState.units.filter(u=>u.side==='enemy');const ph=p.reduce((a,u)=>a+Math.max(0,u.hp),0),pm=p.reduce((a,u)=>a+u.maxHp,0),eh=e.reduce((a,u)=>a+Math.max(0,u.hp),0),em=e.reduce((a,u)=>a+u.maxHp,0); const pw=pm?ph/pm*100:0,ew=em?eh/em*100:0; if($('#bettaPlayerHp'))$('#bettaPlayerHp').style.width=`${pw}%`;if($('#bettaEnemyHp'))$('#bettaEnemyHp').style.width=`${ew}%`;if($('#bettaPlayerHpText'))$('#bettaPlayerHpText').textContent=`${Math.max(0,Math.round(ph))}/${pm}`;if($('#bettaEnemyHpText'))$('#bettaEnemyHpText').textContent=`${Math.max(0,Math.round(eh))}/${em}`;}
-function finishBettaBattle(playerWon){
-  if(!bettaState.running)return; bettaState.running=false; cancelAnimationFrame(bettaState.raf); clearInterval(bettaState.timer); bettaState.raf=null; bettaState.timer=null;
-  const mode=bettaState.mode; if(playerWon){bettaState.wins++; bettaState.coins+=(mode==='PVP'?70:30+bettaState.selectedStage*10); if(mode==='PVP')bettaState.rating+=18; $('#bettaResultIcon').textContent='🏆';$('#bettaResultTitle').textContent='ชนะ!';$('#bettaResultText').textContent=mode==='PVP'?`Rating +18 · เหรียญ +70`:`ผ่าน STAGE ${bettaState.selectedStage} · EXP +${20+bettaState.selectedStage*10} · เหรียญ +${30+bettaState.selectedStage*10}`;
-  }else{bettaState.losses++;if(mode==='PVP')bettaState.rating=Math.max(0,bettaState.rating-12);$('#bettaResultIcon').textContent='💀';$('#bettaResultTitle').textContent='แพ้!';$('#bettaResultText').textContent=mode==='PVP'?`Rating -12 · ลองจัดทีมแล้วกลับมาใหม่`:`ยังไม่ผ่าน STAGE ${bettaState.selectedStage} · ลองอัปเกรดปลาแล้วสู้ใหม่`;}
-  saveBetta(); updateBettaStats(); $('#bettaBattleResult')?.classList.remove('hidden');
-}
-function stopBettaBattle(){bettaState.running=false;cancelAnimationFrame(bettaState.raf);clearInterval(bettaState.timer);bettaState.raf=null;bettaState.timer=null;}
 
-// Game navigation is intentionally added alongside the original nav handler; other pages remain untouched.
-document.querySelector('.nav[data-page="game"]')?.addEventListener('click',()=>bettaShowPage());
-document.querySelectorAll('.betta-tab').forEach(b=>b.addEventListener('click',()=>switchBettaMode(b.dataset.bettaMode)));
-$('#bettaFindMatch')?.addEventListener('click',()=>{if(bettaState.running)return;startBettaBattle(1,'PVP');});
-$('#bettaBattleBack')?.addEventListener('click',bettaBackHome);
-$('#bettaResultBtn')?.addEventListener('click',bettaBackHome);
+function enemyTurnPVE() {
+  if (battleState.gameOver || battleState.mode !== 'pve') return;
+  battleState.phase = 'enemy';
+  battleStatus();
+  randomEnemyMove();
+  battleMessage(`บอตย้ายไปจุด ${battleState.enemyPos + 1} แล้วกำลังปา...`);
+  const icon = battleWeapons[battleState.weapon]?.icon || '🏹';
+  setTimeout(() => {
+    if (battleState.gameOver) return;
+    animateBattleProjectile('enemy', battleState.enemyPos, 'player', battleState.playerPos, icon, () => {
+      const dmg = 12 + Math.floor(Math.random()*12);
+      setBattleHp('playerHp', battleState.playerHp - dmg);
+      flashFighter('#playerFighter');
+      if (battleState.playerHp <= 0) return finishBattle(false);
+      battleState.turn += 1;
+      battleState.phase = 'move';
+      battleStatus();
+      battleMessage(`โดน ${dmg} ดาเมจ — เลือกจุดยืนใหม่ได้แล้ว`);
+    });
+  }, 450);
+}
+
+function playerAttack() {
+  if (battleState.gameOver || battleState.phase !== 'player') return;
+  if (battleState.mode === 'pvp' && battleState.roomRole === 'guest') {
+    online.sendBattleMessage(battleState.roomChannel, {type:'guest_action', action:'attack', weapon:battleState.weapon}).catch(()=>{});
+    battleMessage('ส่งคำสั่งโจมตีให้ผู้สร้างห้องแล้ว...');
+    return;
+  }
+  battleState.phase = 'enemy';
+  battleStatus();
+  const weapon = battleWeapons[battleState.weapon];
+  const dmg = weapon.base + battleState.weaponPower + Math.floor(Math.random()*8);
+  battleMessage(`${weapon.name} พุ่งไปที่จุด ${battleState.enemyPos + 1}!`);
+  playBattleSound('throw');
+  animateBattleProjectile('player', battleState.playerPos, 'enemy', battleState.enemyPos, weapon.icon, () => {
+    setBattleHp('enemyHp', battleState.enemyHp - dmg);
+    flashFighter('#enemyFighter');
+    if (battleState.enemyHp <= 0) return finishBattle(true);
+    if (battleState.mode === 'pvp') {
+      battleState.turnOwner = 'guest';
+      battleState.phase = 'wait';
+      battleState.canMove = true;
+      battleStatus();
+      battleMessage(`โจมตีสำเร็จ ${dmg} ดาเมจ — รอคู่ต่อสู้ขยับและปา`);
+      broadcastBattleState();
+      return;
+    }
+    enemyTurnPVE();
+  });
+}
+
+function chooseBattlePosition(pos) {
+  if (battleState.gameOver || (battleState.mode === 'pvp' ? !battleState.canMove : battleState.phase !== 'move')) return;
+  battleState.playerPos = pos;
+  updateBattlePositions();
+  if (battleState.mode === 'pvp' && battleState.roomRole === 'guest') {
+    online.sendBattleMessage(battleState.roomChannel, {type:'guest_action', action:'position', position:pos}).catch(()=>{});
+    battleState.canMove = false;
+    battleState.phase = 'player';
+    battleStatus();
+    battleMessage(`ย้ายไปจุด ${pos+1} แล้ว — ถึงตาคุณปา`);
+    return;
+  }
+  battleState.phase = 'player';
+  battleStatus();
+  battleMessage(`ย้ายไปจุด ${pos+1} แล้ว — ถึงตาคุณปา`);
+  if (battleState.mode === 'pvp') broadcastBattleState();
+}
+
+function resetBattleRound() {
+  if (battleState.enemyTimer) clearTimeout(battleState.enemyTimer);
+  battleState.turn = 1;
+  battleState.phase = 'player';
+  battleState.playerHp = 100;
+  battleState.enemyHp = 100;
+  battleState.playerPos = 2;
+  battleState.enemyPos = 2;
+  battleState.gameOver = false;
+  battleState.turnOwner = 'host';
+  battleState.canMove = false;
+  const restart = $('#battleRestartBtn');
+  if (restart) restart.classList.add('hidden');
+  const name = $('#enemyName');
+  if (name) name.textContent = battleState.mode === 'pve' ? 'Shadow Bot' : (battleState.enemyName || 'คู่ต่อสู้ออนไลน์');
+  setBattleHp('playerHp',100); setBattleHp('enemyHp',100);
+  updateBattlePositions();
+  battleStatus();
+  battleMessage(battleState.mode === 'pve' ? 'เริ่มการต่อสู้ — คุณได้ปาก่อน' : 'ห้องพร้อม — รอจังหวะของคุณ');
+}
+
+function renderBattleSystem(system='gacha') {
+  const panel = $('#battleSystemPanel');
+  if (!panel) return;
+  const data = {
+    gacha: {title:'🎲 กาชาอาวุธ', desc:'ใช้คริสตัลสุ่มอาวุธและชิ้นส่วนอัปเกรด', cards:[['สุ่ม 1 ครั้ง','สุ่มอาวุธระดับต่าง ๆ',50,'สุ่ม'],['สุ่ม 10 ครั้ง','การันตี Rare ขึ้นไป',450,'สุ่ม x10']]},
+    upgrade: {title:'⬆️ อัปเกรดตัวละคร', desc:'เพิ่มเลเวลเพื่อเพิ่มพลังชีวิตและดาเมจ', cards:[[`ตัวละคร LV.${battleState.level}`,'ใช้ทองเพื่อเพิ่มเลเวล',180,'อัปเลเวล'],['สกิลติดตัว','เพิ่มพลังโจมตีพื้นฐาน',350,'ปลดล็อก']]},
+    forge: {title:'🔨 ระบบตีบวก', desc:'ตีบวกอาวุธเพื่อเพิ่ม Weapon Power', cards:[[`อาวุธ +${battleState.weaponLevel}`,'เพิ่มพลัง +5',100,'ตีบวก'],['ตีบวกปลอดภัย','เพิ่มโอกาสสำเร็จในครั้งถัดไป',250,'ใช้']]},
+    items: {title:'🎒 ไอเทม', desc:'ไอเทมช่วยต่อสู้และไอเทมฟาร์ม', cards:[['ยา HP','ฟื้น 25 HP ระหว่างการต่อสู้',30,'ซื้อ'],['ระเบิดน้ำแข็ง','มีโอกาสลดดาเมจศัตรู',80,'ซื้อ'],['คัมภีร์ XP','เพิ่ม XP จากด่าน',60,'ซื้อ']]},
+    shop: {title:'🛒 ร้านค้า', desc:'ร้านค้าหมุนเวียนสำหรับอาวุธและไอเทม', cards:[['กล่องอาวุธ Rare','สุ่มอาวุธ Rare 1 ชิ้น',220,'ซื้อ'],['แพ็กทอง','รับทอง 1,500',120,'ซื้อ'],['แพ็กคริสตัล','รับคริสตัล 300',300,'ซื้อ']]}
+  }[system];
+  panel.innerHTML = `<div class="system-title">${data.title}</div><div class="system-desc">${data.desc}</div>${data.cards.map((c,i)=>`<div class="system-card"><div><b>${c[0]}</b><small>${c[1]}</small></div><button class="system-action" data-system-action="${system}" data-system-index="${i}" data-cost="${c[2]}">${c[3]} · ${c[2]}</button></div>`).join('')}`;
+  panel.querySelectorAll('.system-action').forEach(btn => btn.addEventListener('click', () => useBattleSystem(system, Number(btn.dataset.systemIndex), Number(btn.dataset.cost))));
+}
+
+function useBattleSystem(system,index,cost) {
+  if (battleState.gold < cost && !(system === 'gacha' && battleState.gems >= cost)) {
+    battleMessage('ทรัพยากรไม่พอ'); return;
+  }
+  if (system === 'gacha') {
+    if (battleState.gems < cost) { battleMessage('คริสตัลไม่พอ'); return; }
+    battleState.gems -= cost;
+    const choices = ['🏹 ธนูอสูร','🔱 หอกสายฟ้า','🪃 บูมเมอแรงเงา'];
+    const item = choices[Math.floor(Math.random()*choices.length)];
+    battleState.weaponPower += 2 + Math.floor(Math.random()*4);
+    battleMessage(`🎉 กาชาได้รับ ${item} — Weapon Power +${battleState.weaponPower}`);
+  } else if (system === 'upgrade') {
+    battleState.gold -= cost; battleState.level += 1; battleMessage(`⬆️ ตัวละครอัปเป็น LV.${battleState.level}`);
+  } else if (system === 'forge') {
+    battleState.gold -= cost;
+    if (Math.random() < .78) { battleState.weaponLevel += 1; battleState.weaponPower += 5; battleMessage(`🔨 ตีบวกสำเร็จ! อาวุธ +${battleState.weaponLevel}`); }
+    else battleMessage('🔨 ตีบวกพลาด — อาวุธยังอยู่เหมือนเดิม');
+  } else if (system === 'items') {
+    battleState.gold -= cost; battleMessage('🎒 ซื้อไอเทมเข้ากระเป๋าแล้ว');
+  } else {
+    battleState.gold -= cost;
+    if (index === 1) battleState.gold += 1500;
+    if (index === 2) battleState.gems += 300;
+    battleMessage('🛒 ซื้อสินค้าเรียบร้อย');
+  }
+  saveBattleMeta();
+  renderBattleSystem(system);
+}
+
+function randomRoomCode() {
+  return Math.random().toString(36).slice(2,8).toUpperCase();
+}
+
+function setOnlineRoomStatus(text) {
+  const el = $('#onlineRoomStatus');
+  if (el) el.textContent = text;
+}
+
+async function closeBattleRoom() {
+  if (battleState.roomChannel) {
+    await online.closeBattleRoom(battleState.roomChannel);
+  }
+  battleState.roomChannel = null;
+  battleState.room = '';
+  battleState.roomRole = '';
+  battleState.onlineReady = false;
+}
+
+async function broadcastBattleState(extra={}) {
+  if (battleState.mode !== 'pvp' || !battleState.roomChannel || battleState.roomRole !== 'host') return;
+  await online.sendBattleMessage(battleState.roomChannel, {
+    type:'state',
+    ...extra,
+    turn:battleState.turn, phase:battleState.phase,
+    playerHp:battleState.playerHp, enemyHp:battleState.enemyHp,
+    playerPos:battleState.playerPos, enemyPos:battleState.enemyPos,
+    weapon:battleState.weapon, enemyName: battleState.enemyName,
+    gameOver:battleState.gameOver, turnOwner:battleState.turnOwner, canMove:battleState.phase === 'move'
+  });
+}
+
+async function handleBattleOnlineMessage(msg) {
+  if (!msg || !battleState.roomChannel) return;
+  if (msg.type === 'hello' && battleState.roomRole === 'host') {
+    await broadcastBattleState({type:'state', enemyName: online.user?.user_metadata?.username || 'ผู้เล่น'});
+    setOnlineRoomStatus('มีผู้เล่นเข้าห้องแล้ว — เริ่มต่อสู้ได้');
+    return;
+  }
+  if (msg.type === 'state' && battleState.roomRole === 'guest') {
+    battleState.turn = Number(msg.turn || 1);
+    battleState.turnOwner = msg.turnOwner || 'host';
+    battleState.playerHp = Number(msg.enemyHp ?? 100);
+    battleState.enemyHp = Number(msg.playerHp ?? 100);
+    battleState.playerPos = Number(msg.enemyPos ?? 2);
+    battleState.enemyPos = Number(msg.playerPos ?? 2);
+    battleState.enemyName = msg.enemyName || 'คู่ต่อสู้';
+    battleState.gameOver = !!msg.gameOver;
+    battleState.canMove = battleState.turnOwner === 'guest' && !!msg.canMove;
+    battleState.phase = battleState.turnOwner === 'guest' ? (battleState.canMove ? 'move' : 'player') : 'wait';
+    setBattleHp('playerHp', battleState.playerHp); setBattleHp('enemyHp', battleState.enemyHp);
+    updateBattlePositions(); battleStatus();
+    if (!battleState.gameOver) battleMessage(battleState.canMove ? 'คู่ต่อสู้ปาแล้ว — เลือกจุดยืนของคุณ' : (battleState.turnOwner === 'guest' ? 'ถึงตาคุณปา' : 'รอคู่ต่อสู้ปา'));
+    return;
+  }
+  if (msg.type === 'guest_action' && battleState.roomRole === 'host') {
+    if (msg.action === 'position' && battleState.turnOwner === 'guest' && battleState.canMove) {
+      battleState.enemyPos = Number(msg.position); battleState.canMove = false; battleState.phase = 'wait'; updateBattlePositions();
+      await broadcastBattleState();
+      battleMessage(`คู่ต่อสู้ย้ายไปจุด ${battleState.enemyPos+1} — กำลังรอการปา`);
+    } else if (msg.action === 'attack' && battleState.turnOwner === 'guest' && !battleState.canMove) {
+      const guestWeapon = battleWeapons[msg.weapon] || battleWeapons.bow;
+      const dmg = guestWeapon.base + Math.floor(Math.random()*8);
+      battleState.phase = 'enemy';
+      battleStatus();
+      battleMessage(`คู่ต่อสู้ปา ${guestWeapon.name} มาที่จุด ${battleState.playerPos+1}`);
+      animateBattleProjectile('enemy', battleState.enemyPos, 'player', battleState.playerPos, guestWeapon.icon, async () => {
+        setBattleHp('playerHp', battleState.playerHp - dmg);
+        flashFighter('#playerFighter');
+        if (battleState.playerHp <= 0) {
+          finishBattle(false);
+          await broadcastBattleState();
+          return;
+        }
+        battleState.turn += 1;
+        battleState.turnOwner = 'host';
+        battleState.phase = 'move';
+        battleState.canMove = true;
+        battleStatus();
+        battleMessage(`โดน ${dmg} ดาเมจ — เลือกจุดยืนใหม่ได้แล้ว`);
+        await broadcastBattleState();
+      });
+    }
+  }
+}
+
+async function createBattleRoom() {
+  if (battleState.roomChannel) await closeBattleRoom();
+  const code = randomRoomCode();
+  battleState.room = code;
+  battleState.roomRole = 'host';
+  battleState.enemyName = 'รอผู้เล่น...';
+  try {
+    battleState.roomChannel = online.openBattleRoom(code, handleBattleOnlineMessage);
+    battleState.onlineReady = true;
+    const room = $('#battleRoomCode');
+    if (room) { room.textContent = code; room.classList.remove('hidden'); }
+    setOnlineRoomStatus('สร้างห้องแล้ว ส่งรหัสนี้ให้เพื่อนเพื่อเข้าห้อง');
+    resetBattleRound();
+  } catch (err) { setOnlineRoomStatus(err?.message || 'สร้างห้องไม่สำเร็จ'); }
+}
+
+async function joinBattleRoom() {
+  const code = String($('#battleRoomCodeInput')?.value || '').trim().toUpperCase();
+  if (!/^[A-Z0-9]{6}$/.test(code)) { setOnlineRoomStatus('กรอกรหัสห้อง 6 ตัว'); return; }
+  if (battleState.roomChannel) await closeBattleRoom();
+  try {
+    battleState.room = code; battleState.roomRole = 'guest'; battleState.enemyName = 'ผู้เล่นออนไลน์';
+    battleState.roomChannel = online.openBattleRoom(code, handleBattleOnlineMessage);
+    battleState.onlineReady = true;
+    const room = $('#battleRoomCode');
+    if (room) { room.textContent = code; room.classList.remove('hidden'); }
+    setOnlineRoomStatus('เข้าห้องแล้ว — กำลังรอเจ้าของห้อง');
+    resetBattleRound();
+    setTimeout(() => online.sendBattleMessage(battleState.roomChannel, {type:'hello'}).catch(()=>{}), 500);
+  } catch (err) { setOnlineRoomStatus(err?.message || 'เข้าห้องไม่สำเร็จ'); }
+}
+
+function showBattlePage() {
+  ['.hero','.content','.bottom-grid','#accountPage'].forEach(sel => document.querySelector(sel)?.classList.add('hidden'));
+  $('#gamePage')?.classList.remove('hidden');
+  loadBattleMeta();
+  const playerName = $('#playerName');
+  if (playerName) playerName.textContent = online.user?.user_metadata?.username || 'ผู้เล่น';
+  updateBattlePositions();
+  renderBattleSystem('gacha');
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+
+$('#enterGameBtn')?.addEventListener('click', () => document.querySelector('.nav[data-page="game"]')?.click());
+$('#battleBackHome')?.addEventListener('click', () => document.querySelector('.nav[data-page="home"]')?.click());
+$('#battleThrowBtn')?.addEventListener('click', playerAttack);
+$('#battleRestartBtn')?.addEventListener('click', resetBattleRound);
+$$('.choose-position').forEach(btn => btn.addEventListener('click', () => chooseBattlePosition(Number(btn.dataset.playerPosition))));
+$$('.weapon-btn').forEach(btn => btn.addEventListener('click', () => {
+  $$('.weapon-btn').forEach(x=>x.classList.remove('active'));
+  btn.classList.add('active');
+  battleState.weapon = btn.dataset.weapon;
+}));
+$$('.battle-mode').forEach(btn => btn.addEventListener('click', async () => {
+  const mode = btn.dataset.battleMode;
+  if (battleState.mode === mode) return;
+  await closeBattleRoom();
+  battleState.mode = mode;
+  $$('.battle-mode').forEach(x=>x.classList.toggle('active', x===btn));
+  $('#onlineRoomPanel')?.classList.toggle('hidden', mode !== 'pvp');
+  resetBattleRound();
+}));
+$$('.system-tab').forEach(btn => btn.addEventListener('click', () => {
+  $$('.system-tab').forEach(x=>x.classList.toggle('active',x===btn));
+  renderBattleSystem(btn.dataset.system);
+}));
+$('#createBattleRoom')?.addEventListener('click', createBattleRoom);
+$('#joinBattleRoom')?.addEventListener('click', joinBattleRoom);
+
+// Initial render for the newly added page. It remains hidden until the user enters the game.
+loadBattleMeta();
+updateBattlePositions();
+renderBattleSystem('gacha');
+battleStatus();
