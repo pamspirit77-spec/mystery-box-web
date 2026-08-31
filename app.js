@@ -10,7 +10,7 @@ const boxes = [
  {name:'กล่องเลเจนด์',en:'Legend Box',price:5,rarity:'LEGENDARY',color:0xd97706,accent:0xfde047,icon:'♛',rewards:['iPhone 15 Pro Max','AirPods Pro 2','รางวัลใหญ่','สินค้า Rare']}
 ];
 
-let points = 24;
+let points = 0;
 let selected = 4;
 let rollCount = 1;
 
