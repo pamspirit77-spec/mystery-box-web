@@ -914,14 +914,12 @@ if(rollBtn) {
       return;
     }
     
-    // บันทึกยอดเหรียญลง Supabase ให้สำเร็จก่อนเริ่มสุ่ม
-    // เพื่อป้องกันรีเฟรชแล้วเหรียญเด้งกลับไปยอดเดิม
+    // Save the new balance first so a refresh cannot restore the old coins.
     const newPoints = points - totalPrice;
     try {
       await online.saveCoins(newPoints);
     } catch (err) {
-      console.error('Save coins failed:', err);
-      toast(err?.message || 'บันทึกเหรียญไม่สำเร็จ');
+      toast('บันทึกเหรียญไม่สำเร็จ กรุณาลองใหม่');
       return;
     }
 
@@ -929,7 +927,7 @@ if(rollBtn) {
     hasClaimed = false;
     points = newPoints;
     syncPoints();
-
+    
     rollBtn.disabled = true;
     
     if(!openScene) return;

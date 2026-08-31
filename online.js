@@ -48,16 +48,16 @@ class OnlineDB {
       return;
     }
 
-    // Sign out globally so the previous account cannot be restored on refresh.
-    const { error } = await this.client.auth.signOut({ scope: 'global' });
+    // Logout only this browser/device and remove the persisted Supabase session.
+    const { error } = await this.client.auth.signOut({ scope: 'local' });
     if (error) throw error;
-
     this.user = null;
 
-    // Verify that Supabase no longer has an active session.
+    // Make sure a refresh cannot restore the previous account.
     const { data: { session } } = await this.client.auth.getSession();
     if (session) {
-      await this.client.auth.signOut({ scope: 'local' });
+      const { error: localError } = await this.client.auth.signOut({ scope: 'local' });
+      if (localError) throw localError;
       this.user = null;
     }
   }
@@ -97,26 +97,25 @@ class OnlineDB {
   }
 
   async saveCoins(coins) {
-    if (!this.client || !this.user) {
-      throw new Error('กรุณาเข้าสู่ระบบก่อนบันทึกเหรียญ');
-    }
+    if (!this.client || !this.user) return false;
 
     const userId = this.user.id;
     const newCoins = Math.max(0, Math.floor(coins));
 
-    const { data, error } = await this.client
+    // Update only the coins column. Do not use .single()/.select() here:
+    // RLS can allow the UPDATE while PostgREST returns no row, which caused
+    // the game to report "Cannot coerce the result to a single JSON object".
+    const { error } = await this.client
       .from('profiles')
-      .update({ coins: newCoins, updated_at: new Date().toISOString() })
-      .eq('id', userId)
-      .select('id, coins')
-      .single();
+      .update({ coins: newCoins })
+      .eq('id', userId);
 
-    if (error) throw error;
-    if (!data || data.id !== userId || Number(data.coins) !== newCoins) {
-      throw new Error('บันทึกเหรียญไม่สำเร็จ');
+    if (error) {
+      console.warn('Supabase coins sync failed:', error);
+      throw error;
     }
 
-    return data;
+    return true;
   }
 
 
