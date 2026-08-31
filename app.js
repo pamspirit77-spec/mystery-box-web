@@ -70,7 +70,7 @@ function renderRollHistory() {
 
   el.innerHTML = rollHistory.map(item => `
     <div class="history-row">
-      <div class="history-icon">${item.icon}</div>
+      <div class="history-icon">${item.image_url ? rewardVisualHtml(item) : item.icon}</div>
       <div class="history-main">
         <b>${item.prizeName}</b>
         <span>สุ่มจาก ${item.boxName}</span>
@@ -89,6 +89,7 @@ function addRollHistory(items, boxName) {
       prizeName: item.name,
       rarity: item.rarity,
       icon: item.icon,
+      image_url: item.image_url || '',
       boxName,
       timestamp
     });
@@ -125,14 +126,7 @@ function boxMarkup(b, i) {
 }
 
 const boxGrid = $('#boxGrid');
-function bindBoxCards(){
-  }
-function renderBoxGrid(){
-  if(!boxGrid) return;
-  boxGrid.innerHTML = boxes.map(boxMarkup).join('');
-  bindBoxCards();
-}
-renderBoxGrid();
+if(boxGrid) boxGrid.innerHTML = boxes.map(boxMarkup).join('');
 
 function makeRenderer(canvas) {
   const r = new THREE.WebGLRenderer({canvas, antialias: true, alpha: true});
@@ -1043,6 +1037,7 @@ function openBox(i) {
   }, 30);
 }
 
+$$('.box-card').forEach(c => c.addEventListener('click', () => openBox(+c.dataset.i)));
 $$('[data-open]').forEach(b => b.addEventListener('click', () => openBox(+b.dataset.open)));
 
 $('#closeModal')?.addEventListener('click', () => $('#openModal')?.classList.add('hidden'));
@@ -1086,14 +1081,40 @@ async function applyRemoteBoxSettings() {
       })) : [];
       return {...def,...b,price:Number(b.price||0),color:Number(b.color||def.color),accent:Number(b.accent||def.accent),rewards};
     });
-    renderBoxGrid();
-    // Update the currently visible opening modal/scene without touching any other system.
+    // Update only the five box cards and their 3D scenes. All other systems stay untouched.
+    if (boxGrid) {
+      boxes.forEach((b,i)=>{
+        const card=boxGrid.querySelector(`.box-card[data-i="${i}"]`);
+        if(!card) return;
+        const price=card.querySelector('.price'); if(price) price.textContent=`🪙 ${b.price}`;
+        const title=card.querySelector('h3'); if(title) title.textContent=b.name;
+        const en=card.querySelector('p'); if(en) en.textContent=b.en || '';
+        const rarity=card.querySelector('.rarity');
+        if(rarity){ rarity.textContent=b.rarity; rarity.className=`rarity ${String(b.rarity||'COMMON').toLowerCase()}`; }
+      });
+    }
+    // Refresh the already-mounted card scenes so Admin changes are visible without a page refresh.
+    if (Array.isArray(scenes)) {
+      scenes.forEach((sceneObj,i)=>{
+        if (!sceneObj || !boxes[i]) return;
+        sceneObj.scene.remove(sceneObj.box);
+        sceneObj.box=createLuxuryBox(boxes[i]);
+        sceneObj.data=boxes[i];
+        sceneObj.scene.add(sceneObj.box);
+      });
+    }
+    if (hero && boxes[4]) {
+      hero.scene.remove(hero.box);
+      hero.box=createLuxuryBox(boxes[4]);
+      hero.data=boxes[4];
+      hero.scene.add(hero.box);
+    }
     if (openScene && boxes[selected]) {
       const b=boxes[selected];
       openScene.scene.remove(openScene.box);
       openScene.box=createLuxuryBox(b);
-      openScene.scene.add(openScene.box);
       openScene.data=b;
+      openScene.scene.add(openScene.box);
     }
   } catch (err) {
     console.warn('Box settings unavailable; using defaults:', err);

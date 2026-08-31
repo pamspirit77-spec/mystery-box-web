@@ -21,6 +21,18 @@ async function ensureAdmin(){
 const DEFAULT_BOX_COLORS = [9080486,2277376,2443487,9641722,14251010];
 const DEFAULT_BOX_ACCENTS = [7119497,4849904,3716095,12617724,16638297];
 const BOX_RARITIES = ['COMMON','UNCOMMON','RARE','EPIC','LEGENDARY'];
+const DEFAULT_BOX_SETTINGS = [
+ {id:'box1',name:'กล่องธรรมดา',en:'Food Box',price:1,rarity:'COMMON',color:9080486,accent:7119497,icon:'🍔',rewards:[
+  {id:'box1-item1',name:'ชุดอาหารพรีเมียม',rarity:'COMMON',drop_rate:25,image_url:''},{id:'box1-item2',name:'ขนมนำเข้า',rarity:'COMMON',drop_rate:25,image_url:''},{id:'box1-item3',name:'เครื่องดื่ม',rarity:'COMMON',drop_rate:25,image_url:''},{id:'box1-item4',name:'บะหมี่พิเศษ',rarity:'COMMON',drop_rate:25,image_url:''}]},
+ {id:'box2',name:'กล่องหายาก',en:'Fashion Box',price:2,rarity:'UNCOMMON',color:2277376,accent:4849904,icon:'👕',rewards:[
+  {id:'box2-item1',name:'เสื้อยืดแฟชั่น',rarity:'UNCOMMON',drop_rate:25,image_url:''},{id:'box2-item2',name:'หมวก',rarity:'UNCOMMON',drop_rate:25,image_url:''},{id:'box2-item3',name:'กระเป๋า',rarity:'UNCOMMON',drop_rate:25,image_url:''},{id:'box2-item4',name:'รองเท้า',rarity:'UNCOMMON',drop_rate:25,image_url:''}]},
+ {id:'box3',name:'กล่องแรร์',en:'Utility Box',price:3,rarity:'RARE',color:2443487,accent:3716095,icon:'◉',rewards:[
+  {id:'box3-item1',name:'หูฟัง',rarity:'RARE',drop_rate:25,image_url:''},{id:'box3-item2',name:'แก้วเก็บอุณหภูมิ',rarity:'RARE',drop_rate:25,image_url:''},{id:'box3-item3',name:'อุปกรณ์โต๊ะ',rarity:'RARE',drop_rate:25,image_url:''},{id:'box3-item4',name:'ของใช้พรีเมียม',rarity:'RARE',drop_rate:25,image_url:''}]},
+ {id:'box4',name:'กล่องอีพิค',en:'Big Prize',price:4,rarity:'EPIC',color:9641722,accent:12617724,icon:'🎁',rewards:[
+  {id:'box4-item1',name:'บัตรของขวัญ',rarity:'EPIC',drop_rate:25,image_url:''},{id:'box4-item2',name:'สินค้า Limited',rarity:'EPIC',drop_rate:25,image_url:''},{id:'box4-item3',name:'ของสะสม',rarity:'EPIC',drop_rate:25,image_url:''},{id:'box4-item4',name:'รางวัลพิเศษ',rarity:'EPIC',drop_rate:25,image_url:''}]},
+ {id:'box5',name:'กล่องเลเจนด์',en:'Legend Box',price:5,rarity:'LEGENDARY',color:14251010,accent:16638297,icon:'♛',rewards:[
+  {id:'box5-item1',name:'iPhone 15 Pro Max',rarity:'LEGENDARY',drop_rate:25,image_url:''},{id:'box5-item2',name:'AirPods Pro 2',rarity:'LEGENDARY',drop_rate:25,image_url:''},{id:'box5-item3',name:'รางวัลใหญ่',rarity:'LEGENDARY',drop_rate:25,image_url:''},{id:'box5-item4',name:'สินค้า Rare',rarity:'LEGENDARY',drop_rate:25,image_url:''}]}
+].map(b=>({...b,rewards:b.rewards.map(r=>({...r}))}));
 
 function makeRewardId(boxId){ return `${boxId}-item-${Date.now()}-${Math.random().toString(36).slice(2,8)}`; }
 function rewardImageHtml(url, label='รูป'){ return url ? `<img class="reward-image-preview" src="${escapeHtml(url)}" alt="${escapeHtml(label)}">` : '<div class="reward-image-empty">🖼️</div>'; }
@@ -114,7 +126,15 @@ function bindBoxAdminEvents(){
 }
 
 async function loadBoxSettings(){
- const {data,error}=await getClient().rpc('admin_list_box_settings');
+ const c=getClient();
+ let data=null, error=null;
+ // Preferred path: admin RPC.
+ ({data,error}=await c.rpc('admin_list_box_settings'));
+ // Fallback to direct SELECT so the page still renders if the RPC was not reloaded yet.
+ if(error){
+   const direct=await c.from('box_settings').select('*').order('id');
+   data=direct.data; error=direct.error;
+ }
  if(error) throw error;
  boxSettings=(data||[]).map(b=>({...b,rewards:Array.isArray(b.rewards)?b.rewards:[]}));
  renderBoxAdmin();
@@ -279,6 +299,15 @@ async function loadAll(){
  await loadRewardClaims();
  await loadUsers();
  await loadSite();
+ try {
+   await loadBoxSettings();
+ } catch (boxErr) {
+   console.warn('Box settings table/RPC unavailable:', boxErr);
+   boxSettings=DEFAULT_BOX_SETTINGS.map(b=>({...b,rewards:b.rewards.map(r=>({...r}))}));
+   renderBoxAdmin();
+   const boxMsg=$('#boxMessage');
+   if(boxMsg) boxMsg.textContent='ยังไม่ได้สร้างตาราง box_settings ใน Supabase — ให้รัน BOX_SETTINGS_SETUP.sql 1 ครั้ง';
+ }
  statusEl.textContent=`พร้อมใช้งาน • ${topups.length} รายการเติมเงิน • ผู้เล่น ${userTotal.toLocaleString()} คน`;
 }
 loginForm.onsubmit=async e=>{e.preventDefault();loginMessage.textContent='';try{const {error}=await getClient().auth.signInWithPassword({email:$('#adminEmail').value.trim(),password:$('#adminPassword').value});if(error)throw error;await loadAll();}catch(err){loginMessage.textContent=err.message||'เข้าสู่ระบบไม่สำเร็จ';}};
