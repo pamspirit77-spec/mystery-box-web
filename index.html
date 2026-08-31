@@ -81,7 +81,7 @@
       <nav>
         <button class="nav active" data-page="home">🏠 <span>หน้าแรก</span></button>
         <button class="nav" data-page="boxes">📦 <span>กล่องสุ่ม</span></button>
-        <button class="nav" data-page="fight">🐟 <span>เข้าเกม</span></button>
+        <button class="nav" data-page="game">🐟 <span>เข้าเกม</span></button>
         <button class="nav" data-page="rewards">🏆 <span>รางวัล</span></button>
         <button class="nav" data-page="history">📜 <span>ประวัติ</span></button>
         <button class="nav" data-page="account">👤 <span>บัญชี / ออกจากระบบ</span></button>
@@ -146,131 +146,42 @@
         </div>
       </section>
 
-
-      <section class="fish-game-page hidden" id="fishGamePage">
-        <div class="fish-game-head">
+      <section class="betta-page hidden" id="bettaPage">
+        <div class="betta-hero">
           <div>
-            <div class="eyebrow">BETTA ARENA</div>
+            <div class="eyebrow">BETTA FRONTIER</div>
             <h1>🐟 สนามปลากัด</h1>
-            <p>อัปเกรดปลาของคุณ แล้วปล่อยให้การต่อสู้ดำเนินแบบอัตโนมัติ</p>
+            <p>ทีมปลาของคุณจะเคลื่อนที่และต่อสู้แบบอัตโนมัติ เลือกด่าน อัปเกรดทีม แล้วส่งลงสนาม</p>
           </div>
-          <button class="fish-back-btn" id="fishBackBtn" type="button">← กลับหน้ากล่องสุ่ม</button>
+          <div class="betta-player-card"><span>ทีมของฉัน</span><b id="bettaTeamPower">พลัง 120</b><small id="bettaTeamLevel">ทีมเลเวล 1</small></div>
         </div>
-
-        <div class="fish-mode-grid">
-          <button class="fish-mode-card active" data-fish-mode="pve" type="button">
-            <span class="fish-mode-icon">⚔️</span>
-            <span><b>PVE</b><small>ฟาร์มของ • ต่อสู้กับ NPC</small></span>
-          </button>
-          <button class="fish-mode-card" data-fish-mode="pvp" type="button">
-            <span class="fish-mode-icon">🏆</span>
-            <span><b>PVP</b><small>ต่อสู้ผู้เล่น • Auto Battle</small></span>
-          </button>
+        <div class="betta-tabs">
+          <button class="betta-tab active" data-betta-mode="pve" type="button">⚔️ PVE ฟาร์ม</button>
+          <button class="betta-tab" data-betta-mode="pvp" type="button">🏆 PVP ออนไลน์</button>
+          <button class="betta-tab" data-betta-mode="team" type="button">🐠 ทีมของฉัน</button>
         </div>
-
-        <div class="fish-game-layout">
-          <aside class="fish-stats-card">
-            <div class="fish-card-title"><span>🐠</span> ปลากัดของฉัน</div>
-            <div class="fish-preview-wrap">
-              <div class="betta-realistic my-fish" id="myFishPreview" aria-label="ปลากัดของฉัน">
-<svg viewBox="0 0 360 180" role="img" aria-hidden="true">
- <defs><linearGradient id="bodyMine" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ff7b9d"/><stop offset=".38" stop-color="#d92d68"/><stop offset=".72" stop-color="#6d1aa8"/><stop offset="1" stop-color="#251052"/></linearGradient><linearGradient id="finMine" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#ffb3ca" stop-opacity=".95"/><stop offset=".5" stop-color="#ff3d83" stop-opacity=".8"/><stop offset="1" stop-color="#6820d7" stop-opacity=".35"/></linearGradient><filter id="glowMine"><feGaussianBlur stdDeviation="2" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs>
- <g class="betta-svg-art">
-  <path class="fin" fill="url(#finMine)" d="M112 87 C72 50 37 23 13 15 C35 49 46 76 70 91 C43 104 26 128 12 163 C48 151 83 130 115 103Z"/>
-  <path class="fin top" fill="url(#finMine)" d="M128 65 C119 32 122 13 135 3 C158 29 171 48 166 73Z"/>
-  <path class="fin bottom" fill="url(#finMine)" d="M125 111 C119 143 126 165 143 177 C157 151 167 132 160 109Z"/>
-  <ellipse class="body" fill="url(#bodyMine)" cx="172" cy="89" rx="82" ry="48"/>
-  <path class="fin" fill="url(#finMine)" d="M226 68 C252 31 282 18 317 14 C294 39 284 61 275 83 C297 76 325 77 348 88 C315 101 286 106 252 99Z"/>
-  <path class="fin" fill="url(#finMine)" d="M226 111 C253 137 282 151 315 158 C291 137 279 119 274 101 C293 111 319 116 347 113 C313 99 283 93 250 97Z"/>
-  <path class="stripe" d="M118 69 C151 48 194 47 225 69" fill="none" stroke="#ffd8e4" stroke-opacity=".55" stroke-width="5"/>
-  <path class="stripe" d="M112 84 C150 62 199 62 235 83" fill="none" stroke="#fff" stroke-opacity=".18" stroke-width="3"/>
-  <path class="stripe" d="M116 101 C154 82 198 83 229 102" fill="none" stroke="#16082f" stroke-opacity=".28" stroke-width="5"/>
-  <circle cx="222" cy="78" r="8" fill="#f7fbff"/><circle cx="225" cy="78" r="4" fill="#07070d"/><circle cx="227" cy="76" r="1.7" fill="#fff"/>
-  <path d="M245 88 Q259 96 245 105" fill="none" stroke="#240a35" stroke-width="5" stroke-linecap="round"/>
-  <g class="scale-dots" fill="#fff" opacity=".2"><circle cx="138" cy="73" r="3"/><circle cx="151" cy="67" r="3"/><circle cx="165" cy="64" r="3"/><circle cx="180" cy="63" r="3"/><circle cx="194" cy="66" r="3"/><circle cx="145" cy="84" r="3"/><circle cx="159" cy="80" r="3"/><circle cx="174" cy="78" r="3"/><circle cx="189" cy="80" r="3"/><circle cx="203" cy="84" r="3"/><circle cx="147" cy="96" r="3"/><circle cx="162" cy="94" r="3"/><circle cx="178" cy="93" r="3"/><circle cx="193" cy="95" r="3"/></g>
- </g></svg></div>
-            </div>
-            <h2 id="fishName">นักสู้สีชาด</h2>
-            <div class="fish-level-row"><span>Lv.<b id="fishLevel">1</b></span><span>EXP <b id="fishExp">0/100</b></span></div>
-            <div class="fish-xp"><i id="fishXpBar"></i></div>
-            <div class="fish-stat-list">
-              <div><span>⚔️ พลังโจมตี</span><b id="fishAttack">20</b></div>
-              <div><span>🛡️ พลังป้องกัน</span><b id="fishDefense">10</b></div>
-              <div><span>❤️ พลังชีวิต</span><b id="fishHp">120</b></div>
-              <div><span>⚡ ความเร็ว</span><b id="fishSpeed">12</b></div>
-            </div>
-            <button class="fish-upgrade-btn" id="fishUpgradeBtn" type="button">⬆️ อัปเกรดปลา <span>🪙 <b id="upgradeCost">20</b></span></button>
-            <div class="fish-upgrade-note">อัปเกรดเพิ่มค่าสเตตัสแบบถาวร</div>
-          </aside>
-
-          <section class="fish-arena-card">
-            <div class="arena-topbar">
-              <div class="arena-mode-label" id="arenaModeLabel">PVE • ฟาร์มของ</div>
-              <div class="arena-status" id="arenaStatus">พร้อมต่อสู้</div>
-            </div>
-
-            <div class="battle-arena" id="battleArena">
-              <div class="arena-bubble bubble-1"></div><div class="arena-bubble bubble-2"></div><div class="arena-bubble bubble-3"></div>
-              <div class="arena-ground"></div>
-              <div class="arena-fighter player-fighter" id="playerFighter">
-                <div class="hp-label"><b id="playerNameBattle">นักสู้สีชาด</b><span id="playerHpText">120/120</span></div>
-                <div class="hp-bar"><i id="playerHpBar"></i></div>
-                <div class="betta-realistic my-fish" aria-label="ปลากัดของฉัน">
-<svg viewBox="0 0 360 180" role="img" aria-hidden="true">
- <defs><linearGradient id="bodyMine" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ff7b9d"/><stop offset=".38" stop-color="#d92d68"/><stop offset=".72" stop-color="#6d1aa8"/><stop offset="1" stop-color="#251052"/></linearGradient><linearGradient id="finMine" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#ffb3ca" stop-opacity=".95"/><stop offset=".5" stop-color="#ff3d83" stop-opacity=".8"/><stop offset="1" stop-color="#6820d7" stop-opacity=".35"/></linearGradient><filter id="glowMine"><feGaussianBlur stdDeviation="2" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs>
- <g class="betta-svg-art">
-  <path class="fin" fill="url(#finMine)" d="M112 87 C72 50 37 23 13 15 C35 49 46 76 70 91 C43 104 26 128 12 163 C48 151 83 130 115 103Z"/>
-  <path class="fin top" fill="url(#finMine)" d="M128 65 C119 32 122 13 135 3 C158 29 171 48 166 73Z"/>
-  <path class="fin bottom" fill="url(#finMine)" d="M125 111 C119 143 126 165 143 177 C157 151 167 132 160 109Z"/>
-  <ellipse class="body" fill="url(#bodyMine)" cx="172" cy="89" rx="82" ry="48"/>
-  <path class="fin" fill="url(#finMine)" d="M226 68 C252 31 282 18 317 14 C294 39 284 61 275 83 C297 76 325 77 348 88 C315 101 286 106 252 99Z"/>
-  <path class="fin" fill="url(#finMine)" d="M226 111 C253 137 282 151 315 158 C291 137 279 119 274 101 C293 111 319 116 347 113 C313 99 283 93 250 97Z"/>
-  <path class="stripe" d="M118 69 C151 48 194 47 225 69" fill="none" stroke="#ffd8e4" stroke-opacity=".55" stroke-width="5"/>
-  <path class="stripe" d="M112 84 C150 62 199 62 235 83" fill="none" stroke="#fff" stroke-opacity=".18" stroke-width="3"/>
-  <path class="stripe" d="M116 101 C154 82 198 83 229 102" fill="none" stroke="#16082f" stroke-opacity=".28" stroke-width="5"/>
-  <circle cx="222" cy="78" r="8" fill="#f7fbff"/><circle cx="225" cy="78" r="4" fill="#07070d"/><circle cx="227" cy="76" r="1.7" fill="#fff"/>
-  <path d="M245 88 Q259 96 245 105" fill="none" stroke="#240a35" stroke-width="5" stroke-linecap="round"/>
-  <g class="scale-dots" fill="#fff" opacity=".2"><circle cx="138" cy="73" r="3"/><circle cx="151" cy="67" r="3"/><circle cx="165" cy="64" r="3"/><circle cx="180" cy="63" r="3"/><circle cx="194" cy="66" r="3"/><circle cx="145" cy="84" r="3"/><circle cx="159" cy="80" r="3"/><circle cx="174" cy="78" r="3"/><circle cx="189" cy="80" r="3"/><circle cx="203" cy="84" r="3"/><circle cx="147" cy="96" r="3"/><circle cx="162" cy="94" r="3"/><circle cx="178" cy="93" r="3"/><circle cx="193" cy="95" r="3"/></g>
- </g></svg></div>
-              </div>
-              <div class="battle-vs">VS</div>
-              <div class="arena-fighter enemy-fighter" id="enemyFighter">
-                <div class="hp-label"><b id="enemyNameBattle">ปลาป่าทอง</b><span id="enemyHpText">100/100</span></div>
-                <div class="hp-bar enemy-hp"><i id="enemyHpBar"></i></div>
-                <div class="betta-realistic enemy-fish" aria-label="ปลากัดของฉัน">
-<svg viewBox="0 0 360 180" role="img" aria-hidden="true">
- <defs><linearGradient id="bodyMine" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ff7b9d"/><stop offset=".38" stop-color="#d92d68"/><stop offset=".72" stop-color="#6d1aa8"/><stop offset="1" stop-color="#251052"/></linearGradient><linearGradient id="finMine" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#ffb3ca" stop-opacity=".95"/><stop offset=".5" stop-color="#ff3d83" stop-opacity=".8"/><stop offset="1" stop-color="#6820d7" stop-opacity=".35"/></linearGradient><filter id="glowMine"><feGaussianBlur stdDeviation="2" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs>
- <g class="betta-svg-art">
-  <path class="fin" fill="url(#finMine)" d="M112 87 C72 50 37 23 13 15 C35 49 46 76 70 91 C43 104 26 128 12 163 C48 151 83 130 115 103Z"/>
-  <path class="fin top" fill="url(#finMine)" d="M128 65 C119 32 122 13 135 3 C158 29 171 48 166 73Z"/>
-  <path class="fin bottom" fill="url(#finMine)" d="M125 111 C119 143 126 165 143 177 C157 151 167 132 160 109Z"/>
-  <ellipse class="body" fill="url(#bodyMine)" cx="172" cy="89" rx="82" ry="48"/>
-  <path class="fin" fill="url(#finMine)" d="M226 68 C252 31 282 18 317 14 C294 39 284 61 275 83 C297 76 325 77 348 88 C315 101 286 106 252 99Z"/>
-  <path class="fin" fill="url(#finMine)" d="M226 111 C253 137 282 151 315 158 C291 137 279 119 274 101 C293 111 319 116 347 113 C313 99 283 93 250 97Z"/>
-  <path class="stripe" d="M118 69 C151 48 194 47 225 69" fill="none" stroke="#ffd8e4" stroke-opacity=".55" stroke-width="5"/>
-  <path class="stripe" d="M112 84 C150 62 199 62 235 83" fill="none" stroke="#fff" stroke-opacity=".18" stroke-width="3"/>
-  <path class="stripe" d="M116 101 C154 82 198 83 229 102" fill="none" stroke="#16082f" stroke-opacity=".28" stroke-width="5"/>
-  <circle cx="222" cy="78" r="8" fill="#f7fbff"/><circle cx="225" cy="78" r="4" fill="#07070d"/><circle cx="227" cy="76" r="1.7" fill="#fff"/>
-  <path d="M245 88 Q259 96 245 105" fill="none" stroke="#240a35" stroke-width="5" stroke-linecap="round"/>
-  <g class="scale-dots" fill="#fff" opacity=".2"><circle cx="138" cy="73" r="3"/><circle cx="151" cy="67" r="3"/><circle cx="165" cy="64" r="3"/><circle cx="180" cy="63" r="3"/><circle cx="194" cy="66" r="3"/><circle cx="145" cy="84" r="3"/><circle cx="159" cy="80" r="3"/><circle cx="174" cy="78" r="3"/><circle cx="189" cy="80" r="3"/><circle cx="203" cy="84" r="3"/><circle cx="147" cy="96" r="3"/><circle cx="162" cy="94" r="3"/><circle cx="178" cy="93" r="3"/><circle cx="193" cy="95" r="3"/></g>
- </g></svg></div>
-              </div>
-              <div class="battle-fx" id="battleFx"></div>
-              <div class="battle-log" id="battleLog">กด “เริ่มต่อสู้” เพื่อเริ่ม Auto Battle</div>
-            </div>
-
-            <div class="arena-controls">
-              <button class="start-battle-btn" id="startBattleBtn" type="button">⚔️ เริ่มต่อสู้</button>
-              <button class="reset-battle-btn" id="resetBattleBtn" type="button">↻ รีเซ็ต</button>
-            </div>
-          </section>
+        <div id="bettaPvePanel" class="betta-panel">
+          <div class="stage-head"><div><h2>เลือกด่าน</h2><p>ผ่านด่านเพื่อรับ EXP และเหรียญฟาร์ม</p></div><span id="bettaEnergy">⚡ 10/10</span></div>
+          <div class="stage-grid" id="bettaStageGrid"></div>
         </div>
+        <div id="bettaPvpPanel" class="betta-panel hidden">
+          <div class="pvp-card"><div class="pvp-emblem">⚔️</div><h2>อารีน่า PVP</h2><p>จับคู่คู่ต่อสู้ แล้วปล่อยทีมเข้าประชิดและต่อสู้แบบอัตโนมัติ</p><div class="pvp-stats"><span>🏆 Rating <b id="bettaRating">1000</b></span><span>🔥 ชนะ <b id="bettaWins">0</b></span><span>💀 แพ้ <b id="bettaLosses">0</b></span></div><button class="betta-primary" id="bettaFindMatch" type="button">ค้นหาคู่ต่อสู้</button></div>
+        </div>
+        <div id="bettaTeamPanel" class="betta-panel hidden">
+          <div class="team-head"><div><h2>ทีมปลากัด</h2><p>อัปเกรดปลาเพื่อเพิ่มพลังโจมตีและความอึด</p></div><span id="bettaCoins">🪙 500</span></div>
+          <div class="fish-team-grid" id="bettaTeamGrid"></div>
+        </div>
+      </section>
 
-        <div class="fish-game-footer">
-          <div><span>🏆 ชนะ</span><b id="fishWins">0</b></div>
-          <div><span>💀 แพ้</span><b id="fishLosses">0</b></div>
-          <div><span>🎁 ของฟาร์ม</span><b id="fishLoot">0</b></div>
-          <div><span>🪙 เหรียญใช้ได้</span><b id="fishCoins">0</b></div>
+      <section class="betta-battle-page hidden" id="bettaBattlePage">
+        <div class="battle-topbar"><button class="betta-back" id="bettaBattleBack" type="button">← กลับ</button><div><b id="bettaBattleTitle">ด่าน 1</b><small id="bettaBattleMode">PVE</small></div><span id="bettaBattleTimer">00:00</span></div>
+        <div class="battle-arena" id="bettaArena">
+          <div class="arena-bg"><div class="water-light light1"></div><div class="water-light light2"></div><div class="sand"></div><div class="plant plant1">🌿</div><div class="plant plant2">🌱</div><div class="bubble b1"></div><div class="bubble b2"></div></div>
+          <div class="battle-hud player-hud"><div class="hud-name">🐟 <span id="bettaPlayerName">ทีมของฉัน</span></div><div class="hud-bar"><i id="bettaPlayerHp" style="width:100%"></i></div><small id="bettaPlayerHpText">100/100</small></div>
+          <div class="battle-hud enemy-hud"><div class="hud-name"><span id="bettaEnemyName">ศัตรู</span> 🐟</div><div class="hud-bar enemy"><i id="bettaEnemyHp" style="width:100%"></i></div><small id="bettaEnemyHpText">100/100</small></div>
+          <div class="lane" id="bettaLane"><div class="lane-unit player-unit" id="bettaPlayerUnit"><div class="fish-art player-fish"><div class="fish-tail"></div><div class="fish-body"></div><div class="fish-fin top"></div><div class="fish-fin bottom"></div><div class="fish-eye"></div></div><span class="unit-level" id="bettaPlayerUnitLevel">Lv.1</span></div><div class="lane-unit enemy-unit" id="bettaEnemyUnit"><div class="fish-art enemy-fish"><div class="fish-tail"></div><div class="fish-body"></div><div class="fish-fin top"></div><div class="fish-fin bottom"></div><div class="fish-eye"></div></div><span class="unit-level" id="bettaEnemyUnitLevel">Lv.1</span></div></div>
+          <div class="battle-log" id="bettaBattleLog" aria-live="polite"></div>
+          <div class="battle-result hidden" id="bettaBattleResult"><div class="result-icon" id="bettaResultIcon">🏆</div><h2 id="bettaResultTitle">ชนะ!</h2><p id="bettaResultText">ได้รับ EXP +20 และเหรียญ +30</p><button class="betta-primary" id="bettaResultBtn" type="button">กลับหน้าด่าน</button></div>
         </div>
       </section>
 

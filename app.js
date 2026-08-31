@@ -1462,14 +1462,13 @@ topupForm?.addEventListener('submit', async (event) => {
 
 
 function showAccountPage() {
-  ['.hero', '.content', '.bottom-grid', '#fishGamePage'].forEach(sel => document.querySelector(sel)?.classList.add('hidden'));
+  ['.hero', '.content', '.bottom-grid'].forEach(sel => document.querySelector(sel)?.classList.add('hidden'));
   $('#accountPage')?.classList.remove('hidden');
   window.scrollTo({top: 0, behavior: 'smooth'});
 }
 
 function showHomePage() {
   ['.hero', '.content', '.bottom-grid'].forEach(sel => document.querySelector(sel)?.classList.remove('hidden'));
-  $('#fishGamePage')?.classList.add('hidden');
   $('#accountPage')?.classList.add('hidden');
 }
 
@@ -1485,190 +1484,8 @@ $$('.nav').forEach(n => n.onclick = () => {
     $('#historyModal')?.classList.remove('hidden');
   }
   else if(p === 'boxes') { showHomePage(); document.querySelector('.content')?.scrollIntoView({behavior: 'smooth'}); }
-  else if(p === 'fight') { ['.hero','.content','.bottom-grid','#accountPage'].forEach(sel=>document.querySelector(sel)?.classList.add('hidden')); $('#fishGamePage')?.classList.remove('hidden'); window.scrollTo({top:0,behavior:'smooth'}); renderFishStats(); resetBattle(); }
   else if(p === 'home') { showHomePage(); document.querySelector('.hero')?.scrollIntoView({behavior: 'smooth'}); }
 });
-
-
-/* ================= BETTA AUTO BATTLE ================= */
-const fishGamePage = $('#fishGamePage');
-let fishMode = 'pve';
-let fishLevel = Number(localStorage.getItem('betta_level') || 1);
-let fishExp = Number(localStorage.getItem('betta_exp') || 0);
-let fishWins = Number(localStorage.getItem('betta_wins') || 0);
-let fishLosses = Number(localStorage.getItem('betta_losses') || 0);
-let fishLoot = Number(localStorage.getItem('betta_loot') || 0);
-let fishAttack = 20 + (fishLevel - 1) * 5;
-let fishDefense = 10 + (fishLevel - 1) * 3;
-let fishMaxHp = 120 + (fishLevel - 1) * 12;
-let fishSpeed = 12 + (fishLevel - 1);
-let battleTimer = null;
-let battleRunning = false;
-let playerHp = fishMaxHp, enemyHp = 100;
-let enemyMaxHp = 100;
-
-function saveFishProgress(){
-  localStorage.setItem('betta_level', fishLevel);
-  localStorage.setItem('betta_exp', fishExp);
-  localStorage.setItem('betta_wins', fishWins);
-  localStorage.setItem('betta_losses', fishLosses);
-  localStorage.setItem('betta_loot', fishLoot);
-}
-function renderFishStats(){
-  fishAttack = 20 + (fishLevel - 1) * 5;
-  fishDefense = 10 + (fishLevel - 1) * 3;
-  fishMaxHp = 120 + (fishLevel - 1) * 12;
-  fishSpeed = 12 + (fishLevel - 1);
-  const els = {
-    fishLevel, fishAttack, fishDefense, fishHp: fishMaxHp, fishSpeed,
-    fishWins, fishLosses, fishLoot, fishCoins: points
-  };
-  Object.entries(els).forEach(([id,val])=>{const e=$('#'+id);if(e)e.textContent=Number(val).toLocaleString();});
-  const need=fishLevel*100;
-  const xp=$('#fishExp'); if(xp) xp.textContent=`${fishExp}/${need}`;
-  const bar=$('#fishXpBar'); if(bar) bar.style.width=Math.min(100,(fishExp/need)*100)+'%';
-  const cost=fishLevel*20; const ce=$('#upgradeCost'); if(ce) ce.textContent=cost.toLocaleString();
-  const nm=$('#fishName'); if(nm) nm.textContent=fishLevel>=10?'นักสู้ราชันย์':fishLevel>=5?'นักสู้ชั้นสูง':'นักสู้สีชาด';
-  const bn=$('#playerNameBattle'); if(bn) bn.textContent=nm?.textContent||'นักสู้สีชาด';
-}
-function setFishMode(mode){
-  fishMode=mode;
-  $$('.fish-mode-card').forEach(b=>b.classList.toggle('active',b.dataset.fishMode===mode));
-  const label=$('#arenaModeLabel'); if(label) label.textContent=mode==='pve'?'PVE • ฟาร์มของ':'PVP • จับคู่ผู้เล่น';
-  resetBattle();
-}
-function resetBattle(){
-  if(battleTimer){clearInterval(battleTimer);battleTimer=null;}
-  battleRunning=false;
-  const arena=$('#battleArena'); if(arena) arena.classList.remove('battle-clash');
-  clearBattleResult();
-  playerHp=fishMaxHp;
-  enemyMaxHp=fishMode==='pve' ? 100 + Math.floor(fishLevel*8) : 125 + Math.floor(fishLevel*12);
-  enemyHp=enemyMaxHp;
-  const names=fishMode==='pve'?['ปลาป่าทอง','ปลากัดนักล่า','ปลากัดเกราะเหล็ก']:['Rival_Aqua','BettaKing','RedFighter'];
-  const en=$('#enemyNameBattle');if(en)en.textContent=names[Math.floor(Math.random()*names.length)];
-  const st=$('#arenaStatus');if(st)st.textContent='พร้อมต่อสู้';
-  const log=$('#battleLog');if(log)log.textContent='กด “เริ่มต่อสู้” เพื่อเริ่ม Auto Battle';
-  const btn=$('#startBattleBtn');if(btn){btn.disabled=false;btn.textContent='⚔️ เริ่มต่อสู้';}
-  updateHpBars();
-}
-function updateHpBars(){
-  const pb=$('#playerHpBar'),eb=$('#enemyHpBar');
-  if(pb)pb.style.width=Math.max(0,playerHp/fishMaxHp*100)+'%';
-  if(eb)eb.style.width=Math.max(0,enemyHp/enemyMaxHp*100)+'%';
-  const pt=$('#playerHpText');if(pt)pt.textContent=`${Math.max(0,Math.ceil(playerHp))}/${fishMaxHp}`;
-  const et=$('#enemyHpText');if(et)et.textContent=`${Math.max(0,Math.ceil(enemyHp))}/${enemyMaxHp}`;
-}
-function hitFx(side,damage){
-  const fx=$('#battleFx');if(!fx)return;
-  const el=document.createElement('div');el.className='hit-fx '+side;el.textContent='-'+damage;
-  el.style.left=side==='player'?'28%':'70%';el.style.top=(35+Math.random()*18)+'%';
-  fx.appendChild(el);setTimeout(()=>el.remove(),600);
-}
-function logBattle(text){const e=$('#battleLog');if(e)e.textContent=text;}
-function attackAnimation(side){
-  const el=$(side==='player'?'#playerFighter':'#enemyFighter');
-  if(!el)return;
-  el.classList.remove('attacking-left','attacking-right');
-  void el.offsetWidth;
-  el.classList.add(side==='player'?'attacking-left':'attacking-right');
-}
-function finishBattle(playerWon){
-  if(battleTimer){clearInterval(battleTimer);battleTimer=null;}
-  battleRunning=false;
-  const status=$('#arenaStatus');if(status)status.textContent=playerWon?'🏆 ชนะ!':'💀 แพ้';
-  showBattleResult(playerWon);
-  const btn=$('#startBattleBtn');if(btn){btn.disabled=false;btn.textContent=playerWon?'⚔️ ต่อสู้อีกครั้ง':'↻ ลองใหม่';}
-  if(playerWon){
-    fishWins++;
-    const gain=fishMode==='pve'?25:40;
-    fishLoot += fishMode==='pve'?1:0;
-    fishExp += gain;
-    logBattle(fishMode==='pve'?`ชนะ! ได้ EXP +${gain} และของฟาร์ม +1`:`ชนะคู่แข่ง! ได้ EXP +${gain}`);
-    const need=fishLevel*100;
-    if(fishExp>=need){fishExp-=need;fishLevel++;logBattle(`🎉 เลเวลอัป! ตอนนี้ Lv.${fishLevel}`);}
-  }else{
-    fishLosses++;
-    logBattle('ปลาของคุณแพ้ในการต่อสู้ ลองอัปเกรดแล้วกลับมาใหม่');
-  }
-  saveFishProgress();renderFishStats();
-}
-function showBattleResult(playerWon){
-  const arena=$('#battleArena');
-  if(!arena) return;
-  let result=arena.querySelector('.battle-result');
-  if(!result){
-    result=document.createElement('div');
-    result.className='battle-result';
-    result.innerHTML='<div class="battle-result-card"><div class="battle-result-title"></div><div class="battle-result-sub">การต่อสู้จบลง</div></div>';
-    arena.appendChild(result);
-  }
-  const title=result.querySelector('.battle-result-title');
-  if(title) title.textContent=playerWon?'🏆 ชนะ!':'💀 แพ้!';
-  result.classList.add('show');
-}
-function clearBattleResult(){
-  const r=$('#battleArena .battle-result');
-  if(r) r.classList.remove('show');
-}
-function biteAnimation(side){
-  const el=$(side==='player'?'#playerFighter':'#enemyFighter');
-  if(!el)return;
-  el.classList.remove('bite-player','bite-enemy');
-  void el.offsetWidth;
-  el.classList.add(side==='player'?'bite-player':'bite-enemy');
-  setTimeout(()=>el.classList.remove('bite-player','bite-enemy'),380);
-}
-function startBattle(){
-  if(battleRunning)return;
-  resetBattle();
-  clearBattleResult();
-  const arena=$('#battleArena');
-  if(arena) arena.classList.remove('battle-clash');
-  battleRunning=true;
-  const status=$('#arenaStatus');if(status)status.textContent=fishMode==='pvp'?'🔎 กำลังจับคู่...':'⚔️ กำลังเข้าด่าน';
-  const btn=$('#startBattleBtn');if(btn){btn.disabled=true;btn.textContent='⚔️ กำลังต่อสู้...';}
-  setTimeout(()=>{
-    if(!battleRunning)return;
-    if(status)status.textContent='🐟 ปลากำลังเข้าประชิดกัน';
-    logBattle('เข้าสู่ด่านต่อสู้ • ปลาทั้งสองฝ่ายกำลังเข้าประชิด');
-    if(arena) arena.classList.add('battle-clash');
-  },300);
-  setTimeout(()=>{
-    if(!battleRunning)return;
-    if(status)status.textContent='⚔️ กัดต่อสู้แบบอัตโนมัติ';
-    logBattle('เข้าระยะแล้ว • ปลากัดเริ่มปะทะกัน!');
-    let tick=0;
-    const interval=Math.max(720,1200-(fishSpeed*20));
-    battleTimer=setInterval(()=>{
-      if(!battleRunning)return;
-      tick++;
-      const playerDamage=Math.max(5,Math.round(fishAttack*(0.8+Math.random()*0.4)));
-      const enemyDamage=Math.max(4,Math.round((fishMode==='pve'?16:22)*(0.8+Math.random()*0.4)-fishDefense*.25));
-      const first=Math.random()<0.5?'player':'enemy';
-      const second=first==='player'?'enemy':'player';
-      biteAnimation(first);
-      setTimeout(()=>biteAnimation(second),190);
-      setTimeout(()=>hitFx('enemy',playerDamage),170);
-      setTimeout(()=>hitFx('player',enemyDamage),360);
-      enemyHp-=playerDamage;playerHp-=enemyDamage;updateHpBars();
-      logBattle(`จังหวะกัดครั้งที่ ${tick} • คุณ -${enemyDamage} HP / คู่ต่อสู้ -${playerDamage} HP`);
-      if(enemyHp<=0 || playerHp<=0) finishBattle(enemyHp<=0);
-    },interval);
-  },1550);
-}
-$$('.fish-mode-card').forEach(b=>b.addEventListener('click',()=>setFishMode(b.dataset.fishMode)));
-$('#startBattleBtn')?.addEventListener('click',startBattle);
-$('#resetBattleBtn')?.addEventListener('click',resetBattle);
-$('#fishUpgradeBtn')?.addEventListener('click',()=>{
-  const cost=fishLevel*20;
-  if(points<cost){toast(`เหรียญไม่พอ ต้องใช้ ${cost} เหรียญ`);return;}
-  points-=cost;syncPoints();
-  fishLevel++;fishExp=0;saveFishProgress();renderFishStats();resetBattle();
-  toast(`อัปเกรดปลาสำเร็จ! เป็น Lv.${fishLevel}`);
-});
-$('#fishBackBtn')?.addEventListener('click',()=>document.querySelector('.nav[data-page="home"]')?.click());
-renderFishStats();resetBattle();
 
 $('#accountPageLogout')?.addEventListener('click', async () => {
   const btn = $('#accountPageLogout');
@@ -1718,3 +1535,134 @@ window.addEventListener('resize', () => scenes.forEach(o => {
   o.camera.aspect = o.renderer.domElement.clientWidth / o.renderer.domElement.clientHeight;
   o.camera.updateProjectionMatrix();
 }));
+// ===== Betta Frontier: lane auto-battle game =====
+const bettaState = {
+  mode: 'pve',
+  energy: 10,
+  rating: Number(localStorage.getItem('betta_rating') || 1000),
+  wins: Number(localStorage.getItem('betta_wins') || 0),
+  losses: Number(localStorage.getItem('betta_losses') || 0),
+  coins: Number(localStorage.getItem('betta_coins') || 500),
+  teamLevel: Number(localStorage.getItem('betta_team_level') || 1),
+  selectedStage: 1,
+  running: false,
+  raf: null,
+  timer: null,
+  battleStart: 0,
+  units: []
+};
+
+const bettaFish = [
+  {id:'rose',name:'Rose Fighter',atk:34,def:18,hp:170,spd:82,cost:80,level:1},
+  {id:'ruby',name:'Ruby Fang',atk:42,def:14,hp:145,spd:95,cost:110,level:1},
+  {id:'pearl',name:'Pearl Guard',atk:25,def:28,hp:220,spd:68,cost:95,level:1}
+];
+try {
+  const saved = JSON.parse(localStorage.getItem('betta_fish_team') || 'null');
+  if (Array.isArray(saved)) saved.forEach((s,i)=>{ if (bettaFish[i]) Object.assign(bettaFish[i], s); });
+} catch (_) {}
+
+function saveBetta(){
+  localStorage.setItem('betta_rating', String(bettaState.rating));
+  localStorage.setItem('betta_wins', String(bettaState.wins));
+  localStorage.setItem('betta_losses', String(bettaState.losses));
+  localStorage.setItem('betta_coins', String(bettaState.coins));
+  localStorage.setItem('betta_team_level', String(bettaState.teamLevel));
+  localStorage.setItem('betta_fish_team', JSON.stringify(bettaFish));
+}
+function bettaShowPage(){
+  ['.hero','.content','.bottom-grid','.account-page','.betta-battle-page'].forEach(s=>document.querySelector(s)?.classList.add('hidden'));
+  $('#bettaPage')?.classList.remove('hidden');
+  renderBettaStages(); renderBettaTeam(); updateBettaStats(); window.scrollTo({top:0,behavior:'smooth'});
+}
+function bettaBackHome(){
+  if (bettaState.running) stopBettaBattle();
+  $('#bettaBattlePage')?.classList.add('hidden');
+  bettaShowPage();
+}
+function updateBettaStats(){
+  const power = bettaFish.reduce((n,f)=>n+f.atk+f.def+Math.floor(f.hp/5),0);
+  $('#bettaTeamPower') && ($('#bettaTeamPower').textContent=`พลัง ${power}`);
+  $('#bettaTeamLevel') && ($('#bettaTeamLevel').textContent=`ทีมเลเวล ${bettaState.teamLevel}`);
+  $('#bettaRating') && ($('#bettaRating').textContent=bettaState.rating);
+  $('#bettaWins') && ($('#bettaWins').textContent=bettaState.wins);
+  $('#bettaLosses') && ($('#bettaLosses').textContent=bettaState.losses);
+  $('#bettaCoins') && ($('#bettaCoins').textContent=`🪙 ${bettaState.coins}`);
+  $('#bettaEnergy') && ($('#bettaEnergy').textContent=`⚡ ${bettaState.energy}/10`);
+}
+function renderBettaStages(){
+  const el=$('#bettaStageGrid'); if(!el) return;
+  const stages=[
+    ['แนวปะการังเริ่มต้น','ฝูงปลานักสู้','30 EXP','ง่าย'],['อ่าวพระจันทร์','นักรบครีบเงิน','45 EXP','ปานกลาง'],['ถ้ำคราม','ราชาปลากัด','60 EXP','ยาก'],['สนามราชันย์','จ้าวแห่งสายน้ำ','90 EXP','โหด']
+  ];
+  el.innerHTML=stages.map((s,i)=>`<button type="button" class="stage-card ${i>0?'locked':''}" data-stage="${i+1}" ${i>0?'disabled':''}><span class="stage-num">STAGE ${i+1}</span><h3>🌊 ${s[0]}</h3><p>${s[1]} · รางวัล ${s[2]}</p><div class="stage-stars">${'★'.repeat(Math.min(3,i+1))}${'☆'.repeat(3-Math.min(3,i+1))} · ${s[3]}</div></button>`).join('');
+  el.querySelectorAll('.stage-card:not([disabled])').forEach(b=>b.addEventListener('click',()=>startBettaBattle(Number(b.dataset.stage),'PVE')));
+}
+function renderBettaTeam(){
+  const el=$('#bettaTeamGrid'); if(!el) return;
+  el.innerHTML=bettaFish.map((f,i)=>`<article class="fish-card"><div class="fish-preview"><div class="fish-art player-fish" style="transform:scale(1.12)"><div class="fish-tail"></div><div class="fish-body"></div><div class="fish-fin top"></div><div class="fish-fin bottom"></div><div class="fish-eye"></div></div></div><h3>${f.name}</h3><p>Lv.${f.level} · ${i===0?'สายสมดุล':i===1?'สายโจมตี':'สายแทงค์'}</p><div class="stat-row"><span>⚔️ ATK</span><b>${f.atk}</b></div><div class="stat-row"><span>🛡️ DEF</span><b>${f.def}</b></div><div class="stat-row"><span>❤️ HP</span><b>${f.hp}</b></div><button type="button" class="upgrade-btn" data-fish="${i}">⬆️ อัปเกรด · ${f.cost} 🪙</button></article>`).join('');
+  el.querySelectorAll('.upgrade-btn').forEach(btn=>btn.addEventListener('click',()=>upgradeBetta(Number(btn.dataset.fish))));
+}
+function upgradeBetta(i){
+  const f=bettaFish[i]; if(!f) return;
+  if(bettaState.coins<f.cost){ toast('เหรียญเกมไม่พอสำหรับอัปเกรด'); return; }
+  bettaState.coins-=f.cost; f.level++; f.atk+=8; f.def+=5; f.hp+=35; f.cost=Math.ceil(f.cost*1.35); bettaState.teamLevel=Math.max(bettaState.teamLevel,Math.floor((bettaFish.reduce((n,x)=>n+x.level,0))/3)); saveBetta(); renderBettaTeam(); updateBettaStats(); toast(`${f.name} อัปเกรดเป็น Lv.${f.level} แล้ว`);
+}
+function switchBettaMode(mode){
+  bettaState.mode=mode;
+  document.querySelectorAll('.betta-tab').forEach(x=>x.classList.toggle('active',x.dataset.bettaMode===mode));
+  $('#bettaPvePanel')?.classList.toggle('hidden',mode!=='pve');
+  $('#bettaPvpPanel')?.classList.toggle('hidden',mode!=='pvp');
+  $('#bettaTeamPanel')?.classList.toggle('hidden',mode!=='team');
+  updateBettaStats();
+}
+function fishUnitHtml(side,index,name,level){
+  return `<div class="auto-unit ${side}-auto-unit" data-unit="${side}-${index}"><div class="fish-art ${side==='player'?'player-fish':'enemy-fish'}"><div class="fish-tail"></div><div class="fish-body"></div><div class="fish-fin top"></div><div class="fish-fin bottom"></div><div class="fish-eye"></div></div><span class="unit-level">${name} · Lv.${level}</span></div>`;
+}
+function makeEnemy(stage, pvp=false){
+  const scale=pvp ? 1.02 : (1 + stage*.13);
+  return bettaFish.map((f,i)=>({name:pvp?['Crimson AI','Azure AI','Night Guard'][i]:['Reef Scout','Ember Fin','Stone Fin'][i],level:Math.max(1,Math.floor(f.level*scale)),atk:Math.round(f.atk*scale*(pvp?1.0:0.88)),def:Math.round(f.def*scale),hp:Math.round(f.hp*scale*(pvp?1:1.05)),maxHp:Math.round(f.hp*scale*(pvp?1:1.05)),spd:f.spd*(pvp?1:0.92),side:'enemy',index:i,x:82-i*4,alive:true,nextAttack:0}));
+}
+function startBettaBattle(stage=1,mode='PVE'){
+  if(bettaState.running) return;
+  if(mode==='PVE' && bettaState.energy<=0){toast('พลังงานหมดแล้ว');return;}
+  if(mode==='PVE') bettaState.energy--;
+  bettaState.selectedStage=stage; bettaState.running=true; bettaState.battleStart=performance.now();
+  $('#bettaPage')?.classList.add('hidden'); $('#bettaBattlePage')?.classList.remove('hidden');
+  $('#bettaBattleTitle').textContent=mode==='PVP'?'PVP · Arena':`STAGE ${stage}`; $('#bettaBattleMode').textContent=mode;
+  $('#bettaBattleResult')?.classList.add('hidden');
+  const lane=$('#bettaLane');
+  lane.innerHTML=bettaFish.map((f,i)=>fishUnitHtml('player',i,f.name,f.level)).join('')+makeEnemy(stage,mode==='PVP').map((f,i)=>fishUnitHtml('enemy',i,f.name,f.level)).join('');
+  bettaState.units=[...bettaFish.map((f,i)=>({name:f.name,level:f.level,atk:f.atk,def:f.def,hp:f.hp,maxHp:f.hp,spd:f.spd,side:'player',index:i,x:7+i*3,alive:true,nextAttack:0})),...makeEnemy(stage,mode==='PVP')];
+  renderBattleUnits(); updateBattleHud(); addBattleLog('🐟 ทีมของคุณลงสนาม! กำลังเคลื่อนเข้าประชิด...');
+  cancelAnimationFrame(bettaState.raf); clearInterval(bettaState.timer); bettaState.timer=setInterval(updateBattleTimer,250); bettaState.raf=requestAnimationFrame(battleLoop);
+}
+function updateBattleTimer(){const sec=Math.floor((performance.now()-bettaState.battleStart)/1000); const m=String(Math.floor(sec/60)).padStart(2,'0'),s=String(sec%60).padStart(2,'0'); if($('#bettaBattleTimer')) $('#bettaBattleTimer').textContent=`${m}:${s}`;}
+function addBattleLog(t){const el=$('#bettaBattleLog');if(el)el.textContent=t;}
+function battleLoop(now){
+  if(!bettaState.running)return;
+  const players=bettaState.units.filter(u=>u.side==='player'&&u.alive), enemies=bettaState.units.filter(u=>u.side==='enemy'&&u.alive);
+  if(!players.length||!enemies.length){finishBettaBattle(players.length>0);return;}
+  for(const u of bettaState.units){if(!u.alive)continue; const foes=u.side==='player'?enemies:players; const target=foes.reduce((best,x)=>!best||Math.abs(x.x-u.x)<Math.abs(best.x-u.x)?x:best,null); if(!target)continue;
+    const distance=Math.abs(target.x-u.x);
+    if(distance>10){u.x += (u.side==='player'?1:-1)*u.spd*0.000055; u.x=Math.max(3,Math.min(94,u.x));}
+    else if(now>=u.nextAttack){const raw=Math.max(6,u.atk-Math.round(target.def*.35)); const dmg=Math.round(raw*(0.88+Math.random()*.24)); target.hp=Math.max(0,target.hp-dmg); u.nextAttack=now+Math.max(520,1050-u.spd*2.2); addBattleLog(`${u.side==='player'?'🐟':'🔥'} ${u.name} กัด ${target.name} -${dmg} HP`); if(target.hp<=0){target.alive=false;addBattleLog(`${target.side==='player'?'💥':'⚡'} ${target.name} ถูกโค่น!`);}}
+  }
+  renderBattleUnits(); updateBattleHud(); bettaState.raf=requestAnimationFrame(battleLoop);
+}
+function renderBattleUnits(){bettaState.units.forEach(u=>{const el=document.querySelector(`[data-unit="${u.side}-${u.index}"]`);if(!el)return;el.style.left=`${u.x}%`;el.classList.toggle('unit-dead',!u.alive);el.classList.toggle('unit-attacking',u.alive&&bettaState.running);});}
+function updateBattleHud(){const p=bettaState.units.filter(u=>u.side==='player');const e=bettaState.units.filter(u=>u.side==='enemy');const ph=p.reduce((a,u)=>a+Math.max(0,u.hp),0),pm=p.reduce((a,u)=>a+u.maxHp,0),eh=e.reduce((a,u)=>a+Math.max(0,u.hp),0),em=e.reduce((a,u)=>a+u.maxHp,0); const pw=pm?ph/pm*100:0,ew=em?eh/em*100:0; if($('#bettaPlayerHp'))$('#bettaPlayerHp').style.width=`${pw}%`;if($('#bettaEnemyHp'))$('#bettaEnemyHp').style.width=`${ew}%`;if($('#bettaPlayerHpText'))$('#bettaPlayerHpText').textContent=`${Math.max(0,Math.round(ph))}/${pm}`;if($('#bettaEnemyHpText'))$('#bettaEnemyHpText').textContent=`${Math.max(0,Math.round(eh))}/${em}`;}
+function finishBettaBattle(playerWon){
+  if(!bettaState.running)return; bettaState.running=false; cancelAnimationFrame(bettaState.raf); clearInterval(bettaState.timer); bettaState.raf=null; bettaState.timer=null;
+  const mode=bettaState.mode; if(playerWon){bettaState.wins++; bettaState.coins+=(mode==='PVP'?70:30+bettaState.selectedStage*10); if(mode==='PVP')bettaState.rating+=18; $('#bettaResultIcon').textContent='🏆';$('#bettaResultTitle').textContent='ชนะ!';$('#bettaResultText').textContent=mode==='PVP'?`Rating +18 · เหรียญ +70`:`ผ่าน STAGE ${bettaState.selectedStage} · EXP +${20+bettaState.selectedStage*10} · เหรียญ +${30+bettaState.selectedStage*10}`;
+  }else{bettaState.losses++;if(mode==='PVP')bettaState.rating=Math.max(0,bettaState.rating-12);$('#bettaResultIcon').textContent='💀';$('#bettaResultTitle').textContent='แพ้!';$('#bettaResultText').textContent=mode==='PVP'?`Rating -12 · ลองจัดทีมแล้วกลับมาใหม่`:`ยังไม่ผ่าน STAGE ${bettaState.selectedStage} · ลองอัปเกรดปลาแล้วสู้ใหม่`;}
+  saveBetta(); updateBettaStats(); $('#bettaBattleResult')?.classList.remove('hidden');
+}
+function stopBettaBattle(){bettaState.running=false;cancelAnimationFrame(bettaState.raf);clearInterval(bettaState.timer);bettaState.raf=null;bettaState.timer=null;}
+
+// Game navigation is intentionally added alongside the original nav handler; other pages remain untouched.
+document.querySelector('.nav[data-page="game"]')?.addEventListener('click',()=>bettaShowPage());
+document.querySelectorAll('.betta-tab').forEach(b=>b.addEventListener('click',()=>switchBettaMode(b.dataset.bettaMode)));
+$('#bettaFindMatch')?.addEventListener('click',()=>{if(bettaState.running)return;startBettaBattle(1,'PVP');});
+$('#bettaBattleBack')?.addEventListener('click',bettaBackHome);
+$('#bettaResultBtn')?.addEventListener('click',bettaBackHome);
