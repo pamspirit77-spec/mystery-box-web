@@ -1540,6 +1540,8 @@ function setFishMode(mode){
 function resetBattle(){
   if(battleTimer){clearInterval(battleTimer);battleTimer=null;}
   battleRunning=false;
+  const arena=$('#battleArena'); if(arena) arena.classList.remove('battle-clash');
+  clearBattleResult();
   playerHp=fishMaxHp;
   enemyMaxHp=fishMode==='pve' ? 100 + Math.floor(fishLevel*8) : 125 + Math.floor(fishLevel*12);
   enemyHp=enemyMaxHp;
@@ -1575,6 +1577,7 @@ function finishBattle(playerWon){
   if(battleTimer){clearInterval(battleTimer);battleTimer=null;}
   battleRunning=false;
   const status=$('#arenaStatus');if(status)status.textContent=playerWon?'🏆 ชนะ!':'💀 แพ้';
+  showBattleResult(playerWon);
   const btn=$('#startBattleBtn');if(btn){btn.disabled=false;btn.textContent=playerWon?'⚔️ ต่อสู้อีกครั้ง':'↻ ลองใหม่';}
   if(playerWon){
     fishWins++;
@@ -1590,29 +1593,69 @@ function finishBattle(playerWon){
   }
   saveFishProgress();renderFishStats();
 }
+function showBattleResult(playerWon){
+  const arena=$('#battleArena');
+  if(!arena) return;
+  let result=arena.querySelector('.battle-result');
+  if(!result){
+    result=document.createElement('div');
+    result.className='battle-result';
+    result.innerHTML='<div class="battle-result-card"><div class="battle-result-title"></div><div class="battle-result-sub">การต่อสู้จบลง</div></div>';
+    arena.appendChild(result);
+  }
+  const title=result.querySelector('.battle-result-title');
+  if(title) title.textContent=playerWon?'🏆 ชนะ!':'💀 แพ้!';
+  result.classList.add('show');
+}
+function clearBattleResult(){
+  const r=$('#battleArena .battle-result');
+  if(r) r.classList.remove('show');
+}
+function biteAnimation(side){
+  const el=$(side==='player'?'#playerFighter':'#enemyFighter');
+  if(!el)return;
+  el.classList.remove('bite-player','bite-enemy');
+  void el.offsetWidth;
+  el.classList.add(side==='player'?'bite-player':'bite-enemy');
+  setTimeout(()=>el.classList.remove('bite-player','bite-enemy'),380);
+}
 function startBattle(){
   if(battleRunning)return;
   resetBattle();
+  clearBattleResult();
+  const arena=$('#battleArena');
+  if(arena) arena.classList.remove('battle-clash');
   battleRunning=true;
-  const status=$('#arenaStatus');if(status)status.textContent=fishMode==='pvp'?'🔎 กำลังจับคู่...':'⚔️ กำลังต่อสู้';
+  const status=$('#arenaStatus');if(status)status.textContent=fishMode==='pvp'?'🔎 กำลังจับคู่...':'⚔️ กำลังเข้าด่าน';
   const btn=$('#startBattleBtn');if(btn){btn.disabled=true;btn.textContent='⚔️ กำลังต่อสู้...';}
-  let tick=0;
   setTimeout(()=>{
     if(!battleRunning)return;
-    logBattle(fishMode==='pvp'?'จับคู่สำเร็จ • เริ่ม Auto Battle':'เริ่ม Auto Battle • ปลากำลังเข้าปะทะ');
-    const interval=Math.max(650,1200-(fishSpeed*20));
+    if(status)status.textContent='🐟 ปลากำลังเข้าประชิดกัน';
+    logBattle('เข้าสู่ด่านต่อสู้ • ปลาทั้งสองฝ่ายกำลังเข้าประชิด');
+    if(arena) arena.classList.add('battle-clash');
+  },300);
+  setTimeout(()=>{
+    if(!battleRunning)return;
+    if(status)status.textContent='⚔️ กัดต่อสู้แบบอัตโนมัติ';
+    logBattle('เข้าระยะแล้ว • ปลากัดเริ่มปะทะกัน!');
+    let tick=0;
+    const interval=Math.max(720,1200-(fishSpeed*20));
     battleTimer=setInterval(()=>{
       if(!battleRunning)return;
       tick++;
       const playerDamage=Math.max(5,Math.round(fishAttack*(0.8+Math.random()*0.4)));
       const enemyDamage=Math.max(4,Math.round((fishMode==='pve'?16:22)*(0.8+Math.random()*0.4)-fishDefense*.25));
-      enemyHp-=playerDamage;playerHp-=enemyDamage;
-      attackAnimation('player');attackAnimation('enemy');
-      hitFx('enemy',playerDamage);hitFx('player',enemyDamage);updateHpBars();
-      logBattle(`การโจมตีครั้งที่ ${tick} • คุณ -${enemyDamage} HP / คู่ต่อสู้ -${playerDamage} HP`);
+      const first=Math.random()<0.5?'player':'enemy';
+      const second=first==='player'?'enemy':'player';
+      biteAnimation(first);
+      setTimeout(()=>biteAnimation(second),190);
+      setTimeout(()=>hitFx('enemy',playerDamage),170);
+      setTimeout(()=>hitFx('player',enemyDamage),360);
+      enemyHp-=playerDamage;playerHp-=enemyDamage;updateHpBars();
+      logBattle(`จังหวะกัดครั้งที่ ${tick} • คุณ -${enemyDamage} HP / คู่ต่อสู้ -${playerDamage} HP`);
       if(enemyHp<=0 || playerHp<=0) finishBattle(enemyHp<=0);
     },interval);
-  },fishMode==='pvp'?900:250);
+  },1550);
 }
 $$('.fish-mode-card').forEach(b=>b.addEventListener('click',()=>setFishMode(b.dataset.fishMode)));
 $('#startBattleBtn')?.addEventListener('click',startBattle);
