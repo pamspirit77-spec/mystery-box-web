@@ -25,12 +25,21 @@ class OnlineDB {
 
   async signUp(email, password, username = '') {
     if (!this.client) throw new Error('Supabase is not configured');
+
+    // A new registration must never inherit the previous account's session.
+    // This is especially important when the user registers immediately after
+    // logging out in the same browser.
+    if (this.user) {
+      await this.signOut();
+    }
+
     const { data, error } = await this.client.auth.signUp({
       email,
       password,
       options: { data: { username } }
     });
     if (error) throw error;
+    this.user = data?.user ?? null;
     return data;
   }
 
@@ -53,13 +62,16 @@ class OnlineDB {
     if (error) throw error;
     this.user = null;
 
-    // Make sure a refresh cannot restore the previous account.
-    const { data: { session } } = await this.client.auth.getSession();
-    if (session) {
-      const { error: localError } = await this.client.auth.signOut({ scope: 'local' });
-      if (localError) throw localError;
-      this.user = null;
-    }
+    // Also remove the browser-persisted auth token for this Supabase project.
+    // This is deliberately limited to the Supabase auth key; game data/history
+    // in localStorage must not be touched.
+    try {
+      const projectRef = new URL(SUPABASE_URL).hostname.split('.')[0];
+      localStorage.removeItem(`sb-${projectRef}-auth-token`);
+      sessionStorage.removeItem(`sb-${projectRef}-auth-token`);
+    } catch (_) {}
+
+    this.user = null;
   }
 
   async loadProfile() {
@@ -105,14 +117,23 @@ class OnlineDB {
     // Update only the coins column. Do not use .single()/.select() here:
     // RLS can allow the UPDATE while PostgREST returns no row, which caused
     // the game to report "Cannot coerce the result to a single JSON object".
-    const { error } = await this.client
+    const { data, error } = await this.client
       .from('profiles')
-      .update({ coins: newCoins })
-      .eq('id', userId);
+      .update({ coins: newCoins, updated_at: new Date().toISOString() })
+      .eq('id', userId)
+      .select('id, coins')
+      .maybeSingle();
 
     if (error) {
       console.warn('Supabase coins sync failed:', error);
       throw error;
+    }
+
+    // UPDATE can return no row when RLS blocks the target row. Treat that as
+    // a failed save instead of allowing the game to continue with a local-only
+    // balance that will come back after refresh.
+    if (!data || data.id !== userId || Number(data.coins) !== newCoins) {
+      throw new Error('บันทึกเหรียญไม่สำเร็จ');
     }
 
     return true;

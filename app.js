@@ -592,7 +592,11 @@ registerForm?.addEventListener('submit', async (e) => {
   try {
     const data = await online.signUp(email, password, username);
     if (!data?.session || !data?.user) {
-      throw new Error('บัญชีถูกสร้างแล้ว แต่ Supabase ยังเปิดการยืนยันอีเมลอยู่ กรุณาปิด Confirm email ใน Authentication → Providers → Email แล้วลองสมัครใหม่');
+      // signUp() has already cleared any previous local session. Do not let
+      // the old account remain visible while the new account waits for email
+      // confirmation.
+      showLoggedOut();
+      throw new Error('บัญชีถูกสร้างแล้ว แต่ต้องยืนยันอีเมลก่อนเข้าสู่ระบบ');
     }
     online.user = data.user;
     const profile = await online.loadProfile();
