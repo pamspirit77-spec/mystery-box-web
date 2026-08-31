@@ -93,6 +93,29 @@ function collectBoxAdmin(){
  });
 }
 
+async function compressImageToDataUrl(file,maxSize=1200,quality=0.82){
+ return await new Promise((resolve,reject)=>{
+   const img=new Image();
+   const url=URL.createObjectURL(file);
+   img.onload=()=>{
+     try{
+       const scale=Math.min(1,maxSize/Math.max(img.naturalWidth||img.width,img.naturalHeight||img.height));
+       const canvas=document.createElement('canvas');
+       canvas.width=Math.max(1,Math.round((img.naturalWidth||img.width)*scale));
+       canvas.height=Math.max(1,Math.round((img.naturalHeight||img.height)*scale));
+       const ctx=canvas.getContext('2d');
+       if(!ctx) throw new Error('ไม่สามารถประมวลผลรูปภาพได้');
+       ctx.drawImage(img,0,0,canvas.width,canvas.height);
+       const data=canvas.toDataURL('image/jpeg',quality);
+       URL.revokeObjectURL(url);
+       resolve(data);
+     }catch(e){URL.revokeObjectURL(url);reject(e);}
+   };
+   img.onerror=()=>{URL.revokeObjectURL(url);reject(new Error('อ่านรูปภาพไม่สำเร็จ'));};
+   img.src=url;
+ });
+}
+
 function bindBoxAdminEvents(){
  $$('.add-reward-btn').forEach(btn=>btn.onclick=()=>{
    boxSettings=collectBoxAdmin();
@@ -113,22 +136,32 @@ function bindBoxAdminEvents(){
    if(!file.type.startsWith('image/')){alert('กรุณาเลือกไฟล์รูปภาพ');input.value='';return;}
    if(file.size>8*1024*1024){alert('รูปใหญ่เกิน 8MB');input.value='';return;}
    const row=input.closest('.reward-admin-row');
-   const old=input.closest('.reward-admin-main')?.querySelector('[data-reward-image-url]')?.value||'';
    input.disabled=true;
    try{
-     const safe=String(file.name||'reward').replace(/[^a-zA-Z0-9._-]/g,'_');
-     const path=`${Date.now()}_${crypto.randomUUID()}_${safe}`;
-     const {error}=await getClient().storage.from('box-reward-images').upload(path,file,{cacheControl:'31536000',upsert:false,contentType:file.type});
-     if(error) throw error;
-     const {data}=getClient().storage.from('box-reward-images').getPublicUrl(path);
-     const hidden=row.querySelector('[data-reward-image-url]'); if(hidden) hidden.value=data.publicUrl;
-     const preview=row.querySelector('.reward-admin-image'); if(preview) preview.innerHTML=rewardImageHtml(data.publicUrl,'รางวัล');
-     const note=row.querySelector('.reward-file-note'); if(note) note.textContent='แนบรูปแล้ว • เปลี่ยนรูปได้';
-     if(old && old!==data.publicUrl) { /* old public object is intentionally left untouched */ }
-   }catch(err){alert(err?.message||'อัปโหลดรูปไม่สำเร็จ');input.value='';}
+     // Try Supabase Storage first. If Storage policy/bucket is unavailable,
+     // keep a compressed data URL so the image can still be saved in box_settings.
+     let publicUrl='';
+     try{
+       const safe=String(file.name||'reward').replace(/[^a-zA-Z0-9._-]/g,'_');
+       const path=`${Date.now()}_${crypto.randomUUID()}_${safe}`;
+       const {error}=await getClient().storage.from('box-reward-images').upload(path,file,{cacheControl:'31536000',upsert:false,contentType:file.type});
+       if(!error){
+         const {data}=getClient().storage.from('box-reward-images').getPublicUrl(path);
+         publicUrl=data?.publicUrl||'';
+       }
+     }catch(storageErr){ console.warn('Storage upload unavailable, using inline image:',storageErr); }
+
+     if(!publicUrl){
+       publicUrl=await compressImageToDataUrl(file,1200,0.82);
+     }
+     if(!publicUrl) throw new Error('ไม่สามารถเตรียมรูปภาพได้');
+
+     const hidden=row.querySelector('[data-reward-image-url]'); if(hidden) hidden.value=publicUrl;
+     const preview=row.querySelector('.reward-admin-image'); if(preview) preview.innerHTML=rewardImageHtml(publicUrl,'รางวัล');
+     const note=row.querySelector('.reward-file-note'); if(note) note.textContent=publicUrl.startsWith('data:')?'แนบรูปแล้ว • รูปจะถูกบันทึกพร้อมการตั้งค่ากล่อง':'แนบรูปแล้ว • เปลี่ยนรูปได้';
+   }catch(err){alert(err?.message||'เตรียมรูปไม่สำเร็จ');input.value='';}
    finally{input.disabled=false;}
  });
-}
 
 async function loadBoxSettings(){
  const c=getClient();
@@ -151,7 +184,7 @@ async function saveOneBox(b){
  if(!b.rewards.length) throw new Error(`กล่อง ${b.name}: ต้องมีรางวัลอย่างน้อย 1 ชิ้น`);
  if(b.rewards.some(r=>!r.name)) throw new Error(`กล่อง ${b.name}: ชื่อรางวัลห้ามว่าง`);
  if(b.rewards.some(r=>!Number.isFinite(Number(r.drop_rate)) || Number(r.drop_rate)<0)) throw new Error(`กล่อง ${b.name}: อัตราดรอปไม่ถูกต้อง`);
- if(Math.abs(total-100)>0.001) throw new Error(`กล่อง ${b.name}: อัตราดรอปรวมต้องเท่ากับ 100% (ตอนนี้ ${total.toFixed(2)}%)`);
+ if(total<=0) throw new Error(`กล่อง ${b.name}: อัตราดรอปรวมต้องมากกว่า 0%`);
 
  const row={
    id:String(b.id),
@@ -176,10 +209,9 @@ async function saveOneBox(b){
  const c=getClient();
  // Direct database write. RLS below is restricted to admin_users, so this
  // does not depend on any RPC name/version being installed.
- const {data,error}=await c.from('box_settings').upsert(row,{onConflict:'id'}).select('*').single();
+ const {error}=await c.from('box_settings').update(row).eq('id',b.id);
  if(error) throw new Error(`กล่อง ${b.id}: ${error.message||'บันทึกไม่สำเร็จ'}`);
- if(!data || data.id!==b.id) throw new Error(`กล่อง ${b.id}: ไม่ได้รับข้อมูลยืนยันจากฐานข้อมูล`);
- return data;
+ return true;
 }
 
 async function saveBoxSettings(){
@@ -197,7 +229,7 @@ async function saveBoxSettings(){
      if(!b.rewards.length) throw new Error(`กล่อง ${b.name}: ต้องมีรางวัลอย่างน้อย 1 ชิ้น`);
      if(b.rewards.some(r=>!r.name)) throw new Error(`กล่อง ${b.name}: ชื่อรางวัลห้ามว่าง`);
      if(b.rewards.some(r=>!Number.isFinite(Number(r.drop_rate)) || Number(r.drop_rate)<0)) throw new Error(`กล่อง ${b.name}: อัตราดรอปไม่ถูกต้อง`);
-     if(Math.abs(total-100)>0.001) throw new Error(`กล่อง ${b.name}: อัตราดรอปรวมต้องเท่ากับ 100% (ตอนนี้ ${total.toFixed(2)}%)`);
+     if(total<=0) throw new Error(`กล่อง ${b.name}: อัตราดรอปรวมต้องมากกว่า 0%`);
    }
 
    const c=getClient();
@@ -214,11 +246,18 @@ async function saveBoxSettings(){
    for(const wanted of rows){
      const actual=saved.find(x=>x.id===wanted.id);
      if(!actual) throw new Error(`ไม่พบ ${wanted.id} ในฐานข้อมูลหลังบันทึก`);
+     const actualRewards=Array.isArray(actual.rewards)?actual.rewards:[];
+     const wantedRewards=Array.isArray(wanted.rewards)?wanted.rewards:[];
+     const rewardsMatch=actualRewards.length===wantedRewards.length && wantedRewards.every((wr,i)=>{
+       const ar=actualRewards[i]||{};
+       return String(ar.id||'')===String(wr.id||'') && String(ar.name||'')===String(wr.name||'') &&
+         String(ar.rarity||'')===String(wr.rarity||'') && Math.abs(Number(ar.drop_rate||0)-Number(wr.drop_rate||0))<0.000001 &&
+         String(ar.image_url||'')===String(wr.image_url||'');
+     });
      if(String(actual.name)!==String(wanted.name) ||
         String(actual.en||'')!==String(wanted.en||'') ||
         Number(actual.price)!==Number(wanted.price) ||
-        String(actual.rarity)!==String(wanted.rarity) ||
-        JSON.stringify(actual.rewards||[])!==JSON.stringify(wanted.rewards||[])){
+        String(actual.rarity)!==String(wanted.rarity) || !rewardsMatch){
        throw new Error(`ตรวจสอบหลังบันทึกไม่ผ่านสำหรับ ${wanted.id}`);
      }
    }
