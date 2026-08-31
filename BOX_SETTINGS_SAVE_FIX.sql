@@ -1,9 +1,44 @@
--- Mystery Box Admin save fix
--- Run once in Supabase SQL Editor after BOX_SETTINGS_SETUP.sql
+-- Mystery Box 3D — reliable admin save for box/reward settings
+-- Run this ONCE in Supabase SQL Editor.
+-- This only changes the box_settings admin save path and its RLS policies.
 
+alter table public.box_settings enable row level security;
+
+-- Public/player read: the game must be able to read the active box settings.
+drop policy if exists "box_settings_public_read" on public.box_settings;
+create policy "box_settings_public_read"
+on public.box_settings
+for select
+to anon, authenticated
+using (true);
+
+-- Keep direct writes available only to authenticated admins as a fallback.
+drop policy if exists "box_settings_admin_insert" on public.box_settings;
+create policy "box_settings_admin_insert"
+on public.box_settings
+for insert
+to authenticated
+with check (public.is_admin());
+
+drop policy if exists "box_settings_admin_update" on public.box_settings;
+create policy "box_settings_admin_update"
+on public.box_settings
+for update
+to authenticated
+using (public.is_admin())
+with check (public.is_admin());
+
+-- Reliable server-side save path used by the Admin page.
 create or replace function public.admin_save_box_settings_v2(
-  p_id text, p_name text, p_en text, p_price integer, p_rarity text,
-  p_color bigint, p_accent bigint, p_icon text, p_rewards jsonb
+  p_id text,
+  p_name text,
+  p_en text,
+  p_price integer,
+  p_rarity text,
+  p_color bigint,
+  p_accent bigint,
+  p_icon text,
+  p_rewards jsonb
 )
 returns public.box_settings
 language plpgsql
@@ -34,25 +69,39 @@ begin
     if v_rate < 0 then raise exception 'invalid_drop_rate'; end if;
     v_total := v_total + v_rate;
     v_rewards := v_rewards || jsonb_build_array(jsonb_build_object(
-      'id',trim(v_item->>'id'),
-      'name',trim(v_item->>'name'),
-      'rarity',coalesce(nullif(trim(v_item->>'rarity'),''),coalesce(nullif(trim(p_rarity),''),'COMMON')),
-      'drop_rate',v_rate,
-      'image_url',coalesce(v_item->>'image_url','')
+      'id', trim(v_item->>'id'),
+      'name', trim(v_item->>'name'),
+      'rarity', coalesce(nullif(trim(v_item->>'rarity'),''), coalesce(nullif(trim(p_rarity),''),'COMMON')),
+      'drop_rate', v_rate,
+      'image_url', coalesce(v_item->>'image_url','')
     ));
   end loop;
 
-  if jsonb_array_length(v_rewards)=0 then raise exception 'at_least_one_reward_required'; end if;
-  if abs(v_total-100) > 0.001 then raise exception 'drop_rate_total_must_be_100: %',v_total; end if;
+  if jsonb_array_length(v_rewards) = 0 then raise exception 'at_least_one_reward_required'; end if;
+  if abs(v_total - 100) > 0.001 then
+    raise exception 'drop_rate_total_must_be_100: %', v_total;
+  end if;
 
-  insert into public.box_settings(id,name,en,price,rarity,color,accent,icon,rewards,updated_at,updated_by)
-  values(p_id,trim(p_name),coalesce(p_en,''),p_price,coalesce(nullif(trim(p_rarity),''),'COMMON'),
-         coalesce(p_color,9080486),coalesce(p_accent,7119497),coalesce(nullif(p_icon,''),'🎁'),v_rewards,now(),auth.uid())
-  on conflict(id) do update set
-    name=excluded.name,en=excluded.en,price=excluded.price,rarity=excluded.rarity,
-    color=excluded.color,accent=excluded.accent,icon=excluded.icon,rewards=excluded.rewards,
-    updated_at=now(),updated_by=auth.uid()
+  insert into public.box_settings
+    (id,name,en,price,rarity,color,accent,icon,rewards,updated_at,updated_by)
+  values
+    (p_id,trim(p_name),coalesce(p_en,''),p_price,
+     coalesce(nullif(trim(p_rarity),''),'COMMON'),
+     coalesce(p_color,9080486),coalesce(p_accent,7119497),
+     coalesce(nullif(p_icon,''),'🎁'),v_rewards,now(),auth.uid())
+  on conflict (id) do update set
+    name=excluded.name,
+    en=excluded.en,
+    price=excluded.price,
+    rarity=excluded.rarity,
+    color=excluded.color,
+    accent=excluded.accent,
+    icon=excluded.icon,
+    rewards=excluded.rewards,
+    updated_at=now(),
+    updated_by=auth.uid()
   returning * into v_row;
+
   return v_row;
 end;
 $$;

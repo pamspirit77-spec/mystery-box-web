@@ -145,7 +145,7 @@ async function loadBoxSettings(){
  renderBoxAdmin();
 }
 
-async function saveOneBox(b, index, totalCount){
+async function saveOneBox(b){
  const total=b.rewards.reduce((s,r)=>s+Number(r.drop_rate||0),0);
  if(!b.name) throw new Error(`กล่อง ${b.id}: กรุณาใส่ชื่อกล่อง`);
  if(!b.rewards.length) throw new Error(`กล่อง ${b.name}: ต้องมีรางวัลอย่างน้อย 1 ชิ้น`);
@@ -153,39 +153,48 @@ async function saveOneBox(b, index, totalCount){
  if(b.rewards.some(r=>!Number.isFinite(Number(r.drop_rate)) || Number(r.drop_rate)<0)) throw new Error(`กล่อง ${b.name}: อัตราดรอปไม่ถูกต้อง`);
  if(Math.abs(total-100)>0.001) throw new Error(`กล่อง ${b.name}: อัตราดรอปรวมต้องเท่ากับ 100% (ตอนนี้ ${total.toFixed(2)}%)`);
 
- // Save directly to the exact box_settings row shown in the editor.
- // This removes the RPC/schema-cache dependency that caused the Save button
- // to fail even though the editor loaded the five boxes correctly.
- const row={
-   id:String(b.id),
-   name:b.name,
-   en:b.en||'',
-   price:Math.max(0,Math.floor(Number(b.price)||0)),
-   rarity:b.rarity||'COMMON',
-   color:Number(b.color)||9080486,
-   accent:Number(b.accent)||7119497,
-   icon:b.icon||'🎁',
-   rewards:b.rewards,
-   updated_at:new Date().toISOString()
+ const payload={
+   p_id:String(b.id),
+   p_name:b.name,
+   p_en:b.en||'',
+   p_price:Math.max(0,Math.floor(Number(b.price)||0)),
+   p_rarity:b.rarity||'COMMON',
+   p_color:Number(b.color)||9080486,
+   p_accent:Number(b.accent)||7119497,
+   p_icon:b.icon||'🎁',
+   p_rewards:b.rewards
  };
- const {data,error}=await getClient().from('box_settings').upsert(row,{onConflict:'id'}).select('*').single();
- if(error) throw error;
- return data;
+
+ // Preferred path: SECURITY DEFINER RPC. This is the reliable write path
+ // because it performs the admin check server-side and is not blocked by
+ // client-side table RLS/schema-cache quirks.
+ const rpc=await getClient().rpc('admin_save_box_settings_v2',payload);
+ if(!rpc.error) return rpc.data;
+
+ // Compatibility fallback for installations that still have the older direct
+ // RLS policy but have not yet installed the v2 RPC.
+ const row={...b,updated_at:new Date().toISOString()};
+ delete row.updated_by;
+ const {data,error}=await getClient().from('box_settings').upsert(row,{onConflict:'id'}).select('*').maybeSingle();
+ if(!error && data) return data;
+ throw new Error(rpc.error?.message || error?.message || 'บันทึกข้อมูลไม่สำเร็จ');
 }
 
 async function saveBoxSettings(){
  const btn=$('#saveBoxesBtn'); const msg=$('#boxMessage');
+ const ok=window.confirm('คุณต้องการบันทึกการตั้งค่ากล่องและของรางวัลทั้งหมดใช่ไหม?\n\nเมื่อยืนยันแล้ว ชื่อ ราคา อัตราดรอป รูปภาพ และของรางวัลจะถูกบันทึกและนำไปใช้ในเกมทันที');
+ if(!ok) return;
  if(btn) btn.disabled=true;
  if(msg) msg.textContent='กำลังบันทึก...';
  try{
    const rows=collectBoxAdmin();
    for(let i=0;i<rows.length;i++){
-     await saveOneBox(rows[i],i,rows.length);
+     await saveOneBox(rows[i]);
      if(msg) msg.textContent=`กำลังบันทึกกล่อง ${i+1}/${rows.length}...`;
    }
    await loadBoxSettings();
-   if(msg) msg.textContent='บันทึกการตั้งค่ากล่องทั้งหมดแล้ว ✓';
-   setTimeout(()=>{if(msg)msg.textContent='';},3000);
+   if(msg) msg.textContent='บันทึกสำเร็จ ✓ ค่าจะแสดงในเกมทันที';
+   setTimeout(()=>{if(msg)msg.textContent='';},4000);
  }catch(err){
    console.error('saveBoxSettings:',err);
    if(msg) msg.textContent=`บันทึกไม่สำเร็จ: ${err?.message||'เกิดข้อผิดพลาด'}`;
