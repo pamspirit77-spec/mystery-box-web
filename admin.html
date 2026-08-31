@@ -38,6 +38,7 @@
       <button class="tab active" data-tab="topups">💰 เติมเงิน</button>
       <button class="tab" data-tab="claims">🎁 ขอรับรางวัล</button>
       <button class="tab" data-tab="users">👥 ผู้เล่น</button>
+      <button class="tab" data-tab="boxes">📦 จัดการกล่อง</button>
       <button class="tab" data-tab="site">🌐 ควบคุมเว็บ</button>
     </nav>
 
@@ -75,6 +76,18 @@
       </div>
       <div id="userList" class="user-list"></div>
       <div id="userPagination" class="pagination"></div>
+    </section>
+
+    <section class="tab-panel" data-panel="boxes">
+      <div class="box-admin-head">
+        <div>
+          <h2>📦 จัดการกล่องสุ่มทั้ง 5 กล่อง</h2>
+          <p>ปรับชื่อ ราคา ของรางวัล รูปรางวัล และอัตราดรอปได้จากหน้านี้</p>
+        </div>
+        <button id="saveBoxesBtn" class="approve-btn">💾 บันทึกการตั้งค่ากล่องทั้งหมด</button>
+      </div>
+      <div id="boxAdminList" class="box-admin-list"></div>
+      <div id="boxMessage" class="message"></div>
     </section>
 
     <section class="tab-panel" data-panel="site">

@@ -134,6 +134,16 @@ class OnlineDB {
     return data || null;
   }
 
+  async getBoxSettings() {
+    if (!this.client) return [];
+    const { data, error } = await this.client
+      .from('box_settings')
+      .select('id,name,en,price,rarity,color,accent,icon,rewards,updated_at')
+      .order('id', { ascending: true });
+    if (error) throw error;
+    return Array.isArray(data) ? data : [];
+  }
+
   async getSiteSettings() {
     if (!this.client) return { maintenance_mode: false, announcement: '' };
     const { data, error } = await this.client

@@ -4,7 +4,7 @@ import { SUPABASE_URL, SUPABASE_ANON_KEY, SUPABASE_ENABLED } from './supabase-co
 const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
 const loginPanel=$('#loginPanel'), adminPanel=$('#adminPanel'), loginForm=$('#loginForm');
 const loginMessage=$('#loginMessage'), statusEl=$('#adminStatus'), listEl=$('#topupList'), userList=$('#userList');
-let client=null, topups=[], users=[], rewardClaims=[];
+let client=null, topups=[], users=[], rewardClaims=[], boxSettings=[];
 let userPage=1, userPageSize=20, userTotal=0;
 
 function escapeHtml(v=''){return String(v).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[c]));}
@@ -17,6 +17,136 @@ async function ensureAdmin(){
  if(error||data!==true){await c.auth.signOut();loginPanel.classList.remove('hidden');adminPanel.classList.add('hidden');loginMessage.textContent='บัญชีนี้ไม่มีสิทธิ์แอดมิน';return false;}
  loginPanel.classList.add('hidden');adminPanel.classList.remove('hidden');return true;
 }
+
+const DEFAULT_BOX_COLORS = [9080486,2277376,2443487,9641722,14251010];
+const DEFAULT_BOX_ACCENTS = [7119497,4849904,3716095,12617724,16638297];
+const BOX_RARITIES = ['COMMON','UNCOMMON','RARE','EPIC','LEGENDARY'];
+
+function makeRewardId(boxId){ return `${boxId}-item-${Date.now()}-${Math.random().toString(36).slice(2,8)}`; }
+function rewardImageHtml(url, label='รูป'){ return url ? `<img class="reward-image-preview" src="${escapeHtml(url)}" alt="${escapeHtml(label)}">` : '<div class="reward-image-empty">🖼️</div>'; }
+
+function renderBoxAdmin(){
+ const el=$('#boxAdminList'); if(!el) return;
+ if(!boxSettings.length){el.innerHTML='<div class="empty">ไม่พบการตั้งค่ากล่อง กรุณารัน BOX_SETTINGS_SETUP.sql ก่อน</div>';return;}
+ el.innerHTML=boxSettings.map((b,bi)=>{
+   const rewards=Array.isArray(b.rewards)?b.rewards:[];
+   const total=rewards.reduce((sum,r)=>sum+Number(r.drop_rate||0),0);
+   return `<article class="box-admin-card" data-box-id="${escapeHtml(b.id)}">
+     <div class="box-admin-title"><div><h3>${bi+1}. ${escapeHtml(b.name||b.id)}</h3><span class="meta">${escapeHtml(b.id)} • ${escapeHtml(b.rarity||'COMMON')}</span></div><span class="drop-total ${Math.abs(total-100)<0.001?'ok':'warn'}">รวมดรอป ${total.toFixed(2)}%</span></div>
+     <div class="box-fields">
+       <label>ชื่อกล่อง<input data-box-field="name" value="${escapeHtml(b.name||'')}"></label>
+       <label>ชื่ออังกฤษ<input data-box-field="en" value="${escapeHtml(b.en||'')}"></label>
+       <label>ราคา (เหรียญ)<input data-box-field="price" type="number" min="0" step="1" value="${Number(b.price||0)}"></label>
+       <label>ระดับกล่อง<select data-box-field="rarity">${BOX_RARITIES.map(r=>`<option value="${r}" ${r===b.rarity?'selected':''}>${r}</option>`).join('')}</select></label>
+     </div>
+     <div class="reward-admin-head"><h4>🎁 ของรางวัลในกล่อง</h4><button class="copy-btn add-reward-btn" data-box-add="${escapeHtml(b.id)}">＋ เพิ่มรางวัล</button></div>
+     <div class="reward-admin-list">${rewards.map((r,ri)=>renderRewardRow(b,r,ri)).join('')}</div>
+   </article>`;
+ }).join('');
+ bindBoxAdminEvents();
+}
+
+function renderRewardRow(b,r,ri){
+ return `<div class="reward-admin-row" data-reward-index="${ri}">
+   <div class="reward-admin-image">${rewardImageHtml(r.image_url,r.name)}</div>
+   <div class="reward-admin-main">
+     <label>ชื่อรางวัล<input data-reward-field="name" value="${escapeHtml(r.name||'')}"></label>
+     <label>ระดับ<select data-reward-field="rarity">${BOX_RARITIES.map(x=>`<option value="${x}" ${x===(r.rarity||b.rarity)?'selected':''}>${x}</option>`).join('')}</select></label>
+     <label>อัตราดรอป (%)<input data-reward-field="drop_rate" type="number" min="0" step="0.01" value="${Number(r.drop_rate||0)}"></label>
+     <label>รูปภาพ<input data-reward-upload="1" type="file" accept="image/*"><input data-reward-image-url="1" type="hidden" value="${escapeHtml(r.image_url||'')}"></label>
+     <div class="reward-file-note">${r.image_url?'แนบรูปแล้ว • เปลี่ยนรูปได้':'ยังไม่มีรูป • แนบรูปเพื่อให้แสดงตอนเปิดกล่อง'}</div>
+   </div>
+   <button class="reject-btn remove-reward-btn" data-box-remove="${escapeHtml(b.id)}" data-reward-index="${ri}">ลบ</button>
+ </div>`;
+}
+
+function collectBoxAdmin(){
+ return boxSettings.map((b,bi)=>{
+   const card=$(`.box-admin-card[data-box-id="${CSS.escape(b.id)}"]`);
+   if(!card) return b;
+   const getField=n=>card.querySelector(`[data-box-field="${n}"]`)?.value ?? '';
+   const rewards=[...card.querySelectorAll('.reward-admin-row')].map((row,ri)=>({
+     id: row.dataset.rewardId || (b.rewards?.[ri]?.id || makeRewardId(b.id)),
+     name: row.querySelector('[data-reward-field="name"]')?.value.trim() || '',
+     rarity: row.querySelector('[data-reward-field="rarity"]')?.value || b.rarity || 'COMMON',
+     drop_rate: Number(row.querySelector('[data-reward-field="drop_rate"]')?.value || 0),
+     image_url: row.querySelector('[data-reward-image-url]')?.value || ''
+   }));
+   return {...b,name:getField('name').trim(),en:getField('en').trim(),price:Number(getField('price')||0),rarity:getField('rarity')||b.rarity,rewards};
+ });
+}
+
+function bindBoxAdminEvents(){
+ $$('.add-reward-btn').forEach(btn=>btn.onclick=()=>{
+   boxSettings=collectBoxAdmin();
+   const b=boxSettings.find(x=>x.id===btn.dataset.boxAdd); if(!b) return;
+   if(!Array.isArray(b.rewards)) b.rewards=[];
+   b.rewards.push({id:makeRewardId(b.id),name:'รางวัลใหม่',rarity:b.rarity||'COMMON',drop_rate:0,image_url:''});
+   renderBoxAdmin();
+ });
+ $$('.remove-reward-btn').forEach(btn=>btn.onclick=()=>{
+   boxSettings=collectBoxAdmin();
+   const b=boxSettings.find(x=>x.id===btn.dataset.boxRemove); if(!b) return;
+   const i=Number(btn.dataset.rewardIndex); if(!Array.isArray(b.rewards)) return;
+   if(b.rewards.length<=1){alert('แต่ละกล่องต้องมีรางวัลอย่างน้อย 1 ชิ้น');return;}
+   b.rewards.splice(i,1); renderBoxAdmin();
+ });
+ $$('[data-reward-upload]').forEach(input=>input.onchange=async()=>{
+   const file=input.files?.[0]; if(!file) return;
+   if(!file.type.startsWith('image/')){alert('กรุณาเลือกไฟล์รูปภาพ');input.value='';return;}
+   if(file.size>8*1024*1024){alert('รูปใหญ่เกิน 8MB');input.value='';return;}
+   const row=input.closest('.reward-admin-row');
+   const old=input.closest('.reward-admin-main')?.querySelector('[data-reward-image-url]')?.value||'';
+   input.disabled=true;
+   try{
+     const safe=String(file.name||'reward').replace(/[^a-zA-Z0-9._-]/g,'_');
+     const path=`${Date.now()}_${crypto.randomUUID()}_${safe}`;
+     const {error}=await getClient().storage.from('box-reward-images').upload(path,file,{cacheControl:'31536000',upsert:false,contentType:file.type});
+     if(error) throw error;
+     const {data}=getClient().storage.from('box-reward-images').getPublicUrl(path);
+     const hidden=row.querySelector('[data-reward-image-url]'); if(hidden) hidden.value=data.publicUrl;
+     const preview=row.querySelector('.reward-admin-image'); if(preview) preview.innerHTML=rewardImageHtml(data.publicUrl,'รางวัล');
+     const note=row.querySelector('.reward-file-note'); if(note) note.textContent='แนบรูปแล้ว • เปลี่ยนรูปได้';
+     if(old && old!==data.publicUrl) { /* old public object is intentionally left untouched */ }
+   }catch(err){alert(err?.message||'อัปโหลดรูปไม่สำเร็จ');input.value='';}
+   finally{input.disabled=false;}
+ });
+}
+
+async function loadBoxSettings(){
+ const {data,error}=await getClient().rpc('admin_list_box_settings');
+ if(error) throw error;
+ boxSettings=(data||[]).map(b=>({...b,rewards:Array.isArray(b.rewards)?b.rewards:[]}));
+ renderBoxAdmin();
+}
+
+async function saveBoxSettings(){
+ const btn=$('#saveBoxesBtn'); const msg=$('#boxMessage');
+ if(btn) btn.disabled=true;
+ if(msg) msg.textContent='กำลังบันทึก...';
+ try{
+   const rows=collectBoxAdmin();
+   for(const b of rows){
+     if(!b.name) throw new Error(`กล่อง ${b.id}: กรุณาใส่ชื่อกล่อง`);
+     if(!b.rewards.length) throw new Error(`กล่อง ${b.name}: ต้องมีรางวัลอย่างน้อย 1 ชิ้น`);
+     const total=b.rewards.reduce((s,r)=>s+Number(r.drop_rate||0),0);
+     if(total<=0) throw new Error(`กล่อง ${b.name}: อัตราดรอปรวมต้องมากกว่า 0`);
+     if(Math.abs(total-100)>0.001) throw new Error(`กล่อง ${b.name}: อัตราดรอปรวมต้องเท่ากับ 100% (ตอนนี้ ${total.toFixed(2)}%)`);
+     if(b.rewards.some(r=>!r.name)) throw new Error(`กล่อง ${b.name}: ชื่อรางวัลห้ามว่าง`);
+     const {data,error}=await getClient().rpc('admin_save_box_settings',{
+       p_id:b.id,p_name:b.name,p_en:b.en,p_price:Math.max(0,Math.floor(b.price||0)),p_rarity:b.rarity,
+       p_color:Number(b.color||DEFAULT_BOX_COLORS[rows.indexOf(b)]||9080486),p_accent:Number(b.accent||DEFAULT_BOX_ACCENTS[rows.indexOf(b)]||7119497),p_icon:b.icon||'🎁',p_rewards:b.rewards
+     });
+     if(error) throw error;
+     if(data) b={...data,rewards:Array.isArray(data.rewards)?data.rewards:[]};
+   }
+   await loadBoxSettings();
+   if(msg) msg.textContent='บันทึกการตั้งค่ากล่องทั้งหมดแล้ว';
+   setTimeout(()=>{if(msg)msg.textContent='';},2500);
+ }catch(err){if(msg)msg.textContent=err?.message||'บันทึกไม่สำเร็จ';}
+ finally{if(btn)btn.disabled=false;}
+}
+
 function renderStats(){
  const pending=topups.filter(x=>x.status==='pending').length, approved=topups.filter(x=>x.status==='approved').length;
  const total=topups.filter(x=>x.status==='approved').reduce((s,x)=>s+Number(x.amount||0),0);
@@ -155,5 +285,6 @@ loginForm.onsubmit=async e=>{e.preventDefault();loginMessage.textContent='';try{
 $('#logoutBtn').onclick=async()=>{await getClient().auth.signOut();loginPanel.classList.remove('hidden');adminPanel.classList.add('hidden');};
 $('#refreshBtn').onclick=()=>loadAll();$('#topupFilter').onchange=renderTopups;$('#topupSearch').oninput=renderTopups;$('#claimFilter').onchange=renderClaims;$('#claimSearch').oninput=renderClaims;$('#userSearch').oninput=()=>{userPage=1;loadUsers().catch(err=>{statusEl.textContent=err.message||'โหลดผู้เล่นไม่สำเร็จ';});};
 $$('.tab').forEach(t=>t.onclick=()=>{$$('.tab').forEach(x=>x.classList.remove('active'));$$('.tab-panel').forEach(x=>x.classList.remove('active'));t.classList.add('active');$(`[data-panel="${t.dataset.tab}"]`).classList.add('active');});
+$('#saveBoxesBtn').onclick=saveBoxSettings;
 $('#saveSiteBtn').onclick=async()=>{const {error}=await getClient().from('site_settings').update({maintenance_mode:$('#maintenanceToggle').checked,announcement:$('#announcement').value.trim().slice(0,500),updated_at:new Date().toISOString()}).eq('id',1);$('#siteMessage').textContent=error?error.message:'บันทึกการตั้งค่าแล้ว';if(!error)setTimeout(()=>$('#siteMessage').textContent='',2000);};
 loadAll().catch(err=>{console.error(err);statusEl.textContent=err.message||'โหลดข้อมูลไม่สำเร็จ';});

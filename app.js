@@ -2,13 +2,14 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { online } from './online.js';
 
-const boxes = [
- {name:'กล่องธรรมดา',en:'Food Box',price:1,rarity:'COMMON',color:0x8a92a6,accent:0x6c7a89,icon:'🍔',rewards:['ชุดอาหารพรีเมียม','ขนมนำเข้า','เครื่องดื่ม','บะหมี่พิเศษ']},
- {name:'กล่องหายาก',en:'Fashion Box',price:2,rarity:'UNCOMMON',color:0x22c55e,accent:0x4ade80,icon:'👕',rewards:['เสื้อยืดแฟชั่น','หมวก','กระเป๋า','รองเท้า']},
- {name:'กล่องแรร์',en:'Utility Box',price:3,rarity:'RARE',color:0x2563eb,accent:0x38bdf8,icon:'◉',rewards:['หูฟัง','แก้วเก็บอุณหภูมิ','อุปกรณ์โต๊ะ','ของใช้พรีเมียม']},
- {name:'กล่องอีพิค',en:'Big Prize',price:4,rarity:'EPIC',color:0x9333ea,accent:0xc084fc,icon:'🎁',rewards:['บัตรของขวัญ','สินค้า Limited','ของสะสม','รางวัลพิเศษ']},
- {name:'กล่องเลเจนด์',en:'Legend Box',price:5,rarity:'LEGENDARY',color:0xd97706,accent:0xfde047,icon:'♛',rewards:['iPhone 15 Pro Max','AirPods Pro 2','รางวัลใหญ่','สินค้า Rare']}
+const defaultBoxes = [
+ {id:'box1',name:'กล่องธรรมดา',en:'Food Box',price:1,rarity:'COMMON',color:0x8a92a6,accent:0x6c7a89,icon:'🍔',rewards:[{id:'box1-item1',name:'ชุดอาหารพรีเมียม',rarity:'COMMON',drop_rate:25,image_url:''},{id:'box1-item2',name:'ขนมนำเข้า',rarity:'COMMON',drop_rate:25,image_url:''},{id:'box1-item3',name:'เครื่องดื่ม',rarity:'COMMON',drop_rate:25,image_url:''},{id:'box1-item4',name:'บะหมี่พิเศษ',rarity:'COMMON',drop_rate:25,image_url:''}]},
+ {id:'box2',name:'กล่องหายาก',en:'Fashion Box',price:2,rarity:'UNCOMMON',color:0x22c55e,accent:0x4ade80,icon:'👕',rewards:[{id:'box2-item1',name:'เสื้อยืดแฟชั่น',rarity:'UNCOMMON',drop_rate:25,image_url:''},{id:'box2-item2',name:'หมวก',rarity:'UNCOMMON',drop_rate:25,image_url:''},{id:'box2-item3',name:'กระเป๋า',rarity:'UNCOMMON',drop_rate:25,image_url:''},{id:'box2-item4',name:'รองเท้า',rarity:'UNCOMMON',drop_rate:25,image_url:''}]},
+ {id:'box3',name:'กล่องแรร์',en:'Utility Box',price:3,rarity:'RARE',color:0x2563eb,accent:0x38bdf8,icon:'◉',rewards:[{id:'box3-item1',name:'หูฟัง',rarity:'RARE',drop_rate:25,image_url:''},{id:'box3-item2',name:'แก้วเก็บอุณหภูมิ',rarity:'RARE',drop_rate:25,image_url:''},{id:'box3-item3',name:'อุปกรณ์โต๊ะ',rarity:'RARE',drop_rate:25,image_url:''},{id:'box3-item4',name:'ของใช้พรีเมียม',rarity:'RARE',drop_rate:25,image_url:''}]},
+ {id:'box4',name:'กล่องอีพิค',en:'Big Prize',price:4,rarity:'EPIC',color:0x9333ea,accent:0xc084fc,icon:'🎁',rewards:[{id:'box4-item1',name:'บัตรของขวัญ',rarity:'EPIC',drop_rate:25,image_url:''},{id:'box4-item2',name:'สินค้า Limited',rarity:'EPIC',drop_rate:25,image_url:''},{id:'box4-item3',name:'ของสะสม',rarity:'EPIC',drop_rate:25,image_url:''},{id:'box4-item4',name:'รางวัลพิเศษ',rarity:'EPIC',drop_rate:25,image_url:''}]},
+ {id:'box5',name:'กล่องเลเจนด์',en:'Legend Box',price:5,rarity:'LEGENDARY',color:0xd97706,accent:0xfde047,icon:'♛',rewards:[{id:'box5-item1',name:'iPhone 15 Pro Max',rarity:'LEGENDARY',drop_rate:25,image_url:''},{id:'box5-item2',name:'AirPods Pro 2',rarity:'LEGENDARY',drop_rate:25,image_url:''},{id:'box5-item3',name:'รางวัลใหญ่',rarity:'LEGENDARY',drop_rate:25,image_url:''},{id:'box5-item4',name:'สินค้า Rare',rarity:'LEGENDARY',drop_rate:25,image_url:''}]}
 ];
+let boxes = defaultBoxes.map(b => ({...b, rewards:b.rewards.map(r=>({...r}))}));
 
 let points = 0;
 let selected = 4;
@@ -119,12 +120,19 @@ function boxMarkup(b, i) {
     <div class="card-scene"><canvas id="cardCanvas${i}"></canvas></div>
     <h3>${b.name}</h3>
     <p>${b.en}</p>
-    <div class="rarity ${b.rarity.toLowerCase()}">${b.rarity}</div>
+    <div class="rarity ${String(b.rarity||'COMMON').toLowerCase()}">${b.rarity||'COMMON'}</div>
   </article>`;
 }
 
 const boxGrid = $('#boxGrid');
-if(boxGrid) boxGrid.innerHTML = boxes.map(boxMarkup).join('');
+function bindBoxCards(){
+  }
+function renderBoxGrid(){
+  if(!boxGrid) return;
+  boxGrid.innerHTML = boxes.map(boxMarkup).join('');
+  bindBoxCards();
+}
+renderBoxGrid();
 
 function makeRenderer(canvas) {
   const r = new THREE.WebGLRenderer({canvas, antialias: true, alpha: true});
@@ -489,7 +497,7 @@ function renderInventory() {
   if(!el) return;
   el.innerHTML = rewards.slice(0, 10).map(r => 
     `<div class="item">
-      <div class="item-visual">${r.icon}</div>
+      <div class="item-visual">${rewardVisualHtml(r)}</div>
       <b>${r.name}</b>
       <small class="rarity ${r.rarity.toLowerCase()}">${r.rarity}</small>
     </div>`
@@ -508,7 +516,7 @@ function openInventoryModal() {
     listEl.innerHTML = rewards.map((r) => `
       <div class="inventory-row-item">
         <div class="item-left">
-          <span class="icon">${r.icon}</span>
+          <span class="icon">${rewardVisualHtml(r)}</span>
           <div class="details">
             <b>${r.name}</b>
             <span class="rarity ${r.rarity.toLowerCase()}">${r.rarity}</span>
@@ -788,7 +796,10 @@ function stopLiveBalanceSync() {
   }
 }
 
+applyRemoteBoxSettings();
+
 online.init().then(async profile => {
+  await applyRemoteBoxSettings();
   if (!online.user) {
     showLoggedOut();
     return;
@@ -843,7 +854,7 @@ function renderWinners() {
         </div>
       </div>
       <div class="winner-prize">
-        <span class="prize-icon">${w.icon}</span>
+        <span class="prize-icon">${w.image_url ? rewardVisualHtml(w) : w.icon}</span>
         <div>
           <span class="prize-name">${w.prizeName}</span>
           <span class="rarity ${w.rarity.toLowerCase()}">${w.rarity}</span>
@@ -878,13 +889,14 @@ if(winnersListEl) {
   winnersListEl.addEventListener('touchend', () => isUserInteracting = false, {passive: true});
 }
 
-function addWinnerRecord(prizeName, rarity, icon, boxName) {
+function addWinnerRecord(prizeName, rarity, icon, boxName, image_url='') {
   const newRecord = {
     id: Date.now() + Math.random(),
     username: 'Player_' + Math.floor(1000 + Math.random() * 9000),
     prizeName,
     rarity,
     icon,
+    image_url,
     boxName,
     timestamp: Date.now()
   };
@@ -1031,13 +1043,62 @@ function openBox(i) {
   }, 30);
 }
 
-$$('.box-card').forEach(c => c.addEventListener('click', () => openBox(+c.dataset.i)));
 $$('[data-open]').forEach(b => b.addEventListener('click', () => openBox(+b.dataset.open)));
 
 $('#closeModal')?.addEventListener('click', () => $('#openModal')?.classList.add('hidden'));
 
 // ปุ่ม "ดูทั้งหมด" ของคลังรางวัล
 $('#viewAll')?.addEventListener('click', openInventoryModal);
+
+function pickWeightedReward(b) {
+  const rewards = Array.isArray(b.rewards) ? b.rewards.filter(r => Number(r.drop_rate) > 0 && String(r.name||'').trim()) : [];
+  if (!rewards.length) return null;
+  const total = rewards.reduce((sum,r) => sum + Number(r.drop_rate || 0), 0);
+  let roll = Math.random() * total;
+  for (const reward of rewards) {
+    roll -= Number(reward.drop_rate || 0);
+    if (roll < 0) return reward;
+  }
+  return rewards[rewards.length - 1];
+}
+
+function rewardVisualHtml(item, cls='') {
+  const image = item?.image_url || '';
+  return image
+    ? `<img class="reward-image ${cls}" src="${String(image).replace(/&/g,'&amp;').replace(/"/g,'&quot;')}" alt="${String(item?.name||'รางวัล').replace(/[&<>]/g,'')}" loading="lazy">`
+    : `<span class="reward-icon-fallback ${cls}">${item?.icon || '🎁'}</span>`;
+}
+
+async function applyRemoteBoxSettings() {
+  try {
+    const remote = await online.getBoxSettings();
+    if (!Array.isArray(remote) || remote.length !== 5) return;
+    const byId = new Map(remote.map(b => [String(b.id), b]));
+    boxes = defaultBoxes.map(def => {
+      const b = byId.get(def.id);
+      if (!b) return {...def, rewards:def.rewards.map(r=>({...r}))};
+      const rewards = Array.isArray(b.rewards) ? b.rewards.map((r,i)=>({
+        id:String(r.id || `${def.id}-item-${i+1}`),
+        name:String(r.name || `รางวัล ${i+1}`),
+        rarity:String(r.rarity || b.rarity || def.rarity),
+        drop_rate:Number(r.drop_rate || 0),
+        image_url:String(r.image_url || '')
+      })) : [];
+      return {...def,...b,price:Number(b.price||0),color:Number(b.color||def.color),accent:Number(b.accent||def.accent),rewards};
+    });
+    renderBoxGrid();
+    // Update the currently visible opening modal/scene without touching any other system.
+    if (openScene && boxes[selected]) {
+      const b=boxes[selected];
+      openScene.scene.remove(openScene.box);
+      openScene.box=createLuxuryBox(b);
+      openScene.scene.add(openScene.box);
+      openScene.data=b;
+    }
+  } catch (err) {
+    console.warn('Box settings unavailable; using defaults:', err);
+  }
+}
 
 function spawnSparks() {
   const layer = $('#sparkLayer');
@@ -1082,7 +1143,7 @@ if(rollBtn) {
         if(listEl) {
           listEl.innerHTML = lastRolledItems.map(item => `
             <div class="result-item">
-              <div class="result-item-icon">${item.icon}</div>
+              <div class="result-item-icon">${rewardVisualHtml(item)}</div>
               <div class="result-item-name">${item.name}</div>
               <span class="rarity ${item.rarity.toLowerCase()}">${item.rarity}</span>
             </div>
@@ -1161,12 +1222,21 @@ if(rollBtn) {
     // สุ่มของรางวัลตามจำนวน rollCount
     lastRolledItems = [];
     for(let k = 0; k < rollCount; k++) {
-      const rewardName = b.rewards[Math.floor(Math.random() * b.rewards.length)];
+      const reward = pickWeightedReward(b);
+      if (!reward) {
+        rolling = false;
+        hasClaimed = true;
+        rollBtn.disabled = false;
+        toast('กล่องนี้ยังไม่มีอัตราดรอปที่ใช้งานได้');
+        return;
+      }
       lastRolledItems.push({
         id: Date.now() + Math.random(),
-        name: rewardName,
-        rarity: b.rarity,
-        icon: b.icon
+        reward_id: reward.id,
+        name: reward.name,
+        rarity: reward.rarity || b.rarity,
+        icon: b.icon,
+        image_url: reward.image_url || ''
       });
     }
 
@@ -1175,6 +1245,16 @@ if(rollBtn) {
     if(rewardMesh) {
       rewardMesh.material.map = createTextTexture(mainReward.icon);
       rewardMesh.material.needsUpdate = true;
+      if (mainReward.image_url) {
+        try {
+          const texture = await new THREE.TextureLoader().loadAsync(mainReward.image_url);
+          texture.colorSpace = THREE.SRGBColorSpace;
+          rewardMesh.material.map = texture;
+          rewardMesh.material.needsUpdate = true;
+        } catch (imageErr) {
+          console.warn('Reward image unavailable, using icon:', imageErr);
+        }
+      }
     }
 
     lidPivot.rotation.x = 0;
@@ -1222,7 +1302,7 @@ if(rollBtn) {
             addRollHistory(lastRolledItems, b.name);
             lastRolledItems.forEach(item => {
               rewards.unshift(item);
-              addWinnerRecord(item.name, b.rarity, b.icon, b.name);
+              addWinnerRecord(item.name, item.rarity || b.rarity, item.icon, b.name, item.image_url || '');
             });
             const inventorySaved = await saveCloudInventory();
             renderInventory();

@@ -1424,3 +1424,10 @@ body.auth-pending > .app-shell { visibility: hidden; }
 .logout-page-btn:hover { background:#321722; }
 .account-back-btn { background:#171723; border:1px solid #302d45; color:#ddd; }
 .logout-page-btn:disabled { opacity:.6; cursor:wait; }
+
+/* Admin-managed reward images */
+.reward-image{display:block;width:100%;height:100%;object-fit:contain;border-radius:8px}.reward-icon-fallback{display:inline-flex;align-items:center;justify-content:center;width:100%;height:100%;font-size:inherit}
+.item-visual{height:54px;display:flex;align-items:center;justify-content:center;font-size:24px}.item-visual .reward-image{max-width:54px;max-height:54px}
+.result-item-icon{height:70px;display:flex;align-items:center;justify-content:center;font-size:28px}.result-item-icon .reward-image{max-width:70px;max-height:70px}
+.prize-icon{width:34px;height:34px;display:flex;align-items:center;justify-content:center;font-size:16px}.prize-icon .reward-image{max-width:34px;max-height:34px}
+.item-left .icon{width:46px;height:46px;display:flex;align-items:center;justify-content:center;font-size:24px}.item-left .icon .reward-image{max-width:46px;max-height:46px}
