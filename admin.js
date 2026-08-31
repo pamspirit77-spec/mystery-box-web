@@ -152,13 +152,25 @@ async function saveOneBox(b, index, totalCount){
  if(b.rewards.some(r=>!r.name)) throw new Error(`กล่อง ${b.name}: ชื่อรางวัลห้ามว่าง`);
  if(b.rewards.some(r=>!Number.isFinite(Number(r.drop_rate)) || Number(r.drop_rate)<0)) throw new Error(`กล่อง ${b.name}: อัตราดรอปไม่ถูกต้อง`);
  if(Math.abs(total-100)>0.001) throw new Error(`กล่อง ${b.name}: อัตราดรอปรวมต้องเท่ากับ 100% (ตอนนี้ ${total.toFixed(2)}%)`);
- const payload={p_id:String(b.id),p_name:b.name,p_en:b.en||'',p_price:Math.max(0,Math.floor(Number(b.price)||0)),p_rarity:b.rarity||'COMMON',p_color:Number(b.color)||9080486,p_accent:Number(b.accent)||7119497,p_icon:b.icon||'🎁',p_rewards:b.rewards};
- let result=await getClient().rpc('admin_save_box_settings_v2',payload);
- if(result.error && /admin_save_box_settings_v2|Could not find the function/i.test(result.error.message||'')){
-   result=await getClient().rpc('admin_save_box_settings',payload);
- }
- if(result.error) throw result.error;
- return result.data;
+
+ // Save directly to the exact box_settings row shown in the editor.
+ // This removes the RPC/schema-cache dependency that caused the Save button
+ // to fail even though the editor loaded the five boxes correctly.
+ const row={
+   id:String(b.id),
+   name:b.name,
+   en:b.en||'',
+   price:Math.max(0,Math.floor(Number(b.price)||0)),
+   rarity:b.rarity||'COMMON',
+   color:Number(b.color)||9080486,
+   accent:Number(b.accent)||7119497,
+   icon:b.icon||'🎁',
+   rewards:b.rewards,
+   updated_at:new Date().toISOString()
+ };
+ const {data,error}=await getClient().from('box_settings').upsert(row,{onConflict:'id'}).select('*').single();
+ if(error) throw error;
+ return data;
 }
 
 async function saveBoxSettings(){
