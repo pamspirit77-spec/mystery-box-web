@@ -55,6 +55,19 @@
       <div id="topupList" class="request-list"></div>
     </section>
 
+    <section class="tab-panel" data-panel="claims">
+      <div class="toolbar">
+        <select id="claimFilter">
+          <option value="all">ทั้งหมด</option>
+          <option value="pending">รอตรวจสอบ</option>
+          <option value="approved">อนุมัติแล้ว</option>
+          <option value="rejected">ปฏิเสธแล้ว</option>
+        </select>
+        <input id="claimSearch" placeholder="ค้นหา Username / UUID / Email">
+      </div>
+      <div id="claimList" class="request-list"></div>
+    </section>
+
     <section class="tab-panel" data-panel="users">
       <div class="toolbar">
         <input id="userSearch" placeholder="ค้นหา Username / UUID / Email">

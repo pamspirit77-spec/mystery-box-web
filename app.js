@@ -518,15 +518,26 @@ function openInventoryModal() {
       </div>
     `).join('');
 
-    // ผูก Event ให้ปุ่มกดขอรับรายชิ้น
+    // ส่งคำขอรับรางวัลให้แอดมินก่อนนำรางวัลออกจากคลัง
     $$('.claim-single-btn').forEach(btn => {
-      btn.onclick = () => {
+      btn.onclick = async () => {
         const id = Number(btn.dataset.id);
-        rewards = rewards.filter(item => item.id !== id);
-        saveCloudInventory();
-        renderInventory();
-        openInventoryModal(); // render ใหม่
-        toast('รางวัลจะถูกส่งภายใน 24 ชั่วโมง');
+        const originalRewards = [...rewards];
+        btn.disabled = true;
+        try {
+          const result = await online.submitRewardClaim([id]);
+          rewards = result.remainingItems;
+          cacheInventoryLocally(rewards);
+          renderInventory();
+          openInventoryModal();
+          toast('ส่งคำขอรับรางวัลให้แอดมินแล้ว');
+        } catch (err) {
+          btn.disabled = false;
+          rewards = originalRewards;
+          renderInventory();
+          openInventoryModal();
+          toast(err.message || 'ส่งคำขอรับรางวัลไม่สำเร็จ');
+        }
       };
     });
   }
@@ -534,19 +545,31 @@ function openInventoryModal() {
   modal.classList.remove('hidden');
 }
 
-// ขอรับรางวัลทั้งหมดในคลัง
+// ขอรับรางวัลทั้งหมดในคลัง — ส่งคำขอให้แอดมินก่อน
 const claimAllBtn = $('#claimAllBtn');
 if(claimAllBtn) {
-  claimAllBtn.onclick = () => {
+  claimAllBtn.onclick = async () => {
     if(rewards.length === 0) {
       toast('ไม่มีรางวัลในคลังให้ขอรับ');
       return;
     }
-    rewards = [];
-    saveCloudInventory();
-    renderInventory();
-    openInventoryModal();
-    toast('รางวัลจะถูกส่งภายใน 24 ชั่วโมง');
+    const originalRewards = [...rewards];
+    claimAllBtn.disabled = true;
+    try {
+      const result = await online.submitRewardClaim(originalRewards.map(item => item.id));
+      rewards = result.remainingItems;
+      cacheInventoryLocally(rewards);
+      renderInventory();
+      openInventoryModal();
+      toast('ส่งคำขอรับรางวัลทั้งหมดให้แอดมินแล้ว');
+    } catch (err) {
+      rewards = originalRewards;
+      renderInventory();
+      openInventoryModal();
+      toast(err.message || 'ส่งคำขอรับรางวัลไม่สำเร็จ');
+    } finally {
+      claimAllBtn.disabled = false;
+    }
   };
 }
 

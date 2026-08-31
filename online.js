@@ -286,6 +286,24 @@ class OnlineDB {
     return true;
   }
 
+  async submitRewardClaim(itemIds = []) {
+    if (!this.client) throw new Error('กรุณาเข้าสู่ระบบก่อนขอรับรางวัล');
+    const currentUser = await this.refreshAuthenticatedUser();
+    if (!currentUser) throw new Error('กรุณาเข้าสู่ระบบก่อนขอรับรางวัล');
+
+    const ids = Array.isArray(itemIds) ? itemIds : [];
+    const { data, error } = await this.client.rpc('submit_reward_claim', {
+      p_item_ids: ids
+    });
+    if (error) throw error;
+    if (!data || !data.claim_id) throw new Error('ส่งคำขอรับรางวัลไม่สำเร็จ');
+
+    return {
+      claimId: data.claim_id,
+      remainingItems: Array.isArray(data.remaining_items) ? data.remaining_items : []
+    };
+  }
+
   async getRollHistory() {
     if (!this.client) return [];
     const currentUser = await this.refreshAuthenticatedUser();
