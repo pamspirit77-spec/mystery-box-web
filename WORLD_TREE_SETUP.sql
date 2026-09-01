@@ -5,11 +5,15 @@
 create table if not exists public.world_tree_states (
   user_id uuid primary key references auth.users(id) on delete cascade,
   planted boolean not null default false,
+  planted_at timestamptz null,
   growth integer not null default 0 check (growth >= 0 and growth <= 1000),
-  items jsonb not null default '{"normalWater":10,"specialWater":10,"normalFertilizer":10,"specialFertilizer":10}'::jsonb,
+  items jsonb not null default '{"normalWater":25,"specialWater":15,"normalFertilizer":20,"specialFertilizer":10}'::jsonb,
   claimed_rewards jsonb not null default '[]'::jsonb,
   updated_at timestamptz not null default now()
 );
+
+
+alter table public.world_tree_states add column if not exists planted_at timestamptz null;
 
 alter table public.world_tree_states enable row level security;
 

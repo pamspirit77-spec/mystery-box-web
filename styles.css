@@ -1433,206 +1433,68 @@ body.auth-pending > .app-shell { visibility: hidden; }
 .item-left .icon{width:46px;height:46px;display:flex;align-items:center;justify-content:center;font-size:24px}.item-left .icon .reward-image{max-width:46px;max-height:46px}
 
 /* =========================================================
-   World Tree — new feature panel only
-   Does not override Mystery Box card/opening styles.
+   World Tree — premium dashboard layout
+   This section is isolated from Mystery Box styles.
    ========================================================= */
-.world-tree-panel {
-  background: linear-gradient(135deg, #161426, #0d0c18);
-  border: 1px solid #272440;
-  border-radius: 20px;
-  padding: 18px;
-  position: relative;
-  overflow: hidden;
-  margin-bottom: 16px;
+.world-tree-panel{
+  --tree-green:#61f28e;
+  --tree-green-2:#25c866;
+  --tree-panel:#091322;
+  --tree-panel-2:#0d1829;
+  --tree-line:#1c2b3e;
+  background:
+    radial-gradient(circle at 22% 40%, rgba(45,215,105,.10), transparent 30%),
+    radial-gradient(circle at 82% 20%, rgba(48,121,255,.07), transparent 34%),
+    linear-gradient(145deg,#07101d 0%,#091426 48%,#07101d 100%);
+  border:1px solid #15253a;
+  border-radius:22px;
+  padding:18px;
+  position:relative;
+  overflow:hidden;
+  margin-bottom:18px;
+  box-shadow:0 18px 50px rgba(0,0,0,.24), inset 0 1px rgba(255,255,255,.025);
 }
+.world-tree-panel:before{content:"";position:absolute;inset:0;pointer-events:none;background:linear-gradient(120deg,transparent 0 35%,rgba(98,242,142,.025) 48%,transparent 65%)}
+.world-tree-head{display:flex;align-items:center;justify-content:space-between;gap:18px;padding:2px 4px 8px}
+.tree-eyebrow{color:#70d98b;letter-spacing:1.7px;font-size:11px}
+.world-tree-title-wrap h1{font-size:38px;line-height:1;margin:5px 0 8px;font-weight:700;display:flex;align-items:center;gap:7px}
+.world-tree-title-wrap h1>span{color:#68f18d;text-shadow:0 0 22px rgba(76,242,132,.14)}
+.world-tree-title-wrap p{color:#a0adbf;font-size:14px;margin:0}
+.tree-help-btn{width:31px;height:31px;border:1px solid #526276;background:#101c2e;color:#b9c5d4;border-radius:50%;font-family:inherit;font-size:17px;cursor:pointer;margin-left:3px}
+.tree-help-btn:hover{border-color:#76eb99;color:#fff}
+.world-tree-growth-badge{min-width:150px;padding:12px 18px;border:1px solid #1c5131;border-radius:17px;background:linear-gradient(180deg,#0b1b16,#09151a);text-align:center;box-shadow:inset 0 0 24px rgba(43,222,101,.035)}
+.world-tree-growth-badge small{display:block;color:#a8b5c3;font-size:11px}
+.world-tree-growth-badge strong{display:block;color:#62f19a;font-size:29px;line-height:1.1;margin-top:4px;text-shadow:0 0 18px rgba(98,241,154,.18)}
+.world-tree-tabs{display:flex;gap:8px;margin:8px 0 12px;padding:0 4px;border-bottom:1px solid #17263a}
+.world-tree-tab{border:0;border-bottom:2px solid transparent;background:transparent;color:#8190a5;border-radius:8px 8px 0 0;padding:10px 15px;cursor:pointer;font-family:inherit;font-weight:700;font-size:12px}
+.world-tree-tab.active{color:#eafff0;border-bottom-color:#54ea88;background:rgba(48,208,102,.055)}
+.world-tree-tab-panel{display:none}.world-tree-tab-panel.active{display:block}.world-tree-content{padding-top:0}
+.world-tree-tab-panel.active#treeTabPanel{display:block}
+.world-tree-main-grid{display:grid;grid-template-columns:minmax(440px,1.02fr) minmax(540px,1.35fr);gap:14px;align-items:stretch}
+.world-tree-visual-card{height:485px;min-width:0;position:relative;overflow:hidden;border:1px solid #182a40;border-radius:18px;background:radial-gradient(circle at 48% 44%,rgba(53,226,112,.09),transparent 28%),linear-gradient(180deg,#08121f,#07101a);box-shadow:inset 0 0 70px rgba(40,130,82,.035)}
+.world-tree-visual-card:after{content:"";position:absolute;inset:auto 0 0;height:42%;background:linear-gradient(180deg,transparent,rgba(2,7,13,.5));pointer-events:none}
+.world-tree-visual-glow{position:absolute;width:300px;height:300px;left:50%;top:47%;transform:translate(-50%,-50%);border-radius:50%;background:radial-gradient(circle,rgba(85,244,132,.15),rgba(85,244,132,.045) 32%,transparent 68%);filter:blur(4px);pointer-events:none}
+#worldTreeCanvas{width:100%;height:100%;display:block;position:relative;z-index:1}
+.world-tree-stage-label{position:absolute;left:16px;right:16px;top:15px;text-align:center;color:#c5d0dc;font-size:12px;pointer-events:none;z-index:3;text-shadow:0 2px 8px #000}
+.tree-growth-ruler{position:absolute;right:18px;top:26px;bottom:82px;width:70px;z-index:3;color:#93a1b3;font-size:11px;pointer-events:none}
+.tree-growth-ruler .ruler-line{position:absolute;right:28px;top:22px;bottom:22px;width:2px;background:linear-gradient(#59ef91,#3d6b51,#233644);box-shadow:0 0 7px rgba(80,239,145,.16)}
+.ruler-cap{position:absolute;right:13px;width:32px;height:32px;border-radius:50%;display:grid;place-items:center;border:1px solid #315d40;background:#0b1c16;color:#73f39a;box-shadow:0 0 16px rgba(70,237,126,.14)}
+.ruler-cap.top{top:-1px}.ruler-cap.bottom{bottom:-1px}.ruler-mark{position:absolute;right:0;transform:translateY(50%);white-space:nowrap}.mark-1000{top:0}.mark-800{top:30%}.mark-500{top:57%}.mark-0{bottom:1px;transform:none}
+.tree-plant-overlay{position:absolute;z-index:4;left:20px;right:20px;bottom:18px;text-align:center}
+.tree-plant-overlay>div{font-size:10px;color:#8493a5;margin-top:7px}
+.tree-plant-btn{border:1px solid #3edc76;background:linear-gradient(180deg,#1c9c4c,#126d35);color:#effff3;border-radius:11px;padding:10px 25px;font:700 13px Kanit,inherit;cursor:pointer;box-shadow:0 8px 22px rgba(19,143,68,.22)}
+.tree-plant-btn:hover:not(:disabled){filter:brightness(1.08);transform:translateY(-1px)}.tree-plant-btn:disabled{opacity:.55;cursor:not-allowed}
+.world-tree-right-column{display:flex;flex-direction:column;gap:12px;min-width:0}
+.tree-growth-panel,.tree-section-card,.tree-info-card{border:1px solid #17283d;border-radius:17px;background:linear-gradient(145deg,rgba(13,25,41,.95),rgba(7,16,28,.97));box-shadow:inset 0 1px rgba(255,255,255,.018)}
+.tree-growth-panel{padding:15px 17px}.tree-growth-panel-head,.tree-section-title{display:flex;align-items:center;justify-content:space-between;gap:10px}.tree-growth-panel-head{font-size:13px;color:#dce5ef}.tree-growth-panel-head strong{color:#62f19a;font-size:13px}
+.tree-progress-track{width:100%;height:13px;border-radius:99px;background:#111d2b;overflow:hidden;border:1px solid #233347;margin-top:11px}.tree-progress-fill{width:0;height:100%;border-radius:inherit;background:linear-gradient(90deg,#1ea855,#7df5a0);box-shadow:0 0 16px rgba(75,235,129,.2);transition:width .3s ease}
+.tree-milestones{display:flex;justify-content:space-between;color:#6f8094;font-size:9px;margin-top:6px}.tree-status-message{color:#8291a4;font-size:10px;margin-top:9px}
+.tree-section-card{padding:14px 15px}.tree-section-title{font-size:14px;color:#dce7e2;font-weight:700}.tree-section-title>span:first-child{display:flex;align-items:center;gap:5px}.tree-see-all{border:0;background:transparent;color:#b06df4;font:600 10px Kanit,inherit;cursor:pointer}.tree-info-dot{display:grid;place-items:center;width:18px;height:18px;border:1px solid #4a596b;border-radius:50%;font-size:10px;color:#a9b7c7}
+.tree-mini-rewards{display:grid;grid-template-columns:repeat(3,1fr);gap:9px;margin-top:11px}.tree-mini-reward{min-height:86px;border:1px solid #1f3448;border-radius:12px;background:linear-gradient(180deg,#0d1929,#0a1421);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;position:relative;overflow:hidden}.tree-mini-reward:before{content:"";position:absolute;inset:0;background:radial-gradient(circle at 50% 0,rgba(255,255,255,.04),transparent 55%)}.tree-mini-reward .gem{font-size:25px;line-height:1;color:#63d9ff;text-shadow:0 0 13px currentColor}.tree-mini-reward b{font-size:14px;color:#eef4fb}.tree-mini-reward small{font-size:9px;color:#77879b}.tree-mini-reward.milestone-1000{border-color:#715014}.tree-mini-reward.milestone-1000 .gem{color:#ffd45a}.tree-mini-reward.milestone-800{border-color:#653c80}.tree-mini-reward.milestone-800 .gem{color:#bd5eff}.tree-mini-reward.milestone-500{border-color:#265c84}.tree-mini-reward.milestone-500 .gem{color:#54bfff}
+.tree-items-card{flex:1}.world-tree-actions{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:9px;margin-top:11px}.tree-action{min-width:0;min-height:145px;border:1px solid #1d3044;border-radius:13px;background:linear-gradient(180deg,#0d1a2b,#0a1421);color:#edf4fb;padding:11px 9px;cursor:pointer;font-family:inherit;display:flex;flex-direction:column;align-items:center;position:relative;transition:.18s}.tree-action:hover:not(:disabled){transform:translateY(-2px);border-color:#31506b;box-shadow:0 8px 22px rgba(0,0,0,.16)}.tree-action.special{background:linear-gradient(180deg,#111b31,#0b1424);border-color:#2d4167}.tree-item-icon{width:57px;height:57px;display:grid;place-items:center;font-size:34px;margin:1px 0 7px;filter:drop-shadow(0 5px 10px rgba(0,0,0,.25))}.tree-item-icon.water{color:#52bfff}.tree-item-icon.special-water{color:#536cff}.tree-item-icon.fertilizer{color:#7bca65}.tree-item-icon.special-fertilizer{color:#ffc42e}.tree-item-copy{text-align:center;display:block;min-width:0}.tree-item-copy b{display:block;font-size:12px}.tree-item-copy small{display:block;color:#7d8da1;font-size:8px;line-height:1.35;margin-top:4px}.tree-action em{position:absolute;right:8px;top:8px;font-style:normal;color:#c4ceda;font-size:10px}.tree-action>strong{display:block;width:100%;margin-top:auto;padding:7px;border-radius:8px;background:#116c32;color:#eaffee;font-size:11px}.tree-action:disabled{opacity:.38;cursor:not-allowed;filter:saturate(.55)}
+.world-tree-bottom-grid{display:grid;grid-template-columns:1.05fr 1.25fr 1.45fr;gap:12px;margin-top:12px}.tree-info-card{min-height:106px;padding:13px 15px;position:relative;overflow:hidden}.tree-info-stats{display:flex;align-items:center;gap:12px;margin-top:18px;color:#8c9bad;font-size:10px;white-space:nowrap}.tree-info-stats b{color:#dfe8f1;margin-left:3px}.tree-info-stats i{width:1px;height:25px;background:#223247}.daily-task{display:flex;align-items:center;gap:9px;margin-top:12px;color:#b4c1d0;font-size:10px}.daily-task small{color:#65758a}.daily-icon{width:35px;height:35px;border-radius:50%;display:grid;place-items:center;background:#11283c;border:1px solid #23445e;font-size:19px}.daily-reward{margin-left:auto;color:#bce7c8}.daily-task button{border:1px solid #27384e;background:#172438;color:#9faec0;border-radius:8px;padding:7px 12px;font:600 10px Kanit,inherit}.tree-tip-card p{margin:12px 0 0;color:#8391a2;font-size:10px;line-height:1.6}.tree-tip-card p strong{color:#aeeec1}.tip-tree{position:absolute;right:18px;bottom:-10px;font-size:62px;opacity:.06;filter:grayscale(1)}
+.tree-reward-intro{padding:15px;border:1px solid #1c2c41;border-radius:14px;background:#0b1727;color:#e5edf5;margin-bottom:12px}.tree-reward-intro div{font-size:15px}.tree-reward-intro span{display:block;color:#8391a3;font-size:10px;margin-top:4px}.tree-reward-list{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}.tree-reward-card{display:flex;flex-direction:column;align-items:center;text-align:center;gap:8px;padding:20px 14px;border:1px solid #23354a;background:#0b1726;border-radius:15px;min-height:180px}.tree-reward-card.reached{border-color:#35784b;background:#0b1c13}.tree-reward-icon{width:62px;height:62px;border-radius:50%;display:grid;place-items:center;background:#15253a;font-size:29px}.tree-reward-info{min-width:0}.tree-reward-title{display:flex;gap:8px;justify-content:center;font-size:11px;color:#a9b6c6}.tree-reward-title b{color:#fff}.tree-reward-title span{color:#62f19a;font-weight:700}.tree-reward-info>strong{display:block;margin:5px 0;color:#eef3f8;font-size:14px}.tree-reward-info small{color:#7e8c9d;font-size:10px}.tree-reward-card.reached .tree-reward-info small{color:#73ca8e}.tree-reward-state{font-size:9px;color:#7c8a9a;padding:5px 8px;border-radius:7px;background:#152236}.tree-reward-card.reached .tree-reward-state{color:#8affb0;background:#153522}
+@media(max-width:1180px){.world-tree-main-grid{grid-template-columns:minmax(340px,.9fr) minmax(450px,1.1fr)}.world-tree-visual-card{height:460px}.world-tree-actions{grid-template-columns:repeat(2,1fr)}.tree-action{min-height:125px}.world-tree-bottom-grid{grid-template-columns:1fr 1fr}.tree-tip-card{grid-column:1/-1}}
+@media(max-width:900px){.world-tree-head{align-items:flex-start}.world-tree-title-wrap h1{font-size:30px}.world-tree-main-grid{grid-template-columns:1fr}.world-tree-visual-card{height:430px}.world-tree-bottom-grid{grid-template-columns:1fr}.tree-tip-card{grid-column:auto}.tree-reward-list{grid-template-columns:1fr}}
+@media(max-width:560px){.world-tree-panel{padding:11px;border-radius:16px}.world-tree-head{gap:8px}.world-tree-title-wrap h1{font-size:25px}.world-tree-title-wrap p{font-size:11px}.world-tree-growth-badge{min-width:104px;padding:8px}.world-tree-growth-badge strong{font-size:21px}.world-tree-tabs{overflow-x:auto}.world-tree-tab{white-space:nowrap}.world-tree-visual-card{height:360px}.tree-growth-ruler{right:7px}.world-tree-actions{grid-template-columns:1fr 1fr}.tree-action{min-height:132px}.tree-mini-rewards{gap:5px}.tree-mini-reward{min-height:78px}.world-tree-bottom-grid{gap:8px}}
 
-.world-tree-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 18px;
-}
-
-.world-tree-head h1 {
-  font-size: 32px;
-  margin: 6px 0;
-}
-
-.world-tree-head h1 span { color: #55e88b; }
-.world-tree-head p { color: #8a8a9e; font-size: 13px; margin: 0; }
-
-.world-tree-growth-badge {
-  min-width: 92px;
-  padding: 10px 14px;
-  border: 1px solid #2b4d39;
-  border-radius: 14px;
-  background: #101a16;
-  text-align: center;
-}
-.world-tree-growth-badge small { display: block; color: #8a8a9e; font-size: 10px; }
-.world-tree-growth-badge strong { display: block; color: #62f19a; font-size: 25px; margin-top: 2px; }
-
-.world-tree-tabs {
-  display: flex;
-  gap: 8px;
-  margin-top: 16px;
-  padding-bottom: 8px;
-  border-bottom: 1px solid #242237;
-}
-.world-tree-tab {
-  border: 1px solid #29263f;
-  background: #171526;
-  color: #bdbbd0;
-  border-radius: 10px;
-  padding: 9px 14px;
-  cursor: pointer;
-  font-family: inherit;
-  font-weight: 600;
-}
-.world-tree-tab.active {
-  color: #fff;
-  border-color: #3fb950;
-  background: #14251a;
-}
-
-.world-tree-tab-panel { display: none; }
-.world-tree-tab-panel.active { display: block; }
-
-.world-tree-content { padding-top: 10px; }
-.world-tree-tab-panel.active#treeTabPanel {
-  display: grid;
-  grid-template-columns: minmax(280px, 1fr) minmax(360px, 1.25fr);
-  gap: 14px;
-  align-items: center;
-}
-.world-tree-scene {
-  height: 280px;
-  min-height: 220px;
-  position: relative;
-  border-radius: 16px;
-  background: radial-gradient(circle at 50% 38%, rgba(63,185,80,.11), transparent 50%);
-  overflow: hidden;
-}
-#worldTreeCanvas { width: 100%; height: 100%; display: block; }
-.world-tree-stage-label {
-  position: absolute;
-  left: 12px;
-  right: 12px;
-  bottom: 10px;
-  text-align: center;
-  color: #9d9aae;
-  font-size: 11px;
-  pointer-events: none;
-}
-
-.world-tree-status { padding: 5px 4px; }
-.tree-progress-row { display: flex; align-items: center; gap: 10px; }
-.tree-progress-track {
-  flex: 1;
-  height: 12px;
-  border-radius: 99px;
-  background: #211f30;
-  overflow: hidden;
-  border: 1px solid #302d42;
-}
-.tree-progress-fill {
-  width: 0%;
-  height: 100%;
-  border-radius: inherit;
-  background: linear-gradient(90deg, #3fb950, #8affb0);
-  transition: width .25s ease;
-}
-.tree-progress-row strong { min-width: 72px; color: #dfe7e1; font-size: 12px; text-align: right; }
-.tree-status-message { color: #a5a3b5; font-size: 11px; margin: 9px 0 13px; }
-
-.world-tree-actions {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 8px;
-}
-.tree-action {
-  border: 1px solid #343247;
-  border-radius: 10px;
-  background: #181727;
-  color: #eee;
-  padding: 11px 10px;
-  font-family: inherit;
-  cursor: pointer;
-  font-weight: 600;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 6px;
-}
-.tree-action:hover:not(:disabled) { border-color: #4b5360; }
-.tree-action.plant { grid-column: 1 / -1; justify-content: center; background: #17311f; border-color: #3fb950; color: #8affb0; }
-.tree-action.special { border-color: #5a4d84; background: #211b35; }
-.tree-action span { color: #fff; background: #28263a; padding: 2px 7px; border-radius: 8px; font-size: 11px; }
-.tree-action:disabled { opacity: .42; cursor: not-allowed; }
-
-.world-tree-item-help {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  margin-top: 10px;
-}
-.world-tree-item-help span,
-.world-tree-item-help b {
-  background: #181727;
-  border: 1px solid #29263d;
-  border-radius: 8px;
-  padding: 5px 7px;
-  color: #9694a8;
-  font-size: 9px;
-}
-.world-tree-item-help b { color: #a9ddb9; border-color: #31543b; }
-
-.tree-reward-intro {
-  padding: 12px;
-  border: 1px solid #29263f;
-  border-radius: 12px;
-  background: #13121f;
-  color: #ddd;
-  margin-bottom: 10px;
-}
-.tree-reward-intro div { font-size: 15px; }
-.tree-reward-intro span { display: block; color: #888699; font-size: 11px; margin-top: 4px; }
-.tree-reward-list { display: grid; gap: 9px; }
-.tree-reward-card {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 12px;
-  border: 1px solid #29263f;
-  background: #151422;
-  border-radius: 13px;
-}
-.tree-reward-card.reached { border-color: #3d7b51; background: #132018; }
-.tree-reward-icon { width: 48px; height: 48px; border-radius: 12px; display: grid; place-items: center; background: #211f31; font-size: 25px; }
-.tree-reward-info { flex: 1; min-width: 0; }
-.tree-reward-title { display: flex; justify-content: space-between; gap: 8px; font-size: 11px; color: #9d9bad; }
-.tree-reward-title b { color: #fff; }
-.tree-reward-title span { color: #62f19a; font-weight: 700; }
-.tree-reward-info > strong { display: block; margin: 3px 0; color: #eee; font-size: 13px; }
-.tree-reward-info small { color: #7f7d90; font-size: 10px; }
-.tree-reward-card.reached .tree-reward-info small { color: #70c58b; }
-.tree-reward-state { font-size: 9px; color: #777589; padding: 5px 7px; border-radius: 7px; background: #211f2f; white-space: nowrap; }
-.tree-reward-card.reached .tree-reward-state { color: #8affb0; background: #1b3423; }
-
-@media (max-width: 900px) {
-  .world-tree-tab-panel.active#treeTabPanel { grid-template-columns: 1fr; }
-  .world-tree-head { align-items: flex-start; }
-  .world-tree-head h1 { font-size: 26px; }
-  .world-tree-head p { line-height: 1.55; }
-}
-
-@media (max-width: 560px) {
-  .world-tree-panel { padding: 12px; border-radius: 16px; }
-  .world-tree-growth-badge { min-width: 74px; padding: 8px; }
-  .world-tree-growth-badge strong { font-size: 20px; }
-  .world-tree-tabs { overflow-x: auto; }
-  .world-tree-tab { white-space: nowrap; }
-  .world-tree-scene { height: 230px; }
-  .world-tree-actions { grid-template-columns: 1fr; }
-  .tree-action.plant { grid-column: auto; }
-}

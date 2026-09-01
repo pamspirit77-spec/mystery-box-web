@@ -51,9 +51,9 @@ const WORLD_TREE_STORAGE_PREFIX = 'mystery_box_world_tree_';
 const WORLD_TREE_MAX_GROWTH = 1000;
 const WORLD_TREE_GROWTH = {
   normalWater: 10,
-  specialWater: 25,
-  normalFertilizer: 15,
-  specialFertilizer: 35
+  specialWater: 30,
+  normalFertilizer: 10,
+  specialFertilizer: 30
 };
 
 const WORLD_TREE_REWARDS = [
@@ -64,11 +64,12 @@ const WORLD_TREE_REWARDS = [
 
 const DEFAULT_WORLD_TREE_STATE = {
   planted: false,
+  plantedAt: null,
   growth: 0,
   items: {
-    normalWater: 10,
-    specialWater: 10,
-    normalFertilizer: 10,
+    normalWater: 25,
+    specialWater: 15,
+    normalFertilizer: 20,
     specialFertilizer: 10
   },
   claimedRewards: []
@@ -80,11 +81,12 @@ let worldTreeScene = null;
 function cloneWorldTreeState(state) {
   return {
     planted: Boolean(state?.planted),
+    plantedAt: state?.plantedAt || null,
     growth: Math.min(WORLD_TREE_MAX_GROWTH, Math.max(0, Number(state?.growth || 0))),
     items: {
-      normalWater: Math.max(0, Number(state?.items?.normalWater ?? 10)),
-      specialWater: Math.max(0, Number(state?.items?.specialWater ?? 10)),
-      normalFertilizer: Math.max(0, Number(state?.items?.normalFertilizer ?? 10)),
+      normalWater: Math.max(0, Number(state?.items?.normalWater ?? 25)),
+      specialWater: Math.max(0, Number(state?.items?.specialWater ?? 15)),
+      normalFertilizer: Math.max(0, Number(state?.items?.normalFertilizer ?? 20)),
       specialFertilizer: Math.max(0, Number(state?.items?.specialFertilizer ?? 10))
     },
     claimedRewards: Array.isArray(state?.claimedRewards) ? state.claimedRewards.map(String) : []
@@ -120,12 +122,15 @@ function treePercent() {
 function renderWorldTreeRewards() {
   const el = $('#treeRewardList');
   if (!el) return;
-  el.innerHTML = WORLD_TREE_REWARDS.map(reward => {
+  const ordered = [...WORLD_TREE_REWARDS].sort((a,b) => b.milestone - a.milestone);
+  el.innerHTML = ordered.map(reward => {
     const reached = worldTreeState.growth >= reward.milestone;
+    const label = reward.milestone === 1000 ? 'รางวัลใหญ่' : reward.title;
+    const gem = reward.milestone === 1000 ? 'gold' : reward.milestone === 800 ? 'purple' : 'blue';
     return `<div class="tree-reward-card ${reached ? 'reached' : ''}">
-      <div class="tree-reward-icon">${reward.icon}</div>
+      <div class="tree-reward-icon ${gem}">◆</div>
       <div class="tree-reward-info">
-        <div class="tree-reward-title"><b>${reward.title}</b><span>${reward.milestone}%</span></div>
+        <div class="tree-reward-title"><b>${label}</b><span>${reward.milestone}%</span></div>
         <strong>${reward.name}</strong>
         <small>${reached ? '✓ ปลดล็อกแล้ว' : `โตอีก ${reward.milestone - worldTreeState.growth}% เพื่อปลดล็อก`}</small>
       </div>
@@ -170,6 +175,11 @@ function updateWorldTreeUI() {
     if (count) count.textContent = worldTreeState.items[type];
     if (btn) btn.disabled = !worldTreeState.planted || growth >= WORLD_TREE_MAX_GROWTH || worldTreeState.items[type] <= 0;
   });
+  const level = Math.max(1, Math.min(10, Math.floor(growth / 100) + 1));
+  const levelEl = $('#treeLevelText');
+  if (levelEl) levelEl.textContent = String(level);
+  const plantedAtEl = $('#treePlantedAt');
+  if (plantedAtEl) plantedAtEl.textContent = worldTreeState.plantedAt ? new Date(worldTreeState.plantedAt).toLocaleString('th-TH', {day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit'}) : 'ยังไม่ได้ปลูก';
   renderWorldTreeRewards();
   worldTreeScene?.updateGrowth?.(worldTreeState.planted, growth);
 }
@@ -218,6 +228,7 @@ async function changeWorldTree(action) {
   if (action === 'plant') {
     if (worldTreeState.planted) return;
     worldTreeState.planted = true;
+    worldTreeState.plantedAt = new Date().toISOString();
   } else {
     const growth = WORLD_TREE_GROWTH[action];
     if (!growth || worldTreeState.items[action] <= 0) return;
@@ -235,116 +246,60 @@ async function changeWorldTree(action) {
 
 function createWorldTreeModel() {
   const root = new THREE.Group();
-  const trunkMat = new THREE.MeshStandardMaterial({ color: 0x704214, roughness: 0.85 });
-  const leafMat = new THREE.MeshStandardMaterial({ color: 0x3fb950, roughness: 0.7 });
-  const glowMat = new THREE.MeshStandardMaterial({ color: 0x8affb0, emissive: 0x163d22, emissiveIntensity: 0.5, roughness: 0.5 });
-
-  const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.3, 1.7, 10), trunkMat);
-  trunk.position.y = -0.15;
-  root.add(trunk);
-
-  const branches = [
-    { x: -0.35, y: 0.25, z: 0, r: 0.18, h: 0.9, ry: -0.55 },
-    { x: 0.35, y: 0.35, z: 0, r: 0.17, h: 0.9, ry: 0.55 },
-    { x: 0, y: 0.65, z: 0.05, r: 0.15, h: 0.85, ry: 0 }
+  const trunkMat = new THREE.MeshStandardMaterial({color:0x5a351f,roughness:.92,flatShading:true});
+  const barkLight = new THREE.MeshStandardMaterial({color:0x7a4a27,roughness:.9,flatShading:true});
+  const leafMats = [
+    new THREE.MeshStandardMaterial({color:0x49c83e,roughness:.78,flatShading:true}),
+    new THREE.MeshStandardMaterial({color:0x73e34b,roughness:.75,flatShading:true}),
+    new THREE.MeshStandardMaterial({color:0x2d9d39,roughness:.8,flatShading:true}),
+    new THREE.MeshStandardMaterial({color:0x8bea51,roughness:.74,flatShading:true})
   ];
-  branches.forEach(b => {
-    const branch = new THREE.Mesh(new THREE.CylinderGeometry(b.r * 0.55, b.r, b.h, 8), trunkMat);
-    branch.position.set(b.x, b.y, b.z);
-    branch.rotation.z = b.ry;
-    root.add(branch);
-  });
-
-  const canopies = [
-    { x: 0, y: 1.05, z: 0, s: 0.72 },
-    { x: -0.48, y: 0.72, z: 0.02, s: 0.48 },
-    { x: 0.48, y: 0.78, z: 0.02, s: 0.5 },
-    { x: 0, y: 1.45, z: 0.02, s: 0.48 }
-  ];
-  canopies.forEach(c => {
-    const leaf = new THREE.Mesh(new THREE.IcosahedronGeometry(c.s, 1), leafMat);
-    leaf.position.set(c.x, c.y, c.z);
-    leaf.userData.baseScale = c.s;
-    root.add(leaf);
-  });
-
-  const gem = new THREE.Mesh(new THREE.OctahedronGeometry(0.13), glowMat);
-  gem.position.y = 1.95;
-  gem.userData.treeGem = true;
-  root.add(gem);
-
-  root.userData.updateGrowth = (planted, growth) => {
-    const normalized = planted ? Math.max(0.08, growth / WORLD_TREE_MAX_GROWTH) : 0.06;
-    const scale = 0.35 + normalized * 0.75;
-    root.scale.setScalar(scale);
-    root.position.y = -0.15;
-    root.visible = true;
-    gem.visible = planted;
-    gem.rotation.y += 0.02;
-    root.traverse(obj => {
-      if (obj.isMesh && obj !== trunk && !obj.userData.treeGem && obj.parent === root) {
-        obj.material = leafMat;
-      }
-    });
-  };
+  const grassMat = new THREE.MeshStandardMaterial({color:0x477c31,roughness:1,flatShading:true});
+  const soilMat = new THREE.MeshStandardMaterial({color:0x50371f,roughness:1,flatShading:true});
+  const island = new THREE.Group();
+  const grass = new THREE.Mesh(new THREE.CylinderGeometry(1.82,1.62,.22,48),grassMat); grass.position.y=-1.38; island.add(grass);
+  const soil = new THREE.Mesh(new THREE.CylinderGeometry(1.62,1.38,.36,40),soilMat); soil.position.y=-1.59; island.add(soil); root.add(island);
+  const trunk = new THREE.Mesh(new THREE.CylinderGeometry(.19,.35,2.35,11),trunkMat); trunk.position.y=-.35; root.add(trunk);
+  const makeBranch=(x,y,z,sx,sy,sz,rz,mat)=>{const b=new THREE.Mesh(new THREE.CylinderGeometry(.075,.16,1.2,9),mat);b.position.set(x,y,z);b.scale.set(sx,sy,sz);b.rotation.z=rz;return b};
+  root.add(makeBranch(-.42,.18,0,.82,.9,.8,-.62,barkLight));
+  root.add(makeBranch(.43,.28,.02,.82,.9,.8,.62,barkLight));
+  root.add(makeBranch(-.12,.58,.08,.65,.9,.65,-.18,trunkMat));
+  root.add(makeBranch(.18,.78,-.02,.55,.78,.55,.2,barkLight));
+  const leafClusters=[];
+  const clusters=[[0,1.28,.03,.92,0],[-.62,1.0,.03,.63,1],[.62,1.06,.03,.65,2],[-.25,1.67,.02,.65,3],[.32,1.75,.04,.62,0],[-.85,.73,.04,.44,2],[.84,.78,.02,.46,1],[0,2.02,.02,.48,3]];
+  clusters.forEach(([x,y,z,sc,m])=>{const g=new THREE.Group();const a=new THREE.Mesh(new THREE.IcosahedronGeometry(1,2),leafMats[m]);a.scale.set(sc*1.05,sc*.78,sc*.92);g.position.set(x,y,z);g.add(a);const b=new THREE.Mesh(new THREE.IcosahedronGeometry(1,1),leafMats[(m+1)%leafMats.length]);b.position.set(-sc*.12,sc*.08,.1);b.scale.set(sc*.7,sc*.45,sc*.65);g.add(b);leafClusters.push(g);root.add(g)});
+  const gemMat=new THREE.MeshStandardMaterial({color:0x9cff63,emissive:0x2b9d3d,emissiveIntensity:1.2,roughness:.25,metalness:.15});
+  const gem=new THREE.Mesh(new THREE.OctahedronGeometry(.14),gemMat);gem.position.y=2.42;root.add(gem);
+  root.userData.updateGrowth=(planted,growth)=>{const n=planted?Math.max(.08,growth/WORLD_TREE_MAX_GROWTH):.035;root.scale.setScalar(.46+n*.74);gem.visible=planted;leafClusters.forEach((g,i)=>{const threshold=[.02,.10,.16,.23,.30,.40,.52,.64][i];g.visible=planted?n>=threshold:i===0})};
   return root;
 }
 
-function mountWorldTreeScene() {
-  const canvas = $('#worldTreeCanvas');
-  if (!canvas) return;
-  const scene = new THREE.Scene();
-  const camera = new THREE.PerspectiveCamera(35, 1, 0.1, 100);
-  camera.position.set(0, 1.2, 5.2);
-  camera.lookAt(0, 0.6, 0);
-  const renderer = makeRenderer(canvas);
-  const controls = new OrbitControls(camera, renderer.domElement);
-  controls.enableDamping = true;
-  controls.dampingFactor = 0.05;
-  controls.enablePan = false;
-  controls.minDistance = 3.6;
-  controls.maxDistance = 7;
-  controls.target.set(0, 0.6, 0);
-
-  scene.add(new THREE.AmbientLight(0xffffff, 1.4));
-  const mainLight = new THREE.DirectionalLight(0xffffff, 2.2);
-  mainLight.position.set(4, 7, 4);
-  scene.add(mainLight);
-  const fillLight = new THREE.DirectionalLight(0x63f08c, 1.8);
-  fillLight.position.set(-4, 2, -4);
-  scene.add(fillLight);
-
-  const floor = new THREE.Mesh(new THREE.CircleGeometry(2.2, 64), new THREE.MeshBasicMaterial({ color: 0x3fb950, transparent: true, opacity: 0.12 }));
-  floor.rotation.x = -Math.PI / 2;
-  floor.position.y = -1.18;
-  scene.add(floor);
-
-  const tree = createWorldTreeModel();
-  scene.add(tree);
-  worldTreeScene = {
-    updateGrowth: (planted, growth) => tree.userData.updateGrowth(planted, growth),
-    renderer, camera
-  };
-  tree.userData.updateGrowth(worldTreeState.planted, worldTreeState.growth);
-
-  const tick = () => {
-    tree.rotation.y += 0.003;
-    controls.update();
-    resize(renderer, canvas);
-    camera.aspect = canvas.clientWidth / Math.max(1, canvas.clientHeight);
-    camera.updateProjectionMatrix();
-    renderer.render(scene, camera);
-    requestAnimationFrame(tick);
-  };
-  tick();
+function mountWorldTreeScene(){
+  const canvas=$('#worldTreeCanvas'); if(!canvas) return;
+  const scene=new THREE.Scene();
+  const camera=new THREE.PerspectiveCamera(30,1,.1,100); camera.position.set(0,.7,6.4); camera.lookAt(0,.35,0);
+  const renderer=makeRenderer(canvas); renderer.setPixelRatio(Math.min(window.devicePixelRatio||1,1.6));
+  const controls=new OrbitControls(camera,renderer.domElement); controls.enableDamping=true; controls.dampingFactor=.06; controls.enablePan=false; controls.minDistance=4.8; controls.maxDistance=8; controls.target.set(0,.35,0);
+  scene.add(new THREE.HemisphereLight(0xd9ffe3,0x0b1624,1.7));
+  const mainLight=new THREE.DirectionalLight(0xffffff,2.8);mainLight.position.set(3,6,4);scene.add(mainLight);
+  const greenLight=new THREE.PointLight(0x55f58c,3.2,7);greenLight.position.set(-2,2.8,2);scene.add(greenLight);
+  const blueLight=new THREE.PointLight(0x4aa9ff,1.2,6);blueLight.position.set(2,-.2,3);scene.add(blueLight);
+  const tree=createWorldTreeModel();scene.add(tree);worldTreeScene={updateGrowth:(planted,growth)=>tree.userData.updateGrowth(planted,growth),renderer,camera};tree.userData.updateGrowth(worldTreeState.planted,worldTreeState.growth);
+  const tick=()=>{controls.update();resize(renderer,canvas);camera.aspect=canvas.clientWidth/Math.max(1,canvas.clientHeight);camera.updateProjectionMatrix();renderer.render(scene,camera);requestAnimationFrame(tick)};tick();
 }
 
-$$('[data-tree-tab]').forEach(btn => btn.addEventListener('click', () => {
-  $$('[data-tree-tab]').forEach(x => x.classList.remove('active'));
+$$('.world-tree-tab').forEach(btn => btn.addEventListener('click', () => {
+  $$('.world-tree-tab').forEach(x => x.classList.remove('active'));
   $$('.world-tree-tab-panel').forEach(x => x.classList.remove('active'));
   btn.classList.add('active');
   const panel = btn.dataset.treeTab === 'rewards' ? $('#treeRewardsTabPanel') : $('#treeTabPanel');
   panel?.classList.add('active');
+}));
+
+$$('[data-tree-tab="rewards"]').filter(btn => !btn.classList.contains('world-tree-tab')).forEach(btn => btn.addEventListener('click', () => {
+  $$('.world-tree-tab').forEach(x => x.classList.toggle('active', x.dataset.treeTab === 'rewards'));
+  $('#treeTabPanel')?.classList.remove('active');
+  $('#treeRewardsTabPanel')?.classList.add('active');
 }));
 
 $('#plantTreeBtn')?.addEventListener('click', () => changeWorldTree('plant'));

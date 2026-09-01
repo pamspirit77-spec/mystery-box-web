@@ -150,13 +150,14 @@ class OnlineDB {
     if (!currentUser) return null;
     const { data, error } = await this.client
       .from('world_tree_states')
-      .select('user_id, planted, growth, items, claimed_rewards, updated_at')
+      .select('user_id, planted, planted_at, growth, items, claimed_rewards, updated_at')
       .eq('user_id', currentUser.id)
       .maybeSingle();
     if (error) throw error;
     if (!data) return null;
     return {
       planted: Boolean(data.planted),
+      plantedAt: data.planted_at || null,
       growth: Number(data.growth || 0),
       items: data.items && typeof data.items === 'object' ? data.items : {},
       claimedRewards: Array.isArray(data.claimed_rewards) ? data.claimed_rewards : []
@@ -170,6 +171,7 @@ class OnlineDB {
     const payload = {
       user_id: currentUser.id,
       planted: Boolean(state?.planted),
+      planted_at: state?.plantedAt || null,
       growth: Math.min(1000, Math.max(0, Math.floor(Number(state?.growth || 0)))),
       items: state?.items && typeof state.items === 'object' ? state.items : {},
       claimed_rewards: Array.isArray(state?.claimedRewards) ? state.claimedRewards.map(String) : [],
@@ -178,7 +180,7 @@ class OnlineDB {
     const { data, error } = await this.client
       .from('world_tree_states')
       .upsert(payload, { onConflict: 'user_id' })
-      .select('user_id, planted, growth, items, claimed_rewards')
+      .select('user_id, planted, planted_at, growth, items, claimed_rewards')
       .maybeSingle();
     if (error) throw error;
     if (!data || data.user_id !== currentUser.id) throw new Error('บันทึกต้นไม้ไม่สำเร็จ');
