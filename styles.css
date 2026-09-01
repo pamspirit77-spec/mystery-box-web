@@ -1450,3 +1450,121 @@ body.auth-pending > .app-shell { visibility: hidden; }
 @media(max-width:1240px){.world-tree-main-grid{grid-template-columns:minmax(440px,1fr) minmax(500px,1fr)}.world-tree-visual-card{height:540px}.world-tree-actions{grid-template-columns:repeat(2,1fr)}.tree-action{min-height:138px}}
 @media(max-width:980px){.world-tree-main-grid{grid-template-columns:1fr}.world-tree-visual-card{height:500px}.world-tree-bottom-grid{grid-template-columns:1fr}.tree-reward-list.full{grid-template-columns:1fr}.tree-reward-card{min-height:190px}}
 @media(max-width:560px){.world-tree-panel{padding:11px;border-radius:16px}.world-tree-title-wrap h1{font-size:25px}.world-tree-title-wrap p{font-size:11px}.world-tree-tabs{overflow-x:auto}.world-tree-tab{white-space:nowrap}.world-tree-visual-card{height:420px}.tree-growth-ruler{right:7px;top:18px;bottom:82px;width:90px}.ruler-track{right:22px}.ruler-marker{right:-1px}.ruler-marker b{font-size:9px}.ruler-current{right:7px}.tree-plant-overlay{left:10px;right:90px}.world-tree-actions{grid-template-columns:1fr 1fr}.tree-action{min-height:132px;padding:9px 7px}.tree-item-icon{font-size:30px;width:50px;height:50px}.tree-info-strip{grid-template-columns:1fr}.tree-info-strip>div+div{border-left:0;border-top:1px solid #1b2b40}.world-tree-bottom-grid{gap:8px}.daily-task{flex-wrap:wrap}.daily-reward{margin-left:0}}
+
+/* =========================================================
+   Premium 3D visual layer — World Tree + Mystery Box only
+   ========================================================= */
+.world-tree-visual-card{
+  background:
+    radial-gradient(circle at 42% 48%,rgba(69,246,130,.16),transparent 25%),
+    radial-gradient(circle at 74% 24%,rgba(80,126,255,.10),transparent 27%),
+    linear-gradient(145deg,#050d18 0%,#071625 52%,#040b14 100%);
+  box-shadow:inset 0 0 90px rgba(31,112,75,.08),0 18px 42px rgba(0,0,0,.22);
+}
+.world-tree-visual-card:before{
+  content:"";position:absolute;inset:0;pointer-events:none;z-index:0;
+  background:radial-gradient(circle at 50% 72%,rgba(102,255,146,.08),transparent 20%),
+             linear-gradient(180deg,rgba(255,255,255,.025),transparent 20%);
+}
+#worldTreeCanvas{filter:saturate(1.08) contrast(1.02);touch-action:none;}
+#worldTreeCanvas.webgl-fallback{
+  background:radial-gradient(circle at 50% 55%,rgba(70,230,125,.18),transparent 32%),linear-gradient(180deg,#081526,#040b13);
+}
+.world-tree-stage-label{
+  top:16px;left:24px;right:120px;padding:8px 12px;border:1px solid rgba(109,232,150,.12);
+  border-radius:999px;background:rgba(4,13,22,.42);backdrop-filter:blur(8px);font-weight:600;
+}
+.tree-growth-ruler{right:13px;width:116px;}
+.ruler-track{
+  width:11px;right:31px;border-color:rgba(103,236,147,.26);
+  background:linear-gradient(180deg,rgba(17,47,31,.88),rgba(5,17,25,.95));
+  box-shadow:inset 0 0 14px rgba(0,0,0,.8),0 0 18px rgba(73,242,130,.08);
+}
+.ruler-fill{
+  background:linear-gradient(180deg,#c4ffd2 0%,#69f29a 28%,#20c967 70%,#0b7839 100%);
+  box-shadow:0 0 8px rgba(91,247,139,.55),0 0 26px rgba(47,222,105,.22);
+}
+.ruler-marker b{font-size:10px;font-weight:700;letter-spacing:.1px;text-shadow:0 1px 6px rgba(0,0,0,.7)}
+.ruler-marker i{width:15px;height:2px;border-radius:2px;background:#526b61}
+.ruler-marker.mark-1000 i{box-shadow:0 0 8px rgba(255,211,90,.45)}
+.ruler-marker.mark-800 i{box-shadow:0 0 8px rgba(191,101,255,.4)}
+.ruler-marker.mark-500 i{box-shadow:0 0 8px rgba(75,188,255,.4)}
+.ruler-current{
+  right:13px;font-size:13px;padding:4px 8px;border:1px solid rgba(108,243,148,.18);
+  border-radius:8px;background:rgba(5,17,12,.72);backdrop-filter:blur(6px);
+}
+.ruler-cap{background:rgba(5,24,15,.86);backdrop-filter:blur(6px)}
+
+.tree-section-card,.tree-info-card,.tree-info-strip{
+  background:linear-gradient(145deg,rgba(10,24,39,.92),rgba(4,13,24,.96));
+  box-shadow:0 12px 28px rgba(0,0,0,.16),inset 0 1px rgba(255,255,255,.025);
+  backdrop-filter:blur(10px);
+}
+.tree-reward-card{
+  min-height:220px;background:linear-gradient(145deg,rgba(13,27,44,.94),rgba(5,14,25,.98));
+  box-shadow:inset 0 1px rgba(255,255,255,.025),0 10px 25px rgba(0,0,0,.16);
+  transition:transform .2s ease,box-shadow .2s ease,border-color .2s ease;
+}
+.tree-reward-card:hover{transform:translateY(-2px)}
+.tree-reward-card.ready{box-shadow:0 0 0 1px rgba(97,242,142,.16),0 0 26px rgba(52,216,112,.10),0 12px 28px rgba(0,0,0,.18)}
+.tree-reward-icon{
+  position:relative;overflow:hidden;border:1px solid rgba(255,255,255,.07);
+  box-shadow:inset 0 0 20px rgba(255,255,255,.035),0 10px 18px rgba(0,0,0,.18);
+}
+.tree-reward-icon:after{
+  content:"";position:absolute;inset:-40%;background:linear-gradient(120deg,transparent 35%,rgba(255,255,255,.12) 48%,transparent 60%);
+  transform:rotate(18deg);animation:treeCardShimmer 5s linear infinite;pointer-events:none;
+}
+@keyframes treeCardShimmer{0%{translate:-30% 0}100%{translate:30% 0}}
+.tree-action{
+  background:linear-gradient(145deg,#0e1c2d,#07121f);box-shadow:inset 0 1px rgba(255,255,255,.025),0 8px 20px rgba(0,0,0,.14);
+}
+.tree-action:hover:not(:disabled){transform:translateY(-3px);box-shadow:0 12px 25px rgba(0,0,0,.24),0 0 18px rgba(70,221,123,.05)}
+.tree-item-icon{filter:drop-shadow(0 7px 10px rgba(0,0,0,.38));text-shadow:0 2px 0 rgba(0,0,0,.18),0 0 18px currentColor}
+.tree-action>strong{box-shadow:inset 0 1px rgba(255,255,255,.08),0 5px 12px rgba(13,120,53,.18)}
+
+/* Mystery Box 3D presentation */
+.box-card .card-scene{
+  background:radial-gradient(circle at 50% 58%,rgba(255,255,255,.07),transparent 30%),
+             radial-gradient(circle at 50% 76%,rgba(98,164,255,.08),transparent 45%),
+             linear-gradient(180deg,#090f1a,#060b13);
+  border-radius:14px;overflow:hidden;position:relative;
+  box-shadow:inset 0 0 36px rgba(0,0,0,.34),inset 0 1px rgba(255,255,255,.035);
+}
+.box-card .card-scene:after{
+  content:"";position:absolute;left:14%;right:14%;bottom:8%;height:14px;border-radius:50%;
+  background:radial-gradient(ellipse,rgba(255,255,255,.10),transparent 70%);filter:blur(5px);pointer-events:none;
+}
+.box-card canvas{touch-action:none;filter:saturate(1.08) contrast(1.03)}
+.open-card{
+  background:radial-gradient(circle at 50% 22%,rgba(84,115,190,.10),transparent 35%),linear-gradient(145deg,#0a1220,#060b14);
+  border-color:#263853;box-shadow:0 30px 100px rgba(0,0,0,.65),inset 0 1px rgba(255,255,255,.04);
+  backdrop-filter:blur(14px);
+}
+.open-scene{
+  height:270px;border:1px solid #1b2d45;border-radius:16px;overflow:hidden;
+  background:radial-gradient(circle at 50% 55%,rgba(93,128,219,.11),transparent 38%),linear-gradient(180deg,#070e18,#040911);
+  box-shadow:inset 0 0 55px rgba(0,0,0,.45),0 10px 28px rgba(0,0,0,.18);
+}
+#openCanvas{touch-action:none}
+.open-scene:after{
+  content:"";position:absolute;left:18%;right:18%;bottom:9%;height:24px;border-radius:50%;
+  background:radial-gradient(ellipse,rgba(255,255,255,.11),transparent 68%);filter:blur(7px);pointer-events:none;
+}
+.open-btn{box-shadow:0 8px 22px rgba(255,0,85,.25),inset 0 1px rgba(255,255,255,.10);transition:transform .18s ease,filter .18s ease}
+.open-btn:hover:not(:disabled){transform:translateY(-2px);filter:brightness(1.06)}
+
+@media(max-width:980px){
+  .world-tree-visual-card{height:520px}
+  .tree-reward-card{min-height:205px}
+}
+@media(max-width:560px){
+  .world-tree-visual-card{height:440px}
+  .world-tree-stage-label{left:12px;right:96px;font-size:10px}
+  .tree-growth-ruler{right:3px;width:90px}
+  .ruler-track{right:20px;width:9px}
+  .ruler-current{right:5px;font-size:11px;padding:3px 6px}
+  .ruler-marker b{font-size:8px}
+  .open-card{width:94%;padding:17px}
+  .open-scene{height:240px}
+}

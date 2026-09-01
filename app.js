@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
 import { online } from './online.js';
 
 const defaultBoxes = [
@@ -193,41 +194,280 @@ async function claimWorldTreeReward(rewardId) {
   else toast(`รับ ${reward.title} แล้ว`);
 }
 function createWorldTreeModel() {
+  // One procedural 3D tree asset. Growth changes this same model's scale,
+  // leaf-cluster visibility and idle animation; no separate stage trees.
   const root = new THREE.Group();
-  const trunkMat = new THREE.MeshStandardMaterial({color:0x5a351f,roughness:.92,flatShading:true});
-  const barkLight = new THREE.MeshStandardMaterial({color:0x7a4a27,roughness:.9,flatShading:true});
-  const leafMats = [0x49c83e,0x73e34b,0x2d9d39,0x8bea51].map(color => new THREE.MeshStandardMaterial({color,roughness:.78,flatShading:true}));
-  const grassMat = new THREE.MeshStandardMaterial({color:0x477c31,roughness:1,flatShading:true});
-  const soilMat = new THREE.MeshStandardMaterial({color:0x50371f,roughness:1,flatShading:true});
+  root.name = 'WorldTree3D';
+
+  const trunkMat = new THREE.MeshStandardMaterial({
+    color: 0x4b2d1b, roughness: 0.88, metalness: 0.02, flatShading: true
+  });
+  const barkMat = new THREE.MeshStandardMaterial({
+    color: 0x744525, roughness: 0.82, metalness: 0.03, flatShading: true
+  });
+  const barkGlowMat = new THREE.MeshStandardMaterial({
+    color: 0x5f9f46, emissive: 0x174c26, emissiveIntensity: 0.35,
+    roughness: 0.72, flatShading: true
+  });
+  const leafMats = [0x1f8f3d, 0x2caf4c, 0x4fdc63, 0x79ed72].map(color =>
+    new THREE.MeshStandardMaterial({ color, roughness: 0.72, metalness: 0.0, flatShading: true })
+  );
+  const youngLeafMat = new THREE.MeshStandardMaterial({
+    color: 0x9aff7b, emissive: 0x2b9b3d, emissiveIntensity: 0.22,
+    roughness: 0.65, flatShading: true
+  });
+  const soilMat = new THREE.MeshStandardMaterial({ color: 0x3b2819, roughness: 0.98, flatShading: true });
+  const grassMat = new THREE.MeshStandardMaterial({ color: 0x2c7133, roughness: 0.96, flatShading: true });
+  const stoneMat = new THREE.MeshStandardMaterial({ color: 0x40505a, roughness: 0.96, flatShading: true });
+
   const island = new THREE.Group();
-  const grass = new THREE.Mesh(new THREE.CylinderGeometry(1.82,1.62,.22,48),grassMat); grass.position.y=-1.38; island.add(grass);
-  const soil = new THREE.Mesh(new THREE.CylinderGeometry(1.62,1.38,.36,40),soilMat); soil.position.y=-1.59; island.add(soil); root.add(island);
-  const trunk = new THREE.Mesh(new THREE.CylinderGeometry(.19,.35,2.35,11),trunkMat); trunk.position.y=-.35; root.add(trunk);
-  const makeBranch=(x,y,z,sx,sy,sz,rz,mat)=>{const b=new THREE.Mesh(new THREE.CylinderGeometry(.075,.16,1.2,9),mat);b.position.set(x,y,z);b.scale.set(sx,sy,sz);b.rotation.z=rz;return b};
-  root.add(makeBranch(-.42,.18,0,.82,.9,.8,-.62,barkLight),makeBranch(.43,.28,.02,.82,.9,.8,.62,barkLight),makeBranch(-.12,.58,.08,.65,.9,.65,-.18,trunkMat),makeBranch(.18,.78,-.02,.55,.78,.55,.2,barkLight));
-  const leafClusters=[];
-  const clusters=[[0,1.28,.03,.92,0],[-.62,1.0,.03,.63,1],[.62,1.06,.03,.65,2],[-.25,1.67,.02,.65,3],[.32,1.75,.04,.62,0],[-.85,.73,.04,.44,2],[.84,.78,.02,.46,1],[0,2.02,.02,.48,3]];
-  clusters.forEach(([x,y,z,sc,m])=>{const g=new THREE.Group();const a=new THREE.Mesh(new THREE.IcosahedronGeometry(1,2),leafMats[m]);a.scale.set(sc*1.05,sc*.78,sc*.92);g.position.set(x,y,z);g.add(a);const b=new THREE.Mesh(new THREE.IcosahedronGeometry(1,1),leafMats[(m+1)%leafMats.length]);b.position.set(-sc*.12,sc*.08,.1);b.scale.set(sc*.7,sc*.45,sc*.65);g.add(b);leafClusters.push(g);root.add(g)});
-  const gemMat=new THREE.MeshStandardMaterial({color:0x9cff63,emissive:0x2b9d3d,emissiveIntensity:1.2,roughness:.25,metalness:.15});
-  const gem=new THREE.Mesh(new THREE.OctahedronGeometry(.14),gemMat);gem.position.y=2.42;root.add(gem);
-  let currentScale=.45, targetScale=.45, targetGrowth=0;
-  root.userData.updateGrowth=(planted,growth)=>{targetGrowth=growth;targetScale=planted?.46+(growth/WORLD_TREE_MAX_GROWTH)*.72:.40;gem.visible=planted;};
-  root.userData.animate=()=>{currentScale += (targetScale-currentScale)*.08;root.scale.setScalar(currentScale);const n=targetGrowth/WORLD_TREE_MAX_GROWTH;leafClusters.forEach((g,i)=>{const threshold=[.01,.12,.25,.38,.50,.66,.80,.96][i];g.visible=targetGrowth>0? n>=threshold : i===0;});};
+  const grass = new THREE.Mesh(new THREE.CylinderGeometry(1.9, 1.65, 0.22, 48), grassMat);
+  grass.position.y = -1.48;
+  grass.receiveShadow = true;
+  island.add(grass);
+  const soil = new THREE.Mesh(new THREE.CylinderGeometry(1.65, 1.38, 0.38, 40), soilMat);
+  soil.position.y = -1.70;
+  soil.receiveShadow = true;
+  island.add(soil);
+  const soilRing = new THREE.Mesh(new THREE.TorusGeometry(1.57, 0.035, 8, 48), youngLeafMat);
+  soilRing.rotation.x = Math.PI / 2;
+  soilRing.position.y = -1.35;
+  soilRing.material.emissiveIntensity = 0.55;
+  island.add(soilRing);
+  root.add(island);
+
+  const makeTrunk = (radiusTop, radiusBottom, height, y, x = 0, z = 0, material = trunkMat) => {
+    const mesh = new THREE.Mesh(new THREE.CylinderGeometry(radiusTop, radiusBottom, height, 12), material);
+    mesh.position.set(x, y, z);
+    mesh.castShadow = true;
+    mesh.receiveShadow = true;
+    return mesh;
+  };
+
+  const trunk = makeTrunk(0.17, 0.42, 2.45, -0.28);
+  trunk.rotation.z = -0.035;
+  root.add(trunk);
+
+  // Low-poly roots give the base real depth and contact with the island.
+  const rootParts = [
+    [-0.42, -1.05, 0.05, 0.75, 0.12], [0.43, -1.04, 0.02, 0.72, -0.13],
+    [-0.16, -1.10, 0.35, 0.66, 0.28], [0.14, -1.08, -0.28, 0.62, -0.25]
+  ];
+  rootParts.forEach(([x, y, z, len, rz]) => {
+    const r = makeTrunk(0.055, 0.13, 1.0, y, x, z, barkMat);
+    r.scale.x = len;
+    r.rotation.z = rz;
+    r.rotation.x = (z > 0 ? -0.22 : 0.22);
+    root.add(r);
+  });
+
+  const branchData = [
+    [-0.42, 0.15, 0.02, 0.92, -0.65, 0.02], [0.43, 0.25, 0.03, 0.88, 0.62, -0.02],
+    [-0.18, 0.62, 0.02, 0.72, -0.28, 0.08], [0.20, 0.80, -0.01, 0.62, 0.25, 0.05],
+    [-0.08, 1.03, 0.02, 0.52, -0.08, 0.04]
+  ];
+  branchData.forEach(([x, y, z, scale, rz, rx]) => {
+    const b = makeTrunk(0.07, 0.16, 1.28, y, x, z, barkMat);
+    b.scale.set(scale, 0.92, scale * 0.92);
+    b.rotation.z = rz;
+    b.rotation.x = rx;
+    root.add(b);
+  });
+
+  // Leaf clusters are children of the same model and appear progressively as Growth rises.
+  const leafClusters = [];
+  const clusterData = [
+    [0.00, 1.18, 0.02, 0.80, 0.02, 0.01],
+    [-0.60, 0.98, 0.03, 0.62, -0.18, 0.18],
+    [0.63, 1.02, 0.03, 0.64, 0.14, -0.16],
+    [-0.30, 1.56, 0.02, 0.62, -0.08, 0.10],
+    [0.34, 1.66, 0.04, 0.60, 0.08, -0.10],
+    [-0.84, 0.70, 0.04, 0.44, -0.25, 0.14],
+    [0.86, 0.76, 0.02, 0.46, 0.23, -0.12],
+    [0.00, 2.02, 0.02, 0.48, 0.02, 0.02],
+    [-0.36, 2.08, -0.01, 0.34, -0.08, 0.06],
+    [0.40, 2.13, 0.00, 0.36, 0.10, -0.04]
+  ];
+  clusterData.forEach(([x, y, z, sc, rz, rx], i) => {
+    const g = new THREE.Group();
+    g.position.set(x, y, z);
+    g.rotation.set(rx, 0, rz);
+    const a = new THREE.Mesh(new THREE.IcosahedronGeometry(1, 2), leafMats[i % leafMats.length]);
+    a.scale.set(sc * 1.08, sc * 0.74, sc * 0.94);
+    a.castShadow = true;
+    g.add(a);
+    const b = new THREE.Mesh(new THREE.IcosahedronGeometry(1, 1), leafMats[(i + 1) % leafMats.length]);
+    b.position.set(-sc * 0.12, sc * 0.10, 0.08);
+    b.scale.set(sc * 0.68, sc * 0.44, sc * 0.58);
+    b.castShadow = true;
+    g.add(b);
+    const bud = new THREE.Mesh(new THREE.IcosahedronGeometry(sc * 0.15, 1), youngLeafMat);
+    bud.position.set(sc * 0.15, sc * 0.25, sc * 0.28);
+    g.add(bud);
+    g.userData.baseRotation = rz;
+    g.userData.baseScale = sc;
+    g.userData.phase = i * 0.73;
+    g.userData.threshold = [0, 0.10, 0.18, 0.25, 0.35, 0.50, 0.62, 0.80, 0.90, 0.97][i];
+    leafClusters.push(g);
+    root.add(g);
+  });
+
+  // A few stones and small glowing sprouts anchor the tree in 3D space.
+  [[-1.15, -1.29, 0.25, 0.20], [1.16, -1.30, -0.10, 0.16], [0.92, -1.31, 0.65, 0.12]].forEach(([x,y,z,s]) => {
+    const stone = new THREE.Mesh(new THREE.DodecahedronGeometry(s, 0), stoneMat);
+    stone.position.set(x,y,z); stone.rotation.set(0.2,0.6,0.15); stone.castShadow = true; root.add(stone);
+  });
+
+  const gemMat = new THREE.MeshStandardMaterial({
+    color: 0xb5ff7c, emissive: 0x2dbb55, emissiveIntensity: 1.5,
+    roughness: 0.18, metalness: 0.25
+  });
+  const gem = new THREE.Mesh(new THREE.OctahedronGeometry(0.13, 0), gemMat);
+  gem.position.set(0, 2.42, 0);
+  gem.castShadow = true;
+  root.add(gem);
+
+  const aura = new THREE.PointLight(0x5eff91, 1.8, 5.5, 2);
+  aura.position.set(0, 0.9, 1.15);
+  root.add(aura);
+
+  let currentScale = 0.42;
+  let targetScale = 0.42;
+  let targetGrowth = 0;
+  let planted = false;
+
+  root.userData.updateGrowth = (isPlanted, growth) => {
+    planted = Boolean(isPlanted);
+    targetGrowth = clampWorldTreeGrowth(growth);
+    const n = targetGrowth / WORLD_TREE_MAX_GROWTH;
+    targetScale = planted ? (0.42 + n * 0.58) : 0.36;
+    gem.visible = planted && targetGrowth > 0;
+    aura.intensity = planted ? 1.5 + n * 2.2 : 0.45;
+  };
+
+  root.userData.animate = (time = performance.now()) => {
+    currentScale += (targetScale - currentScale) * 0.065;
+    root.scale.setScalar(currentScale);
+    const n = targetGrowth / WORLD_TREE_MAX_GROWTH;
+    const t = time * 0.001;
+    leafClusters.forEach((g, i) => {
+      const threshold = g.userData.threshold;
+      const unlocked = planted && n >= threshold;
+      g.visible = unlocked || (!planted && i === 0);
+      if (!g.visible) return;
+      const sway = Math.sin(t * 1.15 + g.userData.phase) * (0.018 + n * 0.028);
+      g.rotation.z = g.userData.baseRotation + sway;
+      g.rotation.x = Math.sin(t * 0.9 + g.userData.phase) * 0.018;
+      const detailBoost = 0.92 + Math.min(1, Math.max(0, (n - threshold) * 2.5)) * 0.08;
+      g.scale.setScalar(detailBoost);
+    });
+    gem.rotation.y += 0.008;
+    gem.position.y = 2.42 + Math.sin(t * 1.4) * 0.025;
+    aura.intensity = (planted ? 1.5 + n * 2.2 : 0.45) + Math.sin(t * 2.0) * 0.12;
+  };
   return root;
 }
+
 function mountWorldTreeScene(){
-  const canvas=$('#worldTreeCanvas'); if(!canvas) return;
-  const scene=new THREE.Scene();
-  const camera=new THREE.PerspectiveCamera(30,1,.1,100); camera.position.set(0,.7,6.4); camera.lookAt(0,.35,0);
-  const renderer=makeRenderer(canvas); renderer.setPixelRatio(Math.min(window.devicePixelRatio||1,1.6));
-  const controls=new OrbitControls(camera,renderer.domElement); controls.enableDamping=true; controls.dampingFactor=.06; controls.enablePan=false; controls.minDistance=4.8; controls.maxDistance=8; controls.target.set(0,.35,0);
-  scene.add(new THREE.HemisphereLight(0xd9ffe3,0x0b1624,1.7));
-  const mainLight=new THREE.DirectionalLight(0xffffff,2.8); mainLight.position.set(3,6,4); scene.add(mainLight);
-  const greenLight=new THREE.PointLight(0x55f58c,3.2,7); greenLight.position.set(-2,2.8,2); scene.add(greenLight);
-  const blueLight=new THREE.PointLight(0x4aa9ff,1.2,6); blueLight.position.set(2,-.2,3); scene.add(blueLight);
-  const tree=createWorldTreeModel(); scene.add(tree); worldTreeScene={updateGrowth:(planted,growth)=>tree.userData.updateGrowth(planted,growth)}; tree.userData.updateGrowth(worldTreeState.planted,worldTreeGrowth);
-  const tick=()=>{controls.update();tree.userData.animate();resize(renderer,canvas);camera.aspect=canvas.clientWidth/Math.max(1,canvas.clientHeight);camera.updateProjectionMatrix();renderer.render(scene,camera);requestAnimationFrame(tick)}; tick();
+  const canvas = $('#worldTreeCanvas');
+  if (!canvas) return;
+  try {
+    const scene = new THREE.Scene();
+    const camera = new THREE.PerspectiveCamera(30, 1, 0.1, 100);
+    camera.position.set(0, 0.55, 6.25);
+    camera.lookAt(0, 0.35, 0);
+    const renderer = makeRenderer(canvas);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.45));
+
+    const controls = new OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.055;
+    controls.enablePan = false;
+    controls.rotateSpeed = 0.42;
+    controls.minDistance = 4.8;
+    controls.maxDistance = 7.4;
+    controls.minPolarAngle = Math.PI * 0.36;
+    controls.maxPolarAngle = Math.PI * 0.60;
+    controls.target.set(0, 0.30, 0);
+
+    scene.add(new THREE.HemisphereLight(0xdfffe8, 0x07101b, 1.65));
+    const key = new THREE.DirectionalLight(0xffffff, 2.7);
+    key.position.set(4.5, 7, 4.5);
+    key.castShadow = true;
+    key.shadow.mapSize.set(1024, 1024);
+    key.shadow.camera.near = 0.5;
+    key.shadow.camera.far = 16;
+    key.shadow.camera.left = -4;
+    key.shadow.camera.right = 4;
+    key.shadow.camera.top = 5;
+    key.shadow.camera.bottom = -4;
+    scene.add(key);
+    const green = new THREE.PointLight(0x52f58b, 2.8, 7, 2);
+    green.position.set(-2.2, 2.2, 2.0);
+    scene.add(green);
+    const rim = new THREE.PointLight(0x4c9dff, 1.0, 7, 2);
+    rim.position.set(2.4, 0.2, -2.8);
+    scene.add(rim);
+
+    const tree = createWorldTreeModel();
+    scene.add(tree);
+
+    const shadow = new THREE.Mesh(
+      new THREE.CircleGeometry(1.65, 48),
+      new THREE.MeshBasicMaterial({ color: 0x06100a, transparent: true, opacity: 0.32 })
+    );
+    shadow.rotation.x = -Math.PI / 2;
+    shadow.position.y = -1.28;
+    scene.add(shadow);
+
+    const particleGroup = new THREE.Group();
+    const mobile = window.matchMedia?.('(max-width: 700px)').matches;
+    const particleCount = mobile ? 12 : 24;
+    const particleMat = new THREE.MeshBasicMaterial({ color: 0x74f59a, transparent: true, opacity: 0.58 });
+    const particles = [];
+    for (let i = 0; i < particleCount; i++) {
+      const p = new THREE.Mesh(new THREE.IcosahedronGeometry(0.018 + Math.random() * 0.018, 0), particleMat);
+      p.position.set((Math.random() - 0.5) * 3.4, -0.8 + Math.random() * 3.6, (Math.random() - 0.5) * 1.9);
+      p.userData = { phase: Math.random() * Math.PI * 2, speed: 0.25 + Math.random() * 0.35, baseY: p.position.y };
+      particleGroup.add(p); particles.push(p);
+    }
+    scene.add(particleGroup);
+
+    worldTreeScene = {
+      updateGrowth: (isPlanted, growth) => tree.userData.updateGrowth(isPlanted, growth),
+      dispose: () => {
+        controls.dispose();
+        renderer.dispose();
+        tree.traverse(o => {
+          if (!o.isMesh) return;
+          o.geometry?.dispose?.();
+          if (Array.isArray(o.material)) o.material.forEach(m => m.dispose?.());
+          else o.material?.dispose?.();
+        });
+      }
+    };
+    tree.userData.updateGrowth(worldTreeState.planted, worldTreeGrowth);
+
+    const tick = (now) => {
+      controls.update();
+      tree.userData.animate(now);
+      particles.forEach(p => {
+        p.position.y = p.userData.baseY + Math.sin(now * 0.00045 * p.userData.speed + p.userData.phase) * 0.12;
+        p.position.x += Math.sin(now * 0.00018 + p.userData.phase) * 0.00035;
+      });
+      resize(renderer, canvas);
+      camera.aspect = canvas.clientWidth / Math.max(1, canvas.clientHeight);
+      camera.updateProjectionMatrix();
+      renderer.render(scene, camera);
+      requestAnimationFrame(tick);
+    };
+    requestAnimationFrame(tick);
+  } catch (err) {
+    console.warn('World Tree WebGL unavailable; using visual fallback:', err);
+    canvas.classList.add('webgl-fallback');
+  }
 }
+
 $$('.world-tree-tab').forEach(btn => btn.addEventListener('click', () => {
   $$('.world-tree-tab').forEach(x => x.classList.remove('active')); $$('.world-tree-tab-panel').forEach(x => x.classList.remove('active')); btn.classList.add('active');
   const panel = btn.dataset.treeTab === 'rewards' ? $('#treeRewardsTabPanel') : $('#treeTabPanel'); panel?.classList.add('active');
@@ -330,9 +570,11 @@ const boxGrid = $('#boxGrid');
 if(boxGrid) boxGrid.innerHTML = boxes.map(boxMarkup).join('');
 
 function makeRenderer(canvas) {
-  const r = new THREE.WebGLRenderer({canvas, antialias: true, alpha: true});
-  r.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  const r = new THREE.WebGLRenderer({canvas, antialias: true, alpha: true, powerPreference: 'high-performance'});
+  r.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.6));
   r.outputColorSpace = THREE.SRGBColorSpace;
+  r.toneMapping = THREE.ACESFilmicToneMapping;
+  r.toneMappingExposure = 1.08;
   r.shadowMap.enabled = true;
   r.shadowMap.type = THREE.PCFSoftShadowMap;
   return r;
@@ -359,149 +601,152 @@ function createTextTexture(text) {
 }
 
 function createLuxuryBox(b) {
+  // Procedural 3D luxury box. Kept API-compatible with the existing opening logic:
+  // children[0] owns lidPivot/rewardGroup/rewardMesh.
   const group = new THREE.Group();
+  group.name = 'MysteryBox3D';
   const rarity = b.rarity;
+  const isLegendary = rarity === 'LEGENDARY';
+  const isEpic = rarity === 'EPIC';
 
   const baseMat = new THREE.MeshStandardMaterial({
     color: b.color,
-    metalness: rarity === 'LEGENDARY' ? 0.95 : (rarity === 'EPIC' ? 0.85 : 0.6),
-    roughness: rarity === 'LEGENDARY' ? 0.1 : (rarity === 'EPIC' ? 0.15 : 0.3),
+    metalness: isLegendary ? 0.92 : isEpic ? 0.78 : 0.55,
+    roughness: isLegendary ? 0.14 : isEpic ? 0.20 : 0.30,
+    envMapIntensity: 1.25
   });
-
-  const goldMat = new THREE.MeshStandardMaterial({
-    color: 0xffd700,
-    metalness: 0.9,
-    roughness: 0.1,
+  const trimMat = new THREE.MeshStandardMaterial({
+    color: isLegendary || isEpic ? 0xf6c94b : 0x9ba7b5,
+    metalness: 0.95, roughness: 0.16, envMapIntensity: 1.6
   });
-
-  const glowMat = new THREE.MeshStandardMaterial({
-    color: b.accent,
-    emissive: b.accent,
-    emissiveIntensity: rarity === 'LEGENDARY' ? 3.5 : (rarity === 'EPIC' ? 2.5 : 1.5),
-    metalness: 0.2,
-    roughness: 0.1
-  });
-
   const darkMat = new THREE.MeshStandardMaterial({
-    color: 0x0a0b10,
-    metalness: 0.8,
-    roughness: 0.2
+    color: 0x080d15, metalness: 0.72, roughness: 0.23, envMapIntensity: 1.1
+  });
+  const innerMat = new THREE.MeshStandardMaterial({
+    color: 0x05070b, metalness: 0.25, roughness: 0.58
+  });
+  const glowMat = new THREE.MeshStandardMaterial({
+    color: b.accent, emissive: b.accent,
+    emissiveIntensity: isLegendary ? 3.1 : isEpic ? 2.25 : 1.25,
+    metalness: 0.28, roughness: 0.14
   });
 
   const bodyGroup = new THREE.Group();
-  const wallMat = baseMat;
-  
-  const bottomBox = new THREE.Mesh(new THREE.BoxGeometry(2.2, 0.1, 2.2), wallMat);
-  bottomBox.position.y = -0.85;
-  bodyGroup.add(bottomBox);
-  
-  const wallFront = new THREE.Mesh(new THREE.BoxGeometry(2.2, 1.7, 0.1), wallMat);
+  bodyGroup.name = 'BoxBody';
+  const rounded = (w,h,d,mat,radius=0.08,segments=3) => {
+    const m = new THREE.Mesh(new RoundedBoxGeometry(w,h,d,segments,radius), mat);
+    m.castShadow = true; m.receiveShadow = true;
+    return m;
+  };
+
+  const bottom = rounded(2.30, 0.16, 2.30, darkMat, 0.07);
+  bottom.position.y = -0.84;
+  bodyGroup.add(bottom);
+
+  const wallFront = rounded(2.26, 1.62, 0.14, baseMat, 0.055);
   wallFront.position.set(0, 0, 1.05);
   bodyGroup.add(wallFront);
-
-  const wallBack = new THREE.Mesh(new THREE.BoxGeometry(2.2, 1.7, 0.1), wallMat);
+  const wallBack = rounded(2.26, 1.62, 0.14, baseMat, 0.055);
   wallBack.position.set(0, 0, -1.05);
   bodyGroup.add(wallBack);
-
-  const wallLeft = new THREE.Mesh(new THREE.BoxGeometry(0.1, 1.7, 2.0), wallMat);
+  const wallLeft = rounded(0.14, 1.62, 2.06, baseMat, 0.055);
   wallLeft.position.set(-1.05, 0, 0);
   bodyGroup.add(wallLeft);
-
-  const wallRight = new THREE.Mesh(new THREE.BoxGeometry(0.1, 1.7, 2.0), wallMat);
+  const wallRight = rounded(0.14, 1.62, 2.06, baseMat, 0.055);
   wallRight.position.set(1.05, 0, 0);
   bodyGroup.add(wallRight);
 
-  group.add(bodyGroup);
+  // Dark recessed interior makes the opening read as a real cavity.
+  const cavity = rounded(1.94, 1.34, 1.94, innerMat, 0.06);
+  cavity.position.y = 0.03;
+  cavity.scale.y = 0.96;
+  bodyGroup.add(cavity);
 
-  const edgeGeo = new THREE.BoxGeometry(0.12, 1.82, 0.12);
-  const corners = [
-    [-1.05, 0, -1.05], [1.05, 0, -1.05],
-    [-1.05, 0, 1.05],  [1.05, 0, 1.05]
-  ];
+  // Metallic corner guards and horizontal bands.
+  const edgeGeo = new RoundedBoxGeometry(0.13, 1.76, 0.13, 3, 0.025);
+  [[-1.05,0,-1.05],[1.05,0,-1.05],[-1.05,0,1.05],[1.05,0,1.05]].forEach(([x,y,z]) => {
+    const edge = new THREE.Mesh(edgeGeo, trimMat);
+    edge.position.set(x,y,z); edge.castShadow = true; bodyGroup.add(edge);
+  });
+  const bandFront = rounded(2.34, 0.11, 0.10, trimMat, 0.02);
+  bandFront.position.set(0, -0.05, 1.12); bodyGroup.add(bandFront);
+  const bandBack = rounded(2.34, 0.11, 0.10, trimMat, 0.02);
+  bandBack.position.set(0, -0.05, -1.12); bodyGroup.add(bandBack);
 
-  corners.forEach(([x, y, z]) => {
-    const edge = new THREE.Mesh(edgeGeo, (rarity === 'LEGENDARY' ? goldMat : darkMat));
-    edge.position.set(x, y, z);
-    group.add(edge);
-
-    const neonBar = new THREE.Mesh(new THREE.BoxGeometry(0.06, 1.6, 0.06), glowMat);
-    neonBar.position.set(x * 1.02, y, z * 1.02);
-    group.add(neonBar);
+  const neonBar = rounded(0.055, 1.42, 0.055, glowMat, 0.018);
+  [[-1.115,0,-1.115],[1.115,0,-1.115],[-1.115,0,1.115],[1.115,0,1.115]].forEach(([x,y,z]) => {
+    const bar = neonBar.clone(); bar.position.set(x,y,z); bodyGroup.add(bar);
   });
 
-  const lockGeo = new THREE.CylinderGeometry(0.3, 0.3, 0.1, 16);
-  const lock = new THREE.Mesh(lockGeo, (rarity === 'COMMON' ? darkMat : goldMat));
-  lock.rotation.x = Math.PI / 2;
-  lock.position.set(0, 0.2, 1.12);
-  group.add(lock);
+  const lock = rounded(0.48, 0.12, 0.16, trimMat, 0.05);
+  lock.position.set(0, 0.08, 1.14); bodyGroup.add(lock);
+  const lockGlow = new THREE.Mesh(new THREE.OctahedronGeometry(0.13, 0), glowMat);
+  lockGlow.position.set(0, 0.08, 1.24); lockGlow.castShadow = true; bodyGroup.add(lockGlow);
 
-  const lockGlow = new THREE.Mesh(new THREE.SphereGeometry(0.12, 16, 16), glowMat);
-  lockGlow.position.set(0, 0.2, 1.18);
-  group.add(lockGlow);
+  group.add(bodyGroup);
 
   const lidPivot = new THREE.Group();
-  lidPivot.position.set(0, 0.9, -1.1);
+  lidPivot.name = 'LidPivot';
+  lidPivot.position.set(0, 0.83, -1.10);
+  const lid = rounded(2.38, 0.36, 2.38, (isLegendary || isEpic) ? trimMat : baseMat, 0.10);
+  lid.position.set(0, 0.18, 1.10);
+  lid.castShadow = true;
+  lidPivot.add(lid);
 
-  const lidMat = (rarity === 'LEGENDARY' || rarity === 'EPIC') ? goldMat : darkMat;
-  const lidMesh = new THREE.Mesh(new THREE.BoxGeometry(2.32, 0.35, 2.32), lidMat);
-  lidMesh.position.set(0, 0.175, 1.1);
-  lidMesh.castShadow = true;
-  lidPivot.add(lidMesh);
+  const lidInset = rounded(1.96, 0.12, 1.96, baseMat, 0.05);
+  lidInset.position.set(0, -0.02, 1.10);
+  lidPivot.add(lidInset);
 
-  if (rarity === 'EPIC' || rarity === 'LEGENDARY') {
-    const gemGeo = new THREE.OctahedronGeometry(0.35);
-    const gem = new THREE.Mesh(gemGeo, glowMat);
-    gem.position.set(0, 0.5, 1.1);
-    lidPivot.add(gem);
-    group.userData.gem = gem;
-  }
+  const lidGem = new THREE.Mesh(new THREE.OctahedronGeometry(isLegendary ? 0.32 : 0.26, 0), glowMat);
+  lidGem.position.set(0, 0.50, 1.10);
+  lidGem.castShadow = true;
+  lidPivot.add(lidGem);
   group.add(lidPivot);
-  group.userData.lidPivot = lidPivot;
 
-  if (rarity === 'EPIC' || rarity === 'LEGENDARY') {
-    const ringGeo = new THREE.TorusGeometry(1.8, 0.03, 16, 100);
-    const ring = new THREE.Mesh(ringGeo, glowMat);
+  // Visible hinge hardware.
+  [-0.58, 0.58].forEach(x => {
+    const hinge = new THREE.Mesh(new THREE.CylinderGeometry(0.09,0.09,0.34,12), trimMat);
+    hinge.rotation.z = Math.PI / 2;
+    hinge.position.set(x, 0.89, -1.09);
+    hinge.castShadow = true;
+    group.add(hinge);
+  });
+
+  if (isEpic || isLegendary) {
+    const ring = new THREE.Mesh(new THREE.TorusGeometry(1.72, 0.025, 10, 64), glowMat);
     ring.rotation.x = Math.PI / 2;
-    ring.position.y = -0.5;
+    ring.position.y = -0.52;
     group.add(ring);
     group.userData.ring = ring;
   }
 
   const rewardGroup = new THREE.Group();
   rewardGroup.position.set(0, -0.4, 0);
-  rewardGroup.scale.set(0, 0, 0);
-
-  const itemMesh = new THREE.Mesh(
-    new THREE.PlaneGeometry(1.6, 1.6),
-    new THREE.MeshBasicMaterial({
-      map: createTextTexture(b.icon),
-      transparent: true,
-      side: THREE.DoubleSide
-    })
-  );
-  rewardGroup.add(itemMesh);
-
+  rewardGroup.scale.set(0,0,0);
   const rewardGlow = new THREE.Mesh(
-    new THREE.SphereGeometry(0.8, 16, 16),
-    new THREE.MeshBasicMaterial({
-      color: b.accent,
-      transparent: true,
-      opacity: 0.5
-    })
+    new THREE.SphereGeometry(0.84, 20, 20),
+    new THREE.MeshBasicMaterial({color:b.accent,transparent:true,opacity:0.30,depthWrite:false,blending:THREE.AdditiveBlending})
   );
   rewardGroup.add(rewardGlow);
-
+  const itemMesh = new THREE.Mesh(
+    new THREE.PlaneGeometry(1.45, 1.45),
+    new THREE.MeshBasicMaterial({map:createTextTexture(b.icon),transparent:true,side:THREE.DoubleSide,depthWrite:false})
+  );
+  itemMesh.position.z = 0.12;
+  rewardGroup.add(itemMesh);
   group.add(rewardGroup);
+
+  group.userData.lidPivot = lidPivot;
+  group.userData.gem = lidGem;
+  group.userData.ring = group.userData.ring || null;
   group.userData.rewardGroup = rewardGroup;
   group.userData.rewardMesh = itemMesh;
 
   const root = new THREE.Group();
   root.add(group);
-  
-  const light = new THREE.PointLight(b.accent, rarity === 'LEGENDARY' ? 8 : 4, 6);
-  light.position.set(0, 0.5, 0);
+  const light = new THREE.PointLight(b.accent, isLegendary ? 6.5 : isEpic ? 4.0 : 2.6, 6.5, 2);
+  light.position.set(0, 0.2, 0.8);
   root.add(light);
-
   return root;
 }
 
@@ -515,7 +760,14 @@ function mountScene(canvas, b, interactive = false) {
   camera.position.set(0, 1.8, 5.5);
   camera.lookAt(0, 0, 0);
   
-  const renderer = makeRenderer(canvas);
+  let renderer;
+  try {
+    renderer = makeRenderer(canvas);
+  } catch (err) {
+    console.warn('Mystery Box WebGL unavailable; using visual fallback:', err);
+    canvas.classList.add('webgl-fallback');
+    return null;
+  }
   const controls = interactive ? new OrbitControls(camera, renderer.domElement) : null;
   if(controls) {
     controls.enableDamping = true;
@@ -526,27 +778,50 @@ function mountScene(canvas, b, interactive = false) {
     controls.target.set(0, 0, 0);
   }
   
-  const ambientLight = new THREE.AmbientLight(0xffffff, 1.2);
+  scene.add(new THREE.HemisphereLight(0xe7efff, 0x070b12, 1.15));
+  const ambientLight = new THREE.AmbientLight(0xffffff, 0.72);
   scene.add(ambientLight);
 
-  const mainLight = new THREE.DirectionalLight(0xffffff, 2.5);
-  mainLight.position.set(5, 8, 5);
+  const mainLight = new THREE.DirectionalLight(0xffffff, 3.1);
+  mainLight.position.set(4.5, 7.5, 4.5);
+  mainLight.castShadow = true;
+  mainLight.shadow.mapSize.set(interactive ? 1024 : 512, interactive ? 1024 : 512);
+  mainLight.shadow.camera.near = 0.5;
+  mainLight.shadow.camera.far = 15;
+  mainLight.shadow.camera.left = -4;
+  mainLight.shadow.camera.right = 4;
+  mainLight.shadow.camera.top = 4;
+  mainLight.shadow.camera.bottom = -4;
   scene.add(mainLight);
 
-  const fillLight = new THREE.DirectionalLight(b.accent, 2.0);
-  fillLight.position.set(-5, -2, -5);
+  const fillLight = new THREE.PointLight(b.accent, 1.7, 7, 2);
+  fillLight.position.set(-3, 1.0, 3.5);
   scene.add(fillLight);
 
+  const rimLight = new THREE.PointLight(0x7aa7ff, 0.75, 7, 2);
+  rimLight.position.set(2.5, 1.8, -3);
+  scene.add(rimLight);
+
   const boxObj = createLuxuryBox(b);
+  boxObj.traverse(node => { if (node.isMesh) { node.castShadow = true; node.receiveShadow = true; } });
   scene.add(boxObj);
 
   const floor = new THREE.Mesh(
-    new THREE.CircleGeometry(2.2, 64),
-    new THREE.MeshBasicMaterial({color: b.accent, transparent: true, opacity: 0.15})
+    new THREE.CircleGeometry(2.25, 64),
+    new THREE.MeshStandardMaterial({color: 0x07101b, metalness: 0.18, roughness: 0.55, transparent: true, opacity: 0.94})
   );
   floor.rotation.x = -Math.PI / 2;
-  floor.position.y = -1.2;
+  floor.position.y = -1.20;
+  floor.receiveShadow = true;
   scene.add(floor);
+
+  const glowDisc = new THREE.Mesh(
+    new THREE.CircleGeometry(1.95, 64),
+    new THREE.MeshBasicMaterial({color:b.accent,transparent:true,opacity:0.10,depthWrite:false,blending:THREE.AdditiveBlending})
+  );
+  glowDisc.rotation.x = -Math.PI / 2;
+  glowDisc.position.y = -1.18;
+  scene.add(glowDisc);
 
   const particles = new THREE.Group();
   const particleCount = b.rarity === 'LEGENDARY' ? 60 : 25;
