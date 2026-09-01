@@ -1,7 +1,12 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
-import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
 import { online } from './online.js';
+
+// Keep the core app independent from optional Three.js addon modules.
+// A segmented BoxGeometry is used as a safe fallback for rounded visual assets.
+const RoundedBoxGeometry = class extends THREE.BoxGeometry {
+  constructor(width, height, depth, segments = 3) { super(width, height, depth, segments, segments, segments); }
+};
 
 const defaultBoxes = [
  {id:'box1',name:'กล่องธรรมดา',en:'Food Box',price:1,rarity:'COMMON',color:0x8a92a6,accent:0x6c7a89,icon:'🍔',rewards:[{id:'box1-item1',name:'ชุดอาหารพรีเมียม',rarity:'COMMON',drop_rate:25,image_url:''},{id:'box1-item2',name:'ขนมนำเข้า',rarity:'COMMON',drop_rate:25,image_url:''},{id:'box1-item3',name:'เครื่องดื่ม',rarity:'COMMON',drop_rate:25,image_url:''},{id:'box1-item4',name:'บะหมี่พิเศษ',rarity:'COMMON',drop_rate:25,image_url:''}]},
@@ -112,7 +117,7 @@ function rewardCardMarkup(reward) {
   const stateText = state === 'claimed' ? '✓ รับแล้ว' : state === 'ready' ? 'พร้อมรับ' : `ล็อก • ต้องถึง ${reward.milestone}%`;
   const buttonText = state === 'claimed' ? 'รับแล้ว' : state === 'ready' ? 'รับรางวัล' : `ล็อกอยู่`;
   return `<article class="tree-reward-card ${state} tone-${reward.tone}">
-    <div class="tree-reward-icon">${reward.icon}</div>
+    <div class="tree-reward-icon reward-3d-icon" data-reward-tone="${reward.tone}" aria-hidden="true"></div>
     <div class="tree-reward-info">
       <div class="tree-reward-title"><b>${reward.title}</b><span>${reward.milestone}%</span></div>
       <strong>${reward.name}</strong>
@@ -152,6 +157,7 @@ function updateWorldTreeUI() {
   const plantedAtEl = $('#treePlantedAt');
   if (plantedAtEl) plantedAtEl.textContent = worldTreeState.plantedAt ? new Date(worldTreeState.plantedAt).toLocaleString('th-TH', {day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'}) : 'ยังไม่ได้ปลูก';
   renderWorldTreeRewards();
+  mountRewardIconScenes();
   worldTreeScene?.updateGrowth?.(worldTreeState.planted, worldTreeGrowth);
 }
 async function saveWorldTreeCloud() {
@@ -193,179 +199,152 @@ async function claimWorldTreeReward(rewardId) {
   if (!saved) toast('รับรางวัลแล้ว แต่ซิงก์ขึ้นคลาวด์ไม่สำเร็จ');
   else toast(`รับ ${reward.title} แล้ว`);
 }
+function createBarkTexture() {
+  const c = document.createElement('canvas'); c.width = 256; c.height = 256;
+  const ctx = c.getContext('2d');
+  const g = ctx.createLinearGradient(0,0,256,0);
+  g.addColorStop(0,'#24130c'); g.addColorStop(.24,'#6b3b1e'); g.addColorStop(.5,'#32180d'); g.addColorStop(.72,'#7b4725'); g.addColorStop(1,'#2a160d');
+  ctx.fillStyle=g; ctx.fillRect(0,0,256,256);
+  for(let i=0;i<90;i++){
+    const x=Math.random()*256, y=Math.random()*256, len=20+Math.random()*90;
+    ctx.strokeStyle=`rgba(${55+Math.random()*55},${25+Math.random()*35},${12+Math.random()*18},${.18+Math.random()*.35})`;
+    ctx.lineWidth=1+Math.random()*2; ctx.beginPath(); ctx.moveTo(x,y); ctx.bezierCurveTo(x+8,y+len*.25,x-7,y+len*.65,x+Math.random()*12,y+len); ctx.stroke();
+  }
+  const tex=new THREE.CanvasTexture(c); tex.wrapS=tex.wrapT=THREE.RepeatWrapping; tex.repeat.set(1.2,2.5); tex.colorSpace=THREE.SRGBColorSpace; return tex;
+}
+function createLeafGeometry() {
+  const shape = new THREE.Shape();
+  shape.moveTo(0, -0.42); shape.bezierCurveTo(0.34,-0.28,0.46,0.04,0,0.52); shape.bezierCurveTo(-0.46,0.04,-0.34,-0.28,0,-0.42);
+  const geo = new THREE.ExtrudeGeometry(shape,{depth:0.055,bevelEnabled:true,bevelSegments:2,bevelSize:0.018,bevelThickness:0.018,curveSegments:5});
+  geo.translate(0,0,-0.027); geo.computeVertexNormals(); return geo;
+}
+function makeBranchCurve(points, radius, material) {
+  const curve = new THREE.CatmullRomCurve3(points);
+  const mesh = new THREE.Mesh(new THREE.TubeGeometry(curve, 18, radius, 7, false), material);
+  mesh.castShadow=true; mesh.receiveShadow=true; return mesh;
+}
 function createWorldTreeModel() {
-  // One procedural 3D tree asset. Growth changes this same model's scale,
-  // leaf-cluster visibility and idle animation; no separate stage trees.
-  const root = new THREE.Group();
-  root.name = 'WorldTree3D';
+  // One detailed procedural 3D asset. It is intentionally built from curved/custom
+  // geometry rather than balls/cones/cylinders, and is ready to swap for a GLB later.
+  const root = new THREE.Group(); root.name='WorldTree3D';
+  const barkTex=createBarkTexture();
+  const barkMat=new THREE.MeshStandardMaterial({map:barkTex,color:0x8a4d27,roughness:.92,metalness:.02});
+  const barkDark=new THREE.MeshStandardMaterial({map:barkTex,color:0x4a2715,roughness:.96,metalness:.01});
+  const leafColors=[0x1c7135,0x278b40,0x3cad4c,0x5ed15e,0x8be56c];
+  const leafMats=leafColors.map((c,i)=>new THREE.MeshStandardMaterial({color:c,roughness:.68,metalness:.01,side:THREE.DoubleSide,emissive:i>2?0x164f21:0x071e0d,emissiveIntensity:i>2?.18:.08}));
+  const leafGeo=createLeafGeometry();
+  const soilMat=new THREE.MeshStandardMaterial({color:0x352316,roughness:1});
+  const grassMat=new THREE.MeshStandardMaterial({color:0x326b2e,roughness:.95});
+  const stoneMat=new THREE.MeshStandardMaterial({color:0x4c5b5c,roughness:.9});
 
-  const trunkMat = new THREE.MeshStandardMaterial({
-    color: 0x4b2d1b, roughness: 0.88, metalness: 0.02, flatShading: true
-  });
-  const barkMat = new THREE.MeshStandardMaterial({
-    color: 0x744525, roughness: 0.82, metalness: 0.03, flatShading: true
-  });
-  const barkGlowMat = new THREE.MeshStandardMaterial({
-    color: 0x5f9f46, emissive: 0x174c26, emissiveIntensity: 0.35,
-    roughness: 0.72, flatShading: true
-  });
-  const leafMats = [0x1f8f3d, 0x2caf4c, 0x4fdc63, 0x79ed72].map(color =>
-    new THREE.MeshStandardMaterial({ color, roughness: 0.72, metalness: 0.0, flatShading: true })
-  );
-  const youngLeafMat = new THREE.MeshStandardMaterial({
-    color: 0x9aff7b, emissive: 0x2b9b3d, emissiveIntensity: 0.22,
-    roughness: 0.65, flatShading: true
-  });
-  const soilMat = new THREE.MeshStandardMaterial({ color: 0x3b2819, roughness: 0.98, flatShading: true });
-  const grassMat = new THREE.MeshStandardMaterial({ color: 0x2c7133, roughness: 0.96, flatShading: true });
-  const stoneMat = new THREE.MeshStandardMaterial({ color: 0x40505a, roughness: 0.96, flatShading: true });
-
-  const island = new THREE.Group();
-  const grass = new THREE.Mesh(new THREE.CylinderGeometry(1.9, 1.65, 0.22, 48), grassMat);
-  grass.position.y = -1.48;
-  grass.receiveShadow = true;
-  island.add(grass);
-  const soil = new THREE.Mesh(new THREE.CylinderGeometry(1.65, 1.38, 0.38, 40), soilMat);
-  soil.position.y = -1.70;
-  soil.receiveShadow = true;
-  island.add(soil);
-  const soilRing = new THREE.Mesh(new THREE.TorusGeometry(1.57, 0.035, 8, 48), youngLeafMat);
-  soilRing.rotation.x = Math.PI / 2;
-  soilRing.position.y = -1.35;
-  soilRing.material.emissiveIntensity = 0.55;
-  island.add(soilRing);
+  const island=new THREE.Group();
+  const grass=new THREE.Mesh(new THREE.CylinderGeometry(2.0,1.78,.28,56),grassMat); grass.position.y=-1.54; grass.castShadow=grass.receiveShadow=true; island.add(grass);
+  const soil=new THREE.Mesh(new THREE.CylinderGeometry(1.78,1.46,.46,56),soilMat); soil.position.y=-1.79; soil.castShadow=soil.receiveShadow=true; island.add(soil);
+  const soilTop=new THREE.Mesh(new THREE.CircleGeometry(1.77,56),grassMat); soilTop.rotation.x=-Math.PI/2; soilTop.position.y=-1.39; soilTop.receiveShadow=true; island.add(soilTop);
   root.add(island);
 
-  const makeTrunk = (radiusTop, radiusBottom, height, y, x = 0, z = 0, material = trunkMat) => {
-    const mesh = new THREE.Mesh(new THREE.CylinderGeometry(radiusTop, radiusBottom, height, 12), material);
-    mesh.position.set(x, y, z);
-    mesh.castShadow = true;
-    mesh.receiveShadow = true;
-    return mesh;
-  };
+  // Main trunk and roots follow curved paths for a more natural silhouette.
+  root.add(makeBranchCurve([new THREE.Vector3(0,-1.42,0),new THREE.Vector3(-.08,-.75,.02),new THREE.Vector3(.08,.0,0),new THREE.Vector3(-.02,.72,0)],.31,barkMat));
+  root.add(makeBranchCurve([new THREE.Vector3(-.02,-1.2,.03),new THREE.Vector3(-.55,-1.05,.08),new THREE.Vector3(-1.05,-1.28,.12),new THREE.Vector3(-1.35,-1.38,.08)],.105,barkDark));
+  root.add(makeBranchCurve([new THREE.Vector3(.04,-1.2,-.03),new THREE.Vector3(.52,-1.0,.02),new THREE.Vector3(1.12,-1.3,-.08),new THREE.Vector3(1.38,-1.38,-.02)],.11,barkDark));
+  [[-.28,.1,0,-.92,.05],[.25,.2,.03,.9,-.04],[-.18,.5,.04,-.72,.02],[.18,.68,-.02,.78,.02],[0,.92,0,.55,0]].forEach(([x,y,z,dx,dz])=>{
+    root.add(makeBranchCurve([new THREE.Vector3(x,y,z),new THREE.Vector3(x+dx*.34,y+.18,z+dz*.4),new THREE.Vector3(x+dx*.72,y+.5,z+dz*.7),new THREE.Vector3(x+dx,y+.62,z+dz)],.085,barkMat));
+  });
 
-  const trunk = makeTrunk(0.17, 0.42, 2.45, -0.28);
-  trunk.rotation.z = -0.035;
-  root.add(trunk);
-
-  // Low-poly roots give the base real depth and contact with the island.
-  const rootParts = [
-    [-0.42, -1.05, 0.05, 0.75, 0.12], [0.43, -1.04, 0.02, 0.72, -0.13],
-    [-0.16, -1.10, 0.35, 0.66, 0.28], [0.14, -1.08, -0.28, 0.62, -0.25]
+  // Many custom 3D leaves arranged in layered natural canopy groups.
+  const canopy=[];
+  const layers=[
+    {y:.72,rx:1.25,rz:1.0,count:44,threshold:0},
+    {y:1.05,rx:1.48,rz:1.12,count:48,threshold:.12},
+    {y:1.38,rx:1.32,rz:1.05,count:44,threshold:.25},
+    {y:1.72,rx:1.05,rz:.86,count:36,threshold:.50},
+    {y:2.02,rx:.72,rz:.62,count:28,threshold:.80}
   ];
-  rootParts.forEach(([x, y, z, len, rz]) => {
-    const r = makeTrunk(0.055, 0.13, 1.0, y, x, z, barkMat);
-    r.scale.x = len;
-    r.rotation.z = rz;
-    r.rotation.x = (z > 0 ? -0.22 : 0.22);
-    root.add(r);
+  layers.forEach((layer,li)=>{
+    const g=new THREE.Group(); g.userData={threshold:layer.threshold,phase:li*.8,baseRot:(Math.random()-.5)*.08};
+    for(let i=0;i<layer.count;i++){
+      const a=(i/layer.count)*Math.PI*2 + (li*.61); const radial=Math.sqrt(Math.random())*.95;
+      const leaf=new THREE.Mesh(leafGeo,leafMats[(i+li)%leafMats.length]);
+      leaf.position.set(Math.cos(a)*layer.rx*radial, (Math.random()-.5)*.34, Math.sin(a)*layer.rz*radial);
+      leaf.rotation.set((Math.random()-.5)*.7,a+Math.PI/2+(Math.random()-.5)*.4,(Math.random()-.5)*.55);
+      const s=.24+Math.random()*.18; leaf.scale.set(s,s*1.12,s*.9); leaf.castShadow=true;
+      g.add(leaf);
+    }
+    g.position.y=layer.y; canopy.push(g); root.add(g);
   });
 
-  const branchData = [
-    [-0.42, 0.15, 0.02, 0.92, -0.65, 0.02], [0.43, 0.25, 0.03, 0.88, 0.62, -0.02],
-    [-0.18, 0.62, 0.02, 0.72, -0.28, 0.08], [0.20, 0.80, -0.01, 0.62, 0.25, 0.05],
-    [-0.08, 1.03, 0.02, 0.52, -0.08, 0.04]
-  ];
-  branchData.forEach(([x, y, z, scale, rz, rx]) => {
-    const b = makeTrunk(0.07, 0.16, 1.28, y, x, z, barkMat);
-    b.scale.set(scale, 0.92, scale * 0.92);
-    b.rotation.z = rz;
-    b.rotation.x = rx;
-    root.add(b);
+  // A few vines, roots, stones and sprouts add depth without flat imagery.
+  const vineMat=new THREE.MeshStandardMaterial({color:0x2b7b38,roughness:.75});
+  [[-.22,-.8,.18,.72],[.26,-.5,-.04,.9]].forEach(([x,y,z,h])=>{
+    const pts=[]; for(let i=0;i<12;i++){const t=i/11; pts.push(new THREE.Vector3(x+Math.sin(t*7)*.08,y+t*h,z+Math.cos(t*6)*.08));}
+    root.add(makeBranchCurve(pts,.026,vineMat));
+  });
+  [[-1.18,-1.31,.25,.2],[1.14,-1.3,.2,.18],[.88,-1.33,-.6,.14],[-.72,-1.34,-.55,.12]].forEach(([x,y,z,s])=>{
+    const st=new THREE.Mesh(new THREE.DodecahedronGeometry(s,1),stoneMat); st.position.set(x,y,z); st.scale.y=.55; st.rotation.set(.2,.6,.1); st.castShadow=true; root.add(st);
   });
 
-  // Leaf clusters are children of the same model and appear progressively as Growth rises.
-  const leafClusters = [];
-  const clusterData = [
-    [0.00, 1.18, 0.02, 0.80, 0.02, 0.01],
-    [-0.60, 0.98, 0.03, 0.62, -0.18, 0.18],
-    [0.63, 1.02, 0.03, 0.64, 0.14, -0.16],
-    [-0.30, 1.56, 0.02, 0.62, -0.08, 0.10],
-    [0.34, 1.66, 0.04, 0.60, 0.08, -0.10],
-    [-0.84, 0.70, 0.04, 0.44, -0.25, 0.14],
-    [0.86, 0.76, 0.02, 0.46, 0.23, -0.12],
-    [0.00, 2.02, 0.02, 0.48, 0.02, 0.02],
-    [-0.36, 2.08, -0.01, 0.34, -0.08, 0.06],
-    [0.40, 2.13, 0.00, 0.36, 0.10, -0.04]
-  ];
-  clusterData.forEach(([x, y, z, sc, rz, rx], i) => {
-    const g = new THREE.Group();
-    g.position.set(x, y, z);
-    g.rotation.set(rx, 0, rz);
-    const a = new THREE.Mesh(new THREE.IcosahedronGeometry(1, 2), leafMats[i % leafMats.length]);
-    a.scale.set(sc * 1.08, sc * 0.74, sc * 0.94);
-    a.castShadow = true;
-    g.add(a);
-    const b = new THREE.Mesh(new THREE.IcosahedronGeometry(1, 1), leafMats[(i + 1) % leafMats.length]);
-    b.position.set(-sc * 0.12, sc * 0.10, 0.08);
-    b.scale.set(sc * 0.68, sc * 0.44, sc * 0.58);
-    b.castShadow = true;
-    g.add(b);
-    const bud = new THREE.Mesh(new THREE.IcosahedronGeometry(sc * 0.15, 1), youngLeafMat);
-    bud.position.set(sc * 0.15, sc * 0.25, sc * 0.28);
-    g.add(bud);
-    g.userData.baseRotation = rz;
-    g.userData.baseScale = sc;
-    g.userData.phase = i * 0.73;
-    g.userData.threshold = [0, 0.10, 0.18, 0.25, 0.35, 0.50, 0.62, 0.80, 0.90, 0.97][i];
-    leafClusters.push(g);
-    root.add(g);
-  });
+  const crystalMat=new THREE.MeshPhysicalMaterial({color:0xb6ff8b,emissive:0x2fbb55,emissiveIntensity:2,roughness:.12,metalness:.18,transmission:.1});
+  const crystal=new THREE.Mesh(new THREE.OctahedronGeometry(.14,1),crystalMat); crystal.position.set(0,2.55,0); crystal.castShadow=true; root.add(crystal);
+  const aura=new THREE.PointLight(0x63ff91,1.8,5.8,2); aura.position.set(0,.8,1.1); root.add(aura);
 
-  // A few stones and small glowing sprouts anchor the tree in 3D space.
-  [[-1.15, -1.29, 0.25, 0.20], [1.16, -1.30, -0.10, 0.16], [0.92, -1.31, 0.65, 0.12]].forEach(([x,y,z,s]) => {
-    const stone = new THREE.Mesh(new THREE.DodecahedronGeometry(s, 0), stoneMat);
-    stone.position.set(x,y,z); stone.rotation.set(0.2,0.6,0.15); stone.castShadow = true; root.add(stone);
-  });
-
-  const gemMat = new THREE.MeshStandardMaterial({
-    color: 0xb5ff7c, emissive: 0x2dbb55, emissiveIntensity: 1.5,
-    roughness: 0.18, metalness: 0.25
-  });
-  const gem = new THREE.Mesh(new THREE.OctahedronGeometry(0.13, 0), gemMat);
-  gem.position.set(0, 2.42, 0);
-  gem.castShadow = true;
-  root.add(gem);
-
-  const aura = new THREE.PointLight(0x5eff91, 1.8, 5.5, 2);
-  aura.position.set(0, 0.9, 1.15);
-  root.add(aura);
-
-  let currentScale = 0.42;
-  let targetScale = 0.42;
-  let targetGrowth = 0;
-  let planted = false;
-
-  root.userData.updateGrowth = (isPlanted, growth) => {
-    planted = Boolean(isPlanted);
-    targetGrowth = clampWorldTreeGrowth(growth);
-    const n = targetGrowth / WORLD_TREE_MAX_GROWTH;
-    targetScale = planted ? (0.42 + n * 0.58) : 0.36;
-    gem.visible = planted && targetGrowth > 0;
-    aura.intensity = planted ? 1.5 + n * 2.2 : 0.45;
-  };
-
-  root.userData.animate = (time = performance.now()) => {
-    currentScale += (targetScale - currentScale) * 0.065;
-    root.scale.setScalar(currentScale);
-    const n = targetGrowth / WORLD_TREE_MAX_GROWTH;
-    const t = time * 0.001;
-    leafClusters.forEach((g, i) => {
-      const threshold = g.userData.threshold;
-      const unlocked = planted && n >= threshold;
-      g.visible = unlocked || (!planted && i === 0);
-      if (!g.visible) return;
-      const sway = Math.sin(t * 1.15 + g.userData.phase) * (0.018 + n * 0.028);
-      g.rotation.z = g.userData.baseRotation + sway;
-      g.rotation.x = Math.sin(t * 0.9 + g.userData.phase) * 0.018;
-      const detailBoost = 0.92 + Math.min(1, Math.max(0, (n - threshold) * 2.5)) * 0.08;
-      g.scale.setScalar(detailBoost);
-    });
-    gem.rotation.y += 0.008;
-    gem.position.y = 2.42 + Math.sin(t * 1.4) * 0.025;
-    aura.intensity = (planted ? 1.5 + n * 2.2 : 0.45) + Math.sin(t * 2.0) * 0.12;
+  let currentScale=.42,targetScale=.42,targetGrowth=0,planted=false;
+  root.userData.updateGrowth=(isPlanted,growth)=>{ planted=!!isPlanted; targetGrowth=clampWorldTreeGrowth(growth); const n=targetGrowth/1000; targetScale=planted?.42+n*.58:.32; crystal.visible=planted&&targetGrowth>0; aura.intensity=planted?1.7+n*3:.55; };
+  root.userData.animate=(time=performance.now())=>{
+    currentScale+=(targetScale-currentScale)*.065; root.scale.setScalar(currentScale); const n=targetGrowth/1000,t=time*.001;
+    canopy.forEach((g,i)=>{const unlocked=planted&&n>=g.userData.threshold; g.visible=unlocked||(!planted&&i===0); if(!g.visible)return; g.rotation.z=g.userData.baseRot+Math.sin(t*1.05+g.userData.phase)*(.012+n*.018); g.rotation.x=Math.sin(t*.72+g.userData.phase)*(.01+n*.012);});
+    crystal.rotation.y+=.007; crystal.position.y=2.55+Math.sin(t*1.2)*.025; aura.intensity=(planted?1.7+n*3:.55)+Math.sin(t*1.7)*.1;
   };
   return root;
+}
+function createTreeItemModel(type){
+  const group=new THREE.Group();
+  const colors={normalWater:0x48bfff,specialWater:0x315dff,normalFertilizer:0x8a6034,specialFertilizer:0xd9a51f};
+  const accent={normalWater:0x9ee8ff,specialWater:0x6b8cff,normalFertilizer:0x5aa83e,specialFertilizer:0xffd85a};
+  const c=colors[type], a=accent[type];
+  if(type.includes('Water')){
+    const glass=new THREE.MeshPhysicalMaterial({color:0xbfefff,transparent:true,opacity:.28,roughness:.06,metalness:.05,transmission:.72,thickness:.35,ior:1.45});
+    const profile=[new THREE.Vector2(.02,-.62),new THREE.Vector2(.25,-.58),new THREE.Vector2(.32,-.40),new THREE.Vector2(.29,.18),new THREE.Vector2(.22,.36),new THREE.Vector2(.13,.46),new THREE.Vector2(.13,.68),new THREE.Vector2(.08,.73),new THREE.Vector2(.08,.78),new THREE.Vector2(.02,.78)];
+    const bottle=new THREE.Mesh(new THREE.LatheGeometry(profile,24),glass); bottle.scale.set(.9,1.05,.9); bottle.castShadow=true; group.add(bottle);
+    const liquid=new THREE.Mesh(new THREE.LatheGeometry([new THREE.Vector2(.025,-.56),new THREE.Vector2(.22,-.52),new THREE.Vector2(.27,-.34),new THREE.Vector2(.25,.06),new THREE.Vector2(.18,.18),new THREE.Vector2(.02,.18)],24),new THREE.MeshPhysicalMaterial({color:c,emissive:type==='specialWater'?a:0x0b4f76,emissiveIntensity:type==='specialWater'?1.0:.15,roughness:.08,metalness:.08,transmission:.12,transparent:true,opacity:.88})); liquid.position.y=-.05; group.add(liquid);
+    const cap=new THREE.Mesh(new RoundedBoxGeometry(.2,.16,.2,3,.04),new THREE.MeshStandardMaterial({color:type==='specialWater'?0x182c78:0x1b6d8e,metalness:.65,roughness:.22})); cap.position.y=.78; group.add(cap);
+    const glow=new THREE.PointLight(a,type==='specialWater'?1.7:.55,2.2,2); glow.position.set(0,.05,.35); group.add(glow);
+  }else{
+    const sackShape=new THREE.Shape(); sackShape.moveTo(-.28,-.55); sackShape.quadraticCurveTo(-.4,-.15,-.3,.32); sackShape.quadraticCurveTo(-.2,.48,0,.52); sackShape.quadraticCurveTo(.2,.48,.3,.32); sackShape.quadraticCurveTo(.4,-.15,.28,-.55); sackShape.quadraticCurveTo(0,-.68,-.28,-.55);
+    const sackMat=new THREE.MeshStandardMaterial({color:c,roughness:.92,metalness:.02});
+    const sack=new THREE.Mesh(new THREE.ExtrudeGeometry(sackShape,{depth:.28,bevelEnabled:true,bevelSegments:3,bevelSize:.035,bevelThickness:.035}),sackMat); sack.position.z=-.14; sack.scale.set(1,.95,.9); sack.castShadow=true; group.add(sack);
+    const tie=new THREE.Mesh(new THREE.TorusGeometry(.17,.028,8,28),new THREE.MeshStandardMaterial({color:type==='specialFertilizer'?0xffd45a:0x6d4928,metalness:.5,roughness:.3})); tie.rotation.x=Math.PI/2; tie.position.y=.5; group.add(tie);
+    const leaf=new THREE.Mesh(leafGeo,new THREE.MeshStandardMaterial({color:a,roughness:.7,side:THREE.DoubleSide})); leaf.scale.set(.23,.32,.9); leaf.rotation.set(0,.2,.1); leaf.position.set(0,.05,.19); group.add(leaf);
+    if(type==='specialFertilizer'){const glow=new THREE.PointLight(a,1.4,2.4,2); glow.position.set(0,.1,.5); group.add(glow);}
+  }
+  group.rotation.y=.35; return group;
+}
+function mountRewardIconScenes(){
+  const nodes=[...document.querySelectorAll('.reward-3d-icon')].filter(n=>!n.dataset.mounted);
+  nodes.forEach(node=>{
+    node.dataset.mounted='1';
+    const canvas=document.createElement('canvas'); canvas.width=96; canvas.height=96; node.appendChild(canvas);
+    const tone=node.dataset.rewardTone; const palette={gold:[0xf0b62f,0xffe06b],purple:[0x8e3cff,0xd78cff],blue:[0x5aa8ff,0xcde9ff]}; const [base,accent]=palette[tone]||palette.blue;
+    try{
+      const scene=new THREE.Scene(); const camera=new THREE.PerspectiveCamera(30,1,.1,20); camera.position.set(0,.15,3.1); camera.lookAt(0,.05,0);
+      const renderer=makeRenderer(canvas); renderer.setPixelRatio(Math.min(window.devicePixelRatio||1,1.15));
+      scene.add(new THREE.HemisphereLight(0xeaffff,0x07101b,2)); const key=new THREE.DirectionalLight(0xffffff,2.5); key.position.set(2,3,3); scene.add(key);
+      const mat=new THREE.MeshStandardMaterial({color:base,metalness:.86,roughness:.18}); const trim=new THREE.MeshStandardMaterial({color:0xd9a83a,metalness:.94,roughness:.14});
+      const g=new THREE.Group();
+      const body=new THREE.Mesh(new RoundedBoxGeometry(1.45,.82,.9,4,.13),mat); body.castShadow=true; g.add(body);
+      const lid=new THREE.Mesh(new RoundedBoxGeometry(1.5,.24,.94,4,.08),mat); lid.position.y=.52; lid.castShadow=true; g.add(lid);
+      const band=new THREE.Mesh(new RoundedBoxGeometry(.13,.95,.98,3,.035),trim); band.position.y=.12; band.position.z=.02; g.add(band);
+      const gem=new THREE.Mesh(new THREE.OctahedronGeometry(.2,1),new THREE.MeshPhysicalMaterial({color:accent,emissive:accent,emissiveIntensity:1.2,roughness:.12,metalness:.25,transmission:.08})); gem.position.set(0,.05,.5); g.add(gem);
+      g.rotation.set(-.08,.45,0); scene.add(g);
+      const glow=new THREE.PointLight(accent,tone==='gold'?1.7:1.2,2.8,2); glow.position.set(0,.2,.7); scene.add(glow);
+      const tick=(now)=>{if(!node.isConnected){renderer.dispose();return;} g.rotation.y=.45+Math.sin(now*.0007)*.08; gem.rotation.y+=.012; resize(renderer,canvas); renderer.setSize(Math.max(1,node.clientWidth),Math.max(1,node.clientHeight),false); camera.aspect=Math.max(1,node.clientWidth)/Math.max(1,node.clientHeight); camera.updateProjectionMatrix(); renderer.render(scene,camera); requestAnimationFrame(tick);}; requestAnimationFrame(tick);
+    }catch(err){node.classList.add('reward-3d-fallback'); console.warn('Reward 3D icon unavailable:',err);}
+  });
+}
+function mountTreeItemScenes(){
+  const types=['normalWater','specialWater','normalFertilizer','specialFertilizer'];
+  const mounted=[];
+  types.forEach(type=>{const canvas=$(`#${type}Canvas`); if(!canvas)return; try{const scene=new THREE.Scene(); const camera=new THREE.PerspectiveCamera(28,1,.1,20); camera.position.set(0,.05,3.3); camera.lookAt(0,0,0); const renderer=makeRenderer(canvas); renderer.setPixelRatio(Math.min(window.devicePixelRatio||1,1.25)); const hemi=new THREE.HemisphereLight(0xeaffff,0x09121e,1.9); scene.add(hemi); const key=new THREE.DirectionalLight(0xffffff,2.2); key.position.set(2,3,3); key.castShadow=true; scene.add(key); const model=createTreeItemModel(type); scene.add(model); const floor=new THREE.Mesh(new THREE.CircleGeometry(.72,32),new THREE.MeshBasicMaterial({color:0x07111b,transparent:true,opacity:.48})); floor.rotation.x=-Math.PI/2; floor.position.y=-.67; scene.add(floor); mounted.push({renderer,canvas,scene,camera,model});}catch(err){console.warn('Tree item 3D unavailable:',type,err); canvas.classList.add('webgl-fallback');}});
+  const tick=(now)=>{mounted.forEach((x,i)=>{x.model.rotation.y=.35+Math.sin(now*.0007+i)*.08; x.model.rotation.x=Math.sin(now*.0009+i)*.025; resize(x.renderer,x.canvas); x.camera.aspect=x.canvas.clientWidth/Math.max(1,x.canvas.clientHeight); x.camera.updateProjectionMatrix(); x.renderer.render(x.scene,x.camera);}); requestAnimationFrame(tick);}; requestAnimationFrame(tick);
 }
 
 function mountWorldTreeScene(){
@@ -482,6 +461,7 @@ $('#normalFertilizerBtn')?.addEventListener('click', () => changeWorldTree('norm
 $('#specialFertilizerBtn')?.addEventListener('click', () => changeWorldTree('specialFertilizer'));
 document.addEventListener('click', e => { const btn=e.target.closest?.('[data-tree-reward]'); if(btn) claimWorldTreeReward(btn.dataset.treeReward); });
 mountWorldTreeScene();
+mountTreeItemScenes();
 updateWorldTreeUI();
 
 function cleanupRollHistory() {
