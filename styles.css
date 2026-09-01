@@ -63,31 +63,6 @@ nav {
   gap: 8px;
 }
 
-/* Separate Game Lobby entry point. Mystery Box logic is unchanged. */
-.game-entry-btn {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  width: 100%;
-  padding: 12px 16px;
-  margin: 2px 0 4px;
-  background: linear-gradient(135deg, #25134d, #17172a);
-  border: 1px solid #5635a0;
-  color: #fff;
-  font-size: 15px;
-  border-radius: 10px;
-  cursor: pointer;
-  transition: all 0.2s;
-  text-align: left;
-  text-decoration: none;
-}
-
-.game-entry-btn:hover {
-  background: linear-gradient(135deg, #351b68, #1d1d30);
-  border-color: #7a00ff;
-  transform: translateY(-1px);
-}
-
 .nav {
   display: flex;
   align-items: center;
@@ -802,6 +777,90 @@ nav {
   color: #777;
   padding: 30px;
   font-size: 14px;
+}
+
+
+/* Tree World */
+.game-tabs {
+  display: flex;
+  gap: 8px;
+  padding: 5px;
+  background: #11111c;
+  border: 1px solid #24243a;
+  border-radius: 14px;
+  width: fit-content;
+}
+.game-tab {
+  border: 0;
+  background: transparent;
+  color: #77778c;
+  padding: 10px 18px;
+  border-radius: 10px;
+  font-size: 14px;
+  cursor: pointer;
+  transition: all .2s ease;
+}
+.game-tab:hover, .game-tab.active {
+  background: #1e1e31;
+  color: #fff;
+}
+.tree-page { display: flex; flex-direction: column; gap: 18px; }
+.tree-head {
+  display:flex; justify-content:space-between; align-items:center; gap:20px;
+  background: linear-gradient(135deg,#101d19,#0d0c18);
+  border:1px solid #263c34; border-radius:20px; padding:24px;
+}
+.tree-head h1 { font-size:32px; margin:6px 0; }
+.tree-head p { color:#8a9b94; font-size:13px; }
+.tree-progress-badge { min-width:110px; padding:12px 16px; text-align:center; border:1px solid #315548; background:#12231d; border-radius:14px; }
+.tree-progress-badge strong { display:block; font-size:24px; color:#7ee7a9; }
+.tree-progress-badge span { color:#7c8f87; font-size:11px; }
+.tree-layout { display:grid; grid-template-columns:minmax(0,1.5fr) minmax(320px,1fr); gap:18px; }
+.tree-main-card,.tree-rewards-card { background:#141322; border:1px solid #232138; border-radius:18px; padding:18px; }
+.tree-stage { height:330px; border-radius:14px; position:relative; overflow:hidden; display:flex; align-items:center; justify-content:center; background:radial-gradient(circle at 50% 38%,#203b2c 0,#111b18 45%,#0b0b12 78%); border:1px solid #263d32; }
+.tree-ground { position:absolute; width:76%; height:52px; bottom:30px; border-radius:50%; background:#15281e; box-shadow:0 0 40px #0b2b18; }
+.tree-visual { position:relative; z-index:2; font-size:92px; transform-origin:bottom center; transition:transform .25s ease, filter .25s ease; filter:drop-shadow(0 12px 16px #0008); }
+.tree-stage-label { position:absolute; z-index:3; bottom:12px; color:#718178; font-size:11px; }
+.tree-progress-wrap { margin-top:16px; }
+.tree-progress-meta { display:flex; justify-content:space-between; align-items:center; margin-bottom:7px; color:#aaaabc; font-size:12px; }
+.tree-progress-meta strong { color:#7ee7a9; font-size:16px; }
+.tree-progress { height:14px; background:#0c0c14; border:1px solid #25253b; border-radius:99px; overflow:hidden; }
+.tree-progress span { display:block; height:100%; width:0%; border-radius:99px; background:linear-gradient(90deg,#2d9b63,#9af3ba); transition:width .25s ease; }
+.tree-progress-scale { display:flex; justify-content:space-between; color:#5e6b64; font-size:9px; margin-top:5px; }
+.tree-actions { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:9px; margin-top:16px; }
+.tree-action { min-height:78px; border:1px solid #2a3140; background:#171a24; color:#fff; border-radius:12px; cursor:pointer; font-size:13px; padding:9px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:3px; }
+.tree-action:hover:not(:disabled) { border-color:#4d9d74; transform:translateY(-1px); }
+.tree-action.special { border-color:#4a3a69; background:#191624; }
+.tree-action.plant { border-color:#315b47; background:#12231c; }
+.tree-action:disabled { opacity:.42; cursor:not-allowed; transform:none; }
+.tree-action span { color:#ffd86b; font-size:11px; }
+.tree-action small { color:#79dca1; font-size:10px; }
+.tree-note { margin-top:12px; padding:10px 12px; border-radius:10px; background:#101019; color:#77778a; font-size:11px; text-align:center; }
+.tree-rewards-intro { color:#74748a; font-size:11px; line-height:1.6; margin:8px 0 14px; }
+.tree-reward-list { display:flex; flex-direction:column; gap:10px; }
+.tree-reward { display:grid; grid-template-columns:42px minmax(0,1fr) 28px; align-items:center; gap:10px; padding:12px; border-radius:13px; background:#101019; border:1px solid #25253b; }
+.tree-reward.unlocked { border-color:#386b4f; background:#12221a; }
+.tree-reward-icon { width:38px; height:38px; display:flex; align-items:center; justify-content:center; border-radius:10px; background:#1b1b2a; font-size:20px; }
+.tree-reward span,.tree-reward small { display:block; color:#6f7084; font-size:10px; }
+.tree-reward b { display:block; margin:3px 0; font-size:13px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.tree-reward em { font-style:normal; text-align:center; font-size:16px; }
+
+@media (max-width:900px) {
+  .tree-layout { grid-template-columns:1fr; }
+  .tree-actions { grid-template-columns:repeat(2,minmax(0,1fr)); }
+}
+@media (max-width:600px) and (orientation:portrait) {
+  .game-tabs { width:100%; }
+  .game-tab { flex:1; padding:9px 10px; font-size:12px; }
+  .tree-head { padding:16px; border-radius:16px; }
+  .tree-head h1 { font-size:25px; }
+  .tree-head p { font-size:11px; line-height:1.5; }
+  .tree-progress-badge { min-width:82px; padding:9px 10px; }
+  .tree-progress-badge strong { font-size:19px; }
+  .tree-stage { height:270px; }
+  .tree-visual { font-size:76px; }
+  .tree-main-card,.tree-rewards-card { padding:12px; }
+  .tree-action { min-height:74px; font-size:12px; }
 }
 
 /* Toast */

@@ -43,6 +43,181 @@ let rollHistory = rawRollHistory ? JSON.parse(rawRollHistory) : [];
 
 const $ = s => document.querySelector(s); const $$ = s => [...document.querySelectorAll(s)];
 
+// Tree World: growth is manual only. No timer or passive growth is used.
+const TREE_MAX_GROWTH = 1000;
+const TREE_ITEM_GROWTH = {
+  normal_water: 10,
+  special_water: 25,
+  normal_fertilizer: 15,
+  special_fertilizer: 30
+};
+const TREE_DEFAULT_ITEMS = {
+  normal_water: 10,
+  special_water: 10,
+  normal_fertilizer: 10,
+  special_fertilizer: 10
+};
+const TREE_REWARDS = {
+  500: 'ยังไม่ได้ตั้งรางวัล',
+  800: 'ยังไม่ได้ตั้งรางวัล',
+  1000: 'ยังไม่ได้ตั้งรางวัล'
+};
+let treeState = {
+  planted: false,
+  growth: 0,
+  items: {...TREE_DEFAULT_ITEMS},
+  claimed_milestones: []
+};
+
+function getTreeStorageKey() {
+  const userId = online?.user?.id;
+  return userId ? `mystery_box_tree_state_${userId}` : null;
+}
+
+function normalizeTreeState(state) {
+  const items = {...TREE_DEFAULT_ITEMS, ...(state?.items || {})};
+  Object.keys(TREE_DEFAULT_ITEMS).forEach(k => {
+    const n = Number(items[k]);
+    items[k] = Number.isFinite(n) ? Math.max(0, Math.floor(n)) : TREE_DEFAULT_ITEMS[k];
+  });
+  const growth = Math.max(0, Math.min(TREE_MAX_GROWTH, Math.round(Number(state?.growth) || 0)));
+  return {
+    planted: Boolean(state?.planted),
+    growth,
+    items,
+    claimed_milestones: Array.isArray(state?.claimed_milestones) ? state.claimed_milestones.map(Number).filter(Number.isFinite) : []
+  };
+}
+
+function saveTreeLocal() {
+  const key = getTreeStorageKey();
+  if (!key) return;
+  try { localStorage.setItem(key, JSON.stringify(treeState)); } catch (_) {}
+}
+
+function loadTreeLocal() {
+  const key = getTreeStorageKey();
+  if (!key) return null;
+  try {
+    const raw = localStorage.getItem(key);
+    return raw ? normalizeTreeState(JSON.parse(raw)) : null;
+  } catch (_) { return null; }
+}
+
+function treeVisualForGrowth(growth, planted) {
+  if (!planted) return '🌱';
+  if (growth >= 1000) return '🌳';
+  if (growth >= 800) return '🌲';
+  if (growth >= 500) return '🌿';
+  if (growth >= 250) return '🌱';
+  return '🌰';
+}
+
+function renderTree() {
+  const pct = Math.max(0, Math.min(100, treeState.growth / 10));
+  const percentText = `${treeState.growth.toLocaleString('th-TH')}%`;
+  const top = $('#treePercentTop');
+  const label = $('#treePercent');
+  const fill = $('#treeProgressFill');
+  const visual = $('#treeVisual');
+  const stageLabel = $('#treeStageLabel');
+  if (top) top.textContent = percentText;
+  if (label) label.textContent = percentText;
+  if (fill) fill.style.width = `${pct}%`;
+  if (visual) {
+    visual.textContent = treeVisualForGrowth(treeState.growth, treeState.planted);
+    const scale = treeState.planted ? (0.88 + (treeState.growth / TREE_MAX_GROWTH) * 0.5) : 0.8;
+    visual.style.transform = `scale(${scale})`;
+    visual.style.filter = treeState.growth >= TREE_MAX_GROWTH ? 'drop-shadow(0 0 24px #7ee7a966)' : 'drop-shadow(0 12px 16px #0008)';
+  }
+  if (stageLabel) {
+    stageLabel.textContent = !treeState.planted ? 'ยังไม่ได้ปลูกต้นไม้' : treeState.growth >= TREE_MAX_GROWTH ? 'ต้นไม้โตเต็มที่แล้ว • 1,000%' : `ต้นไม้กำลังเติบโต • ${percentText}`;
+  }
+
+  Object.entries(TREE_DEFAULT_ITEMS).forEach(([key]) => {
+    const idMap = {normal_water:'normalWaterQty', special_water:'specialWaterQty', normal_fertilizer:'normalFertilizerQty', special_fertilizer:'specialFertilizerQty'};
+    const el = $(`#${idMap[key]}`);
+    if (el) el.textContent = treeState.items[key] ?? 0;
+  });
+
+  $$('.tree-action[data-tree-item]').forEach(btn => {
+    const key = btn.dataset.treeItem;
+    btn.disabled = !treeState.planted || treeState.growth >= TREE_MAX_GROWTH || Number(treeState.items[key] || 0) <= 0;
+  });
+  const plantBtn = $('#plantTreeBtn');
+  if (plantBtn) {
+    plantBtn.disabled = treeState.planted && treeState.growth < TREE_MAX_GROWTH;
+    plantBtn.textContent = treeState.planted ? (treeState.growth >= TREE_MAX_GROWTH ? '🌳 โตเต็มที่แล้ว' : '🌱 ปลูกแล้ว') : '🌱 ปลูกต้นไม้';
+  }
+
+  [500, 800, 1000].forEach(m => {
+    const card = document.querySelector(`[data-tree-milestone="${m}"]`);
+    const status = $(`#treeRewardStatus${m}`);
+    const reward = $(`#treeReward${m}`);
+    if (reward) reward.textContent = TREE_REWARDS[m];
+    const unlocked = treeState.growth >= m;
+    card?.classList.toggle('unlocked', unlocked);
+    if (status) status.textContent = unlocked ? '✓' : '🔒';
+  });
+}
+
+async function persistTreeState() {
+  treeState = normalizeTreeState(treeState);
+  saveTreeLocal();
+  try { await online.saveTreeState(treeState); return true; }
+  catch (err) { console.warn('Tree state cloud save unavailable:', err); return false; }
+}
+
+async function loadTreeState() {
+  const cached = loadTreeLocal();
+  if (cached) { treeState = cached; renderTree(); }
+  try {
+    const cloud = await online.getTreeState();
+    if (cloud) {
+      treeState = normalizeTreeState(cloud);
+      saveTreeLocal();
+      renderTree();
+      return true;
+    }
+  } catch (err) { console.warn('Tree state cloud load unavailable:', err); }
+  if (!cached && online.user) {
+    treeState = normalizeTreeState(treeState);
+    saveTreeLocal();
+    persistTreeState().catch(() => {});
+  }
+  return false;
+}
+
+$('#plantTreeBtn')?.addEventListener('click', async () => {
+  if (treeState.planted) {
+    toast(treeState.growth >= TREE_MAX_GROWTH ? 'ต้นไม้โตเต็มที่แล้ว' : 'ต้นไม้นี้ปลูกไปแล้ว');
+    return;
+  }
+  treeState.planted = true;
+  treeState.growth = 0;
+  renderTree();
+  const saved = await persistTreeState();
+  toast(saved ? 'ปลูกต้นไม้แล้ว เริ่มดูแลต้นไม้ได้เลย' : 'ปลูกต้นไม้แล้ว แต่กำลังรอบันทึกออนไลน์');
+});
+
+$$('.tree-action[data-tree-item]').forEach(btn => {
+  btn.addEventListener('click', async () => {
+    const key = btn.dataset.treeItem;
+    if (!treeState.planted || treeState.growth >= TREE_MAX_GROWTH) return;
+    if (Number(treeState.items[key] || 0) <= 0) { toast('ไอเท็มชนิดนี้หมดแล้ว'); return; }
+    const oldGrowth = treeState.growth;
+    treeState.items[key] -= 1;
+    treeState.growth = Math.min(TREE_MAX_GROWTH, treeState.growth + TREE_ITEM_GROWTH[key]);
+    const crossed = [500, 800, 1000].filter(m => oldGrowth < m && treeState.growth >= m);
+    renderTree();
+    const saved = await persistTreeState();
+    crossed.forEach(m => toast(`🎉 ต้นไม้ถึง ${m.toLocaleString('th-TH')}% แล้ว • ปลดล็อกรางวัล`));
+    if (!saved) toast('การเติบโตถูกเก็บไว้ในเครื่อง รอซิงก์ออนไลน์');
+  });
+});
+
+renderTree();
+
 function cleanupRollHistory() {
   const now = Date.now();
   const before = rollHistory.length;
@@ -806,6 +981,7 @@ online.init().then(async profile => {
     syncPoints();
   }
   await loadCloudInventory();
+  await loadTreeState();
   startLiveBalanceSync();
   try {
     const cloudHistory = await online.getRollHistory();
@@ -1462,15 +1638,33 @@ topupForm?.addEventListener('submit', async (event) => {
 
 
 function showAccountPage() {
-  ['.hero', '.content', '.bottom-grid'].forEach(sel => document.querySelector(sel)?.classList.add('hidden'));
+  ['.hero', '.content', '.bottom-grid', '#treePage'].forEach(sel => document.querySelector(sel)?.classList.add('hidden'));
   $('#accountPage')?.classList.remove('hidden');
   window.scrollTo({top: 0, behavior: 'smooth'});
 }
 
 function showHomePage() {
   ['.hero', '.content', '.bottom-grid'].forEach(sel => document.querySelector(sel)?.classList.remove('hidden'));
+  $('#treePage')?.classList.add('hidden');
   $('#accountPage')?.classList.add('hidden');
 }
+
+function showTreePage() {
+  ['.hero', '.content', '.bottom-grid'].forEach(sel => document.querySelector(sel)?.classList.add('hidden'));
+  $('#accountPage')?.classList.add('hidden');
+  $('#treePage')?.classList.remove('hidden');
+  renderTree();
+  window.scrollTo({top: 0, behavior: 'smooth'});
+}
+
+$$('.game-tab').forEach(tab => {
+  tab.addEventListener('click', () => {
+    $$('.game-tab').forEach(x => x.classList.remove('active'));
+    tab.classList.add('active');
+    if (tab.dataset.gameTab === 'tree') showTreePage();
+    else showHomePage();
+  });
+});
 
 $$('.nav').forEach(n => n.onclick = () => {
   $$('.nav').forEach(x => x.classList.remove('active'));
@@ -1483,8 +1677,8 @@ $$('.nav').forEach(n => n.onclick = () => {
     renderRollHistory();
     $('#historyModal')?.classList.remove('hidden');
   }
-  else if(p === 'boxes') { showHomePage(); document.querySelector('.content')?.scrollIntoView({behavior: 'smooth'}); }
-  else if(p === 'home') { showHomePage(); document.querySelector('.hero')?.scrollIntoView({behavior: 'smooth'}); }
+  else if(p === 'boxes') { showHomePage(); $$('.game-tab').forEach(x => x.classList.toggle('active', x.dataset.gameTab === 'boxes')); document.querySelector('.content')?.scrollIntoView({behavior: 'smooth'}); }
+  else if(p === 'home') { showHomePage(); $$('.game-tab').forEach(x => x.classList.toggle('active', x.dataset.gameTab === 'boxes')); document.querySelector('.hero')?.scrollIntoView({behavior: 'smooth'}); }
 });
 
 $('#accountPageLogout')?.addEventListener('click', async () => {

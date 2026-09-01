@@ -311,6 +311,42 @@ class OnlineDB {
     return data;
   }
 
+  async getTreeState() {
+    if (!this.client) return null;
+    const currentUser = await this.refreshAuthenticatedUser();
+    if (!currentUser) return null;
+    const { data, error } = await this.client
+      .from('player_tree_state')
+      .select('user_id, planted, growth, items, claimed_milestones, updated_at')
+      .eq('user_id', currentUser.id)
+      .maybeSingle();
+    if (error) throw error;
+    if (!data) return null;
+    return data;
+  }
+
+  async saveTreeState(state) {
+    if (!this.client) return false;
+    const currentUser = await this.refreshAuthenticatedUser();
+    if (!currentUser) return false;
+    const payload = {
+      user_id: currentUser.id,
+      planted: Boolean(state?.planted),
+      growth: Math.max(0, Math.min(1000, Math.round(Number(state?.growth) || 0))),
+      items: state?.items && typeof state.items === 'object' ? state.items : {},
+      claimed_milestones: Array.isArray(state?.claimed_milestones) ? state.claimed_milestones.map(Number).filter(Number.isFinite) : [],
+      updated_at: new Date().toISOString()
+    };
+    const { data, error } = await this.client
+      .from('player_tree_state')
+      .upsert(payload, { onConflict: 'user_id' })
+      .select('user_id, planted, growth, items, claimed_milestones')
+      .maybeSingle();
+    if (error) throw error;
+    if (!data || data.user_id !== currentUser.id) throw new Error('บันทึกต้นไม้ไม่สำเร็จ');
+    return true;
+  }
+
   async getRollHistory() {
     if (!this.client) return [];
     const currentUser = await this.refreshAuthenticatedUser();

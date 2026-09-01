@@ -80,7 +80,6 @@
       </div>
       <nav>
         <button class="nav active" data-page="home">🏠 <span>หน้าแรก</span></button>
-        <a class="game-entry-btn" id="enterGameBtn" href="game-lobby.html">🎮 <span>เข้าเกม</span></a>
         <button class="nav" data-page="boxes">📦 <span>กล่องสุ่ม</span></button>
         <button class="nav" data-page="rewards">🏆 <span>รางวัล</span></button>
         <button class="nav" data-page="history">📜 <span>ประวัติ</span></button>
@@ -103,6 +102,11 @@
           <button class="icon-btn" id="soundBtn">🔊</button>
         </div>
       </header>
+
+      <div class="game-tabs" id="gameTabs">
+        <button type="button" class="game-tab active" data-game-tab="boxes">📦 กล่องสุ่ม</button>
+        <button type="button" class="game-tab" data-game-tab="tree">🌳 ต้นไม้</button>
+      </div>
 
       <section class="hero">
         <div class="hero-copy">
@@ -143,6 +147,56 @@
             <button class="mini-link" id="viewAll">ดูทั้งหมด</button>
           </div>
           <div class="inventory-grid" id="inventoryGrid"></div>
+        </div>
+      </section>
+
+      <section class="tree-page hidden" id="treePage">
+        <div class="tree-head">
+          <div>
+            <div class="eyebrow">TREE WORLD</div>
+            <h1>🌱 โลกต้นไม้</h1>
+            <p>ปลูกต้นไม้ แล้วรดน้ำและใส่ปุ๋ยด้วยตัวเองเพื่อเร่งการเติบโต</p>
+          </div>
+          <div class="tree-progress-badge"><strong id="treePercentTop">0%</strong><span>การเติบโต</span></div>
+        </div>
+
+        <div class="tree-layout">
+          <div class="tree-main-card">
+            <div class="tree-stage" id="treeStage">
+              <div class="tree-ground"></div>
+              <div class="tree-visual" id="treeVisual">🌱</div>
+              <div class="tree-stage-label" id="treeStageLabel">ยังไม่ได้ปลูกต้นไม้</div>
+            </div>
+            <div class="tree-progress-wrap">
+              <div class="tree-progress-meta"><span>การเติบโต</span><strong id="treePercent">0%</strong></div>
+              <div class="tree-progress"><span id="treeProgressFill"></span></div>
+              <div class="tree-progress-scale"><span>0%</span><span>500%</span><span>800%</span><span>1,000%</span></div>
+            </div>
+            <div class="tree-actions" id="treeActions">
+              <button type="button" class="tree-action plant" id="plantTreeBtn">🌱 ปลูกต้นไม้</button>
+              <button type="button" class="tree-action" data-tree-item="normal_water">💧 น้ำธรรมดา <span id="normalWaterQty">10</span><small>+10%</small></button>
+              <button type="button" class="tree-action special" data-tree-item="special_water">💦 น้ำพิเศษ <span id="specialWaterQty">10</span><small>+25%</small></button>
+              <button type="button" class="tree-action" data-tree-item="normal_fertilizer">🧪 ปุ๋ยธรรมดา <span id="normalFertilizerQty">10</span><small>+15%</small></button>
+              <button type="button" class="tree-action special" data-tree-item="special_fertilizer">✨ ปุ๋ยพิเศษ <span id="specialFertilizerQty">10</span><small>+30%</small></button>
+            </div>
+            <div class="tree-note" id="treeNote">กดปลูกก่อน จากนั้นต้นไม้จะไม่โตเอง ต้องรดน้ำหรือใส่ปุ๋ยเท่านั้น</div>
+          </div>
+
+          <aside class="tree-rewards-card">
+            <div class="section-head"><h2>🏆 รางวัลต้นไม้</h2><span class="demo">3 MILESTONES</span></div>
+            <p class="tree-rewards-intro">ผู้เล่นเห็นล่วงหน้าว่าแต่ละระดับการเติบโตจะได้รับรางวัลอะไร</p>
+            <div class="tree-reward-list">
+              <div class="tree-reward milestone-500" data-tree-milestone="500">
+                <div class="tree-reward-icon">🥉</div><div><span>รางวัลที่ 1</span><b id="treeReward500">ยังไม่ได้ตั้งรางวัล</b><small>ปลดล็อกเมื่อโตถึง 500%</small></div><em id="treeRewardStatus500">🔒</em>
+              </div>
+              <div class="tree-reward milestone-800" data-tree-milestone="800">
+                <div class="tree-reward-icon">🥈</div><div><span>รางวัลที่ 2</span><b id="treeReward800">ยังไม่ได้ตั้งรางวัล</b><small>ปลดล็อกเมื่อโตถึง 800%</small></div><em id="treeRewardStatus800">🔒</em>
+              </div>
+              <div class="tree-reward milestone-1000" data-tree-milestone="1000">
+                <div class="tree-reward-icon">🏆</div><div><span>รางวัลใหญ่</span><b id="treeReward1000">ยังไม่ได้ตั้งรางวัล</b><small>ปลดล็อกเมื่อโตถึง 1,000%</small></div><em id="treeRewardStatus1000">🔒</em>
+              </div>
+            </div>
+          </aside>
         </div>
       </section>
 
