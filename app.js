@@ -49,40 +49,37 @@ const $ = s => document.querySelector(s); const $$ = s => [...document.querySele
 // =========================================================
 const WORLD_TREE_STORAGE_PREFIX = 'mystery_box_world_tree_';
 const WORLD_TREE_MAX_GROWTH = 1000;
-const WORLD_TREE_GROWTH = {
+const WORLD_TREE_GROWTH = Object.freeze({
   normalWater: 10,
   specialWater: 30,
   normalFertilizer: 10,
   specialFertilizer: 30
-};
+});
 
+// One source of truth for all World Tree UI growth values.
+let worldTreeGrowth = 0;
 const WORLD_TREE_REWARDS = [
-  { id: 'tree-reward-500', milestone: 500, title: 'รางวัลที่ 1', name: 'ยังไม่ได้ตั้งรางวัล', icon: '🎁' },
-  { id: 'tree-reward-800', milestone: 800, title: 'รางวัลที่ 2', name: 'ยังไม่ได้ตั้งรางวัล', icon: '🎁' },
-  { id: 'tree-reward-1000', milestone: 1000, title: 'รางวัลใหญ่', name: 'ยังไม่ได้ตั้งรางวัล', icon: '👑' }
+  { id: 'tree-reward-1000', milestone: 1000, title: 'รางวัลที่ 1', name: 'ยังไม่ได้ตั้งรางวัล', icon: '👑', tone: 'gold' },
+  { id: 'tree-reward-800', milestone: 800, title: 'รางวัลที่ 2', name: 'ยังไม่ได้ตั้งรางวัล', icon: '💎', tone: 'purple' },
+  { id: 'tree-reward-500', milestone: 500, title: 'รางวัลที่ 3', name: 'ยังไม่ได้ตั้งรางวัล', icon: '🎁', tone: 'blue' }
 ];
-
 const DEFAULT_WORLD_TREE_STATE = {
   planted: false,
   plantedAt: null,
-  growth: 0,
-  items: {
-    normalWater: 25,
-    specialWater: 15,
-    normalFertilizer: 20,
-    specialFertilizer: 10
-  },
+  items: { normalWater: 25, specialWater: 15, normalFertilizer: 20, specialFertilizer: 10 },
   claimedRewards: []
 };
-
 let worldTreeState = JSON.parse(JSON.stringify(DEFAULT_WORLD_TREE_STATE));
 let worldTreeScene = null;
 
+function clampWorldTreeGrowth(value) {
+  return Math.min(WORLD_TREE_MAX_GROWTH, Math.max(0, Math.round(Number(value) || 0)));
+}
 function cloneWorldTreeState(state) {
+  worldTreeGrowth = clampWorldTreeGrowth(state?.growth ?? 0);
   return {
-    planted: Boolean(state?.planted),
-    plantedAt: state?.plantedAt || null,
-    growth: Math.min(WORLD_TREE_MAX_GROWTH, Math.max(0, Number(state?.growth || 0))),
+    planted: Boolean(state?.planted), plantedAt: state?.plantedAt || null,
+    growth: worldTreeGrowth,
     items: {
       normalWater: Math.max(0, Number(state?.items?.normalWater ?? 25)),
       specialWater: Math.max(0, Number(state?.items?.specialWater ?? 15)),
@@ -92,168 +89,114 @@ function cloneWorldTreeState(state) {
     claimedRewards: Array.isArray(state?.claimedRewards) ? state.claimedRewards.map(String) : []
   };
 }
-
 function getWorldTreeStorageKey() {
   const userId = online?.user?.id;
   return userId ? `${WORLD_TREE_STORAGE_PREFIX}${userId}` : null;
 }
-
 function saveWorldTreeLocal() {
-  const key = getWorldTreeStorageKey();
-  if (!key) return;
-  try { localStorage.setItem(key, JSON.stringify(worldTreeState)); } catch (_) {}
+  const key = getWorldTreeStorageKey(); if (!key) return;
+  try { localStorage.setItem(key, JSON.stringify({ ...worldTreeState, growth: worldTreeGrowth })); } catch (_) {}
 }
-
 function loadWorldTreeLocal() {
-  const key = getWorldTreeStorageKey();
-  if (!key) return null;
-  try {
-    const raw = localStorage.getItem(key);
-    return raw ? cloneWorldTreeState(JSON.parse(raw)) : null;
-  } catch (_) {
-    return null;
-  }
+  const key = getWorldTreeStorageKey(); if (!key) return null;
+  try { const raw = localStorage.getItem(key); return raw ? cloneWorldTreeState(JSON.parse(raw)) : null; } catch (_) { return null; }
 }
-
-function treePercent() {
-  return Math.round((worldTreeState.growth / WORLD_TREE_MAX_GROWTH) * 1000) / 10;
+function rewardState(reward) {
+  if (worldTreeState.claimedRewards.includes(reward.id)) return 'claimed';
+  if (worldTreeGrowth >= reward.milestone) return 'ready';
+  return 'locked';
 }
-
+function rewardCardMarkup(reward) {
+  const state = rewardState(reward);
+  const stateText = state === 'claimed' ? '✓ รับแล้ว' : state === 'ready' ? 'พร้อมรับ' : `ล็อก • ต้องถึง ${reward.milestone}%`;
+  const buttonText = state === 'claimed' ? 'รับแล้ว' : state === 'ready' ? 'รับรางวัล' : `ล็อกอยู่`;
+  return `<article class="tree-reward-card ${state} tone-${reward.tone}">
+    <div class="tree-reward-icon">${reward.icon}</div>
+    <div class="tree-reward-info">
+      <div class="tree-reward-title"><b>${reward.title}</b><span>${reward.milestone}%</span></div>
+      <strong>${reward.name}</strong>
+      <small>${stateText}</small>
+    </div>
+    <button type="button" class="tree-reward-claim" data-tree-reward="${reward.id}" ${state !== 'ready' ? 'disabled' : ''}>${buttonText}</button>
+  </article>`;
+}
 function renderWorldTreeRewards() {
-  const el = $('#treeRewardList');
-  if (!el) return;
-  const ordered = [...WORLD_TREE_REWARDS].sort((a,b) => b.milestone - a.milestone);
-  el.innerHTML = ordered.map(reward => {
-    const reached = worldTreeState.growth >= reward.milestone;
-    const label = reward.milestone === 1000 ? 'รางวัลใหญ่' : reward.title;
-    const gem = reward.milestone === 1000 ? 'gold' : reward.milestone === 800 ? 'purple' : 'blue';
-    return `<div class="tree-reward-card ${reached ? 'reached' : ''}">
-      <div class="tree-reward-icon ${gem}">◆</div>
-      <div class="tree-reward-info">
-        <div class="tree-reward-title"><b>${label}</b><span>${reward.milestone}%</span></div>
-        <strong>${reward.name}</strong>
-        <small>${reached ? '✓ ปลดล็อกแล้ว' : `โตอีก ${reward.milestone - worldTreeState.growth}% เพื่อปลดล็อก`}</small>
-      </div>
-      <div class="tree-reward-state">${reached ? 'ปลดล็อก' : 'รอปลดล็อก'}</div>
-    </div>`;
-  }).join('');
+  const markup = WORLD_TREE_REWARDS.map(rewardCardMarkup).join('');
+  const compact = $('#treeRewardList'); if (compact) compact.innerHTML = markup;
+  const full = $('#treeRewardListFull'); if (full) full.innerHTML = markup;
 }
-
 function updateWorldTreeUI() {
-  const growth = Math.min(WORLD_TREE_MAX_GROWTH, Math.max(0, Number(worldTreeState.growth || 0)));
-  const percent = (growth / WORLD_TREE_MAX_GROWTH) * 100;
+  worldTreeGrowth = clampWorldTreeGrowth(worldTreeGrowth);
+  worldTreeState.growth = worldTreeGrowth;
   const fill = $('#treeProgressFill');
-  if (fill) fill.style.width = `${percent}%`;
-  const text = $('#treeGrowthText');
-  if (text) text.textContent = `${growth} / ${WORLD_TREE_MAX_GROWTH}%`;
-  const badge = $('#treeGrowthBadge');
-  if (badge) badge.textContent = `${growth}%`;
+  if (fill) fill.style.height = `${(worldTreeGrowth / WORLD_TREE_MAX_GROWTH) * 100}%`;
+  const growthValue = $('#treeGrowthValue');
+  if (growthValue) growthValue.textContent = `${worldTreeGrowth.toLocaleString('en-US')}%`;
+  if (growthValue) growthValue.style.bottom = `calc(${(worldTreeGrowth / WORLD_TREE_MAX_GROWTH) * 100}% - 13px)`;
 
   const stage = $('#treeStageLabel');
-  if (stage) {
-    stage.textContent = !worldTreeState.planted
-      ? 'ยังไม่ได้ปลูกต้นไม้'
-      : growth >= WORLD_TREE_MAX_GROWTH
-        ? '🌳 ต้นไม้โลกเติบโตเต็มที่ 1,000%'
-        : `🌱 ต้นไม้กำลังเติบโต ${growth}%`;
-  }
-
+  if (stage) stage.textContent = !worldTreeState.planted ? 'ยังไม่ได้ปลูกต้นไม้' : worldTreeGrowth >= WORLD_TREE_MAX_GROWTH ? '🌳 ต้นไม้โลกสมบูรณ์เต็มที่' : `🌱 ต้นไม้กำลังเติบโต • ${worldTreeGrowth}%`;
   const status = $('#treeStatusMessage');
-  if (status) {
-    status.textContent = !worldTreeState.planted
-      ? 'กด “ปลูกต้นไม้” เพื่อเริ่มต้น'
-      : growth >= WORLD_TREE_MAX_GROWTH
-        ? '🎉 ต้นไม้โตเต็มที่แล้ว ตรวจสอบรางวัลที่แท็บ “รางวัลต้นไม้”'
-        : 'ต้นไม้จะไม่โตเอง ต้องใช้น้ำหรือปุ๋ยเพื่อเพิ่มการเติบโต';
-  }
+  if (status) status.textContent = !worldTreeState.planted ? 'กด “ปลูกต้นไม้” เพื่อเริ่มต้น' : worldTreeGrowth >= WORLD_TREE_MAX_GROWTH ? '🎉 ต้นไม้โตเต็มที่แล้ว • ตรวจสอบรางวัลทางด้านขวา' : 'ต้นไม้จะไม่โตเอง ต้องใช้น้ำหรือปุ๋ยเพื่อเพิ่ม Growth';
 
-  const plantBtn = $('#plantTreeBtn');
-  if (plantBtn) plantBtn.disabled = worldTreeState.planted;
-  ['normalWater','specialWater','normalFertilizer','specialFertilizer'].forEach(type => {
-    const btn = $(`#${type === 'normalWater' ? 'normalWaterBtn' : type === 'specialWater' ? 'specialWaterBtn' : type === 'normalFertilizer' ? 'normalFertilizerBtn' : 'specialFertilizerBtn'}`);
-    const count = $(`#${type === 'normalWater' ? 'normalWaterCount' : type === 'specialWater' ? 'specialWaterCount' : type === 'normalFertilizer' ? 'normalFertilizerCount' : 'specialFertilizerCount'}`);
+  const plantBtn = $('#plantTreeBtn'); if (plantBtn) plantBtn.disabled = worldTreeState.planted;
+  const ids = { normalWater:'normalWaterBtn', specialWater:'specialWaterBtn', normalFertilizer:'normalFertilizerBtn', specialFertilizer:'specialFertilizerBtn' };
+  Object.keys(ids).forEach(type => {
+    const btn = $(`#${ids[type]}`), count = $(`#${type}Count`);
     if (count) count.textContent = worldTreeState.items[type];
-    if (btn) btn.disabled = !worldTreeState.planted || growth >= WORLD_TREE_MAX_GROWTH || worldTreeState.items[type] <= 0;
+    if (btn) btn.disabled = !worldTreeState.planted || worldTreeGrowth >= WORLD_TREE_MAX_GROWTH || worldTreeState.items[type] <= 0;
   });
-  const level = Math.max(1, Math.min(10, Math.floor(growth / 100) + 1));
-  const levelEl = $('#treeLevelText');
-  if (levelEl) levelEl.textContent = String(level);
+  const level = Math.max(1, Math.min(10, Math.floor(worldTreeGrowth / 100) + 1));
+  const levelEl = $('#treeLevelText'); if (levelEl) levelEl.textContent = String(level);
   const plantedAtEl = $('#treePlantedAt');
-  if (plantedAtEl) plantedAtEl.textContent = worldTreeState.plantedAt ? new Date(worldTreeState.plantedAt).toLocaleString('th-TH', {day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit'}) : 'ยังไม่ได้ปลูก';
+  if (plantedAtEl) plantedAtEl.textContent = worldTreeState.plantedAt ? new Date(worldTreeState.plantedAt).toLocaleString('th-TH', {day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'}) : 'ยังไม่ได้ปลูก';
   renderWorldTreeRewards();
-  worldTreeScene?.updateGrowth?.(worldTreeState.planted, growth);
+  worldTreeScene?.updateGrowth?.(worldTreeState.planted, worldTreeGrowth);
 }
-
 async function saveWorldTreeCloud() {
   saveWorldTreeLocal();
-  try {
-    const ok = await online.saveWorldTree(worldTreeState);
-    if (!ok) throw new Error('บันทึกต้นไม้ไม่สำเร็จ');
-    return true;
-  } catch (err) {
-    console.warn('World Tree cloud save unavailable:', err);
-    return false;
-  }
+  try { const ok = await online.saveWorldTree({ ...worldTreeState, growth: worldTreeGrowth }); if (!ok) throw new Error('บันทึกต้นไม้ไม่สำเร็จ'); return true; }
+  catch (err) { console.warn('World Tree cloud save unavailable:', err); return false; }
 }
-
 async function loadWorldTree() {
   const cached = loadWorldTreeLocal();
-  if (cached) {
-    worldTreeState = cached;
-    updateWorldTreeUI();
-  }
+  if (cached) { worldTreeState = cached; updateWorldTreeUI(); }
   try {
     const cloud = await online.getWorldTree();
-    if (cloud) {
-      worldTreeState = cloneWorldTreeState(cloud);
-      saveWorldTreeLocal();
-      updateWorldTreeUI();
-    } else if (cached) {
-      await saveWorldTreeCloud();
-    }
-  } catch (err) {
-    console.warn('World Tree cloud load unavailable:', err);
-  }
+    if (cloud) { worldTreeState = cloneWorldTreeState(cloud); saveWorldTreeLocal(); updateWorldTreeUI(); }
+    else if (cached) await saveWorldTreeCloud();
+  } catch (err) { console.warn('World Tree cloud load unavailable:', err); }
 }
-
 async function changeWorldTree(action) {
-  if (!online?.user) {
-    toast('กรุณาเข้าสู่ระบบก่อนใช้ต้นไม้โลก');
-    return;
-  }
-  if (!worldTreeState.planted && action !== 'plant') {
-    toast('กรุณาปลูกต้นไม้ก่อน');
-    return;
-  }
+  if (!online?.user) { toast('กรุณาเข้าสู่ระบบก่อนใช้ต้นไม้โลก'); return; }
+  if (!worldTreeState.planted && action !== 'plant') { toast('กรุณาปลูกต้นไม้ก่อน'); return; }
   if (action === 'plant') {
     if (worldTreeState.planted) return;
-    worldTreeState.planted = true;
-    worldTreeState.plantedAt = new Date().toISOString();
+    worldTreeState.planted = true; worldTreeState.plantedAt = new Date().toISOString();
   } else {
-    const growth = WORLD_TREE_GROWTH[action];
-    if (!growth || worldTreeState.items[action] <= 0) return;
-    if (worldTreeState.growth >= WORLD_TREE_MAX_GROWTH) {
-      toast('ต้นไม้เติบโตครบ 1,000% แล้ว');
-      return;
-    }
+    const amount = WORLD_TREE_GROWTH[action];
+    if (!amount || worldTreeState.items[action] <= 0 || worldTreeGrowth >= WORLD_TREE_MAX_GROWTH) return;
     worldTreeState.items[action] -= 1;
-    worldTreeState.growth = Math.min(WORLD_TREE_MAX_GROWTH, worldTreeState.growth + growth);
+    worldTreeGrowth = clampWorldTreeGrowth(worldTreeGrowth + amount);
   }
   updateWorldTreeUI();
   const saved = await saveWorldTreeCloud();
   if (!saved) toast('บันทึกต้นไม้ขึ้นคลาวด์ไม่สำเร็จ แต่ข้อมูลถูกเก็บไว้ในเครื่องนี้');
 }
-
+async function claimWorldTreeReward(rewardId) {
+  const reward = WORLD_TREE_REWARDS.find(r => r.id === rewardId); if (!reward) return;
+  if (worldTreeGrowth < reward.milestone || worldTreeState.claimedRewards.includes(reward.id)) return;
+  worldTreeState.claimedRewards.push(reward.id);
+  updateWorldTreeUI();
+  const saved = await saveWorldTreeCloud();
+  if (!saved) toast('รับรางวัลแล้ว แต่ซิงก์ขึ้นคลาวด์ไม่สำเร็จ');
+  else toast(`รับ ${reward.title} แล้ว`);
+}
 function createWorldTreeModel() {
   const root = new THREE.Group();
   const trunkMat = new THREE.MeshStandardMaterial({color:0x5a351f,roughness:.92,flatShading:true});
   const barkLight = new THREE.MeshStandardMaterial({color:0x7a4a27,roughness:.9,flatShading:true});
-  const leafMats = [
-    new THREE.MeshStandardMaterial({color:0x49c83e,roughness:.78,flatShading:true}),
-    new THREE.MeshStandardMaterial({color:0x73e34b,roughness:.75,flatShading:true}),
-    new THREE.MeshStandardMaterial({color:0x2d9d39,roughness:.8,flatShading:true}),
-    new THREE.MeshStandardMaterial({color:0x8bea51,roughness:.74,flatShading:true})
-  ];
+  const leafMats = [0x49c83e,0x73e34b,0x2d9d39,0x8bea51].map(color => new THREE.MeshStandardMaterial({color,roughness:.78,flatShading:true}));
   const grassMat = new THREE.MeshStandardMaterial({color:0x477c31,roughness:1,flatShading:true});
   const soilMat = new THREE.MeshStandardMaterial({color:0x50371f,roughness:1,flatShading:true});
   const island = new THREE.Group();
@@ -261,19 +204,17 @@ function createWorldTreeModel() {
   const soil = new THREE.Mesh(new THREE.CylinderGeometry(1.62,1.38,.36,40),soilMat); soil.position.y=-1.59; island.add(soil); root.add(island);
   const trunk = new THREE.Mesh(new THREE.CylinderGeometry(.19,.35,2.35,11),trunkMat); trunk.position.y=-.35; root.add(trunk);
   const makeBranch=(x,y,z,sx,sy,sz,rz,mat)=>{const b=new THREE.Mesh(new THREE.CylinderGeometry(.075,.16,1.2,9),mat);b.position.set(x,y,z);b.scale.set(sx,sy,sz);b.rotation.z=rz;return b};
-  root.add(makeBranch(-.42,.18,0,.82,.9,.8,-.62,barkLight));
-  root.add(makeBranch(.43,.28,.02,.82,.9,.8,.62,barkLight));
-  root.add(makeBranch(-.12,.58,.08,.65,.9,.65,-.18,trunkMat));
-  root.add(makeBranch(.18,.78,-.02,.55,.78,.55,.2,barkLight));
+  root.add(makeBranch(-.42,.18,0,.82,.9,.8,-.62,barkLight),makeBranch(.43,.28,.02,.82,.9,.8,.62,barkLight),makeBranch(-.12,.58,.08,.65,.9,.65,-.18,trunkMat),makeBranch(.18,.78,-.02,.55,.78,.55,.2,barkLight));
   const leafClusters=[];
   const clusters=[[0,1.28,.03,.92,0],[-.62,1.0,.03,.63,1],[.62,1.06,.03,.65,2],[-.25,1.67,.02,.65,3],[.32,1.75,.04,.62,0],[-.85,.73,.04,.44,2],[.84,.78,.02,.46,1],[0,2.02,.02,.48,3]];
   clusters.forEach(([x,y,z,sc,m])=>{const g=new THREE.Group();const a=new THREE.Mesh(new THREE.IcosahedronGeometry(1,2),leafMats[m]);a.scale.set(sc*1.05,sc*.78,sc*.92);g.position.set(x,y,z);g.add(a);const b=new THREE.Mesh(new THREE.IcosahedronGeometry(1,1),leafMats[(m+1)%leafMats.length]);b.position.set(-sc*.12,sc*.08,.1);b.scale.set(sc*.7,sc*.45,sc*.65);g.add(b);leafClusters.push(g);root.add(g)});
   const gemMat=new THREE.MeshStandardMaterial({color:0x9cff63,emissive:0x2b9d3d,emissiveIntensity:1.2,roughness:.25,metalness:.15});
   const gem=new THREE.Mesh(new THREE.OctahedronGeometry(.14),gemMat);gem.position.y=2.42;root.add(gem);
-  root.userData.updateGrowth=(planted,growth)=>{const n=planted?Math.max(.08,growth/WORLD_TREE_MAX_GROWTH):.035;root.scale.setScalar(.46+n*.74);gem.visible=planted;leafClusters.forEach((g,i)=>{const threshold=[.02,.10,.16,.23,.30,.40,.52,.64][i];g.visible=planted?n>=threshold:i===0})};
+  let currentScale=.45, targetScale=.45, targetGrowth=0;
+  root.userData.updateGrowth=(planted,growth)=>{targetGrowth=growth;targetScale=planted?.46+(growth/WORLD_TREE_MAX_GROWTH)*.72:.40;gem.visible=planted;};
+  root.userData.animate=()=>{currentScale += (targetScale-currentScale)*.08;root.scale.setScalar(currentScale);const n=targetGrowth/WORLD_TREE_MAX_GROWTH;leafClusters.forEach((g,i)=>{const threshold=[.01,.12,.25,.38,.50,.66,.80,.96][i];g.visible=targetGrowth>0? n>=threshold : i===0;});};
   return root;
 }
-
 function mountWorldTreeScene(){
   const canvas=$('#worldTreeCanvas'); if(!canvas) return;
   const scene=new THREE.Scene();
@@ -281,33 +222,25 @@ function mountWorldTreeScene(){
   const renderer=makeRenderer(canvas); renderer.setPixelRatio(Math.min(window.devicePixelRatio||1,1.6));
   const controls=new OrbitControls(camera,renderer.domElement); controls.enableDamping=true; controls.dampingFactor=.06; controls.enablePan=false; controls.minDistance=4.8; controls.maxDistance=8; controls.target.set(0,.35,0);
   scene.add(new THREE.HemisphereLight(0xd9ffe3,0x0b1624,1.7));
-  const mainLight=new THREE.DirectionalLight(0xffffff,2.8);mainLight.position.set(3,6,4);scene.add(mainLight);
-  const greenLight=new THREE.PointLight(0x55f58c,3.2,7);greenLight.position.set(-2,2.8,2);scene.add(greenLight);
-  const blueLight=new THREE.PointLight(0x4aa9ff,1.2,6);blueLight.position.set(2,-.2,3);scene.add(blueLight);
-  const tree=createWorldTreeModel();scene.add(tree);worldTreeScene={updateGrowth:(planted,growth)=>tree.userData.updateGrowth(planted,growth),renderer,camera};tree.userData.updateGrowth(worldTreeState.planted,worldTreeState.growth);
-  const tick=()=>{controls.update();resize(renderer,canvas);camera.aspect=canvas.clientWidth/Math.max(1,canvas.clientHeight);camera.updateProjectionMatrix();renderer.render(scene,camera);requestAnimationFrame(tick)};tick();
+  const mainLight=new THREE.DirectionalLight(0xffffff,2.8); mainLight.position.set(3,6,4); scene.add(mainLight);
+  const greenLight=new THREE.PointLight(0x55f58c,3.2,7); greenLight.position.set(-2,2.8,2); scene.add(greenLight);
+  const blueLight=new THREE.PointLight(0x4aa9ff,1.2,6); blueLight.position.set(2,-.2,3); scene.add(blueLight);
+  const tree=createWorldTreeModel(); scene.add(tree); worldTreeScene={updateGrowth:(planted,growth)=>tree.userData.updateGrowth(planted,growth)}; tree.userData.updateGrowth(worldTreeState.planted,worldTreeGrowth);
+  const tick=()=>{controls.update();tree.userData.animate();resize(renderer,canvas);camera.aspect=canvas.clientWidth/Math.max(1,canvas.clientHeight);camera.updateProjectionMatrix();renderer.render(scene,camera);requestAnimationFrame(tick)}; tick();
 }
-
 $$('.world-tree-tab').forEach(btn => btn.addEventListener('click', () => {
-  $$('.world-tree-tab').forEach(x => x.classList.remove('active'));
-  $$('.world-tree-tab-panel').forEach(x => x.classList.remove('active'));
-  btn.classList.add('active');
-  const panel = btn.dataset.treeTab === 'rewards' ? $('#treeRewardsTabPanel') : $('#treeTabPanel');
-  panel?.classList.add('active');
+  $$('.world-tree-tab').forEach(x => x.classList.remove('active')); $$('.world-tree-tab-panel').forEach(x => x.classList.remove('active')); btn.classList.add('active');
+  const panel = btn.dataset.treeTab === 'rewards' ? $('#treeRewardsTabPanel') : $('#treeTabPanel'); panel?.classList.add('active');
 }));
-
 $$('[data-tree-tab="rewards"]').filter(btn => !btn.classList.contains('world-tree-tab')).forEach(btn => btn.addEventListener('click', () => {
-  $$('.world-tree-tab').forEach(x => x.classList.toggle('active', x.dataset.treeTab === 'rewards'));
-  $('#treeTabPanel')?.classList.remove('active');
-  $('#treeRewardsTabPanel')?.classList.add('active');
+  $$('.world-tree-tab').forEach(x => x.classList.toggle('active', x.dataset.treeTab === 'rewards')); $('#treeTabPanel')?.classList.remove('active'); $('#treeRewardsTabPanel')?.classList.add('active');
 }));
-
 $('#plantTreeBtn')?.addEventListener('click', () => changeWorldTree('plant'));
 $('#normalWaterBtn')?.addEventListener('click', () => changeWorldTree('normalWater'));
 $('#specialWaterBtn')?.addEventListener('click', () => changeWorldTree('specialWater'));
 $('#normalFertilizerBtn')?.addEventListener('click', () => changeWorldTree('normalFertilizer'));
 $('#specialFertilizerBtn')?.addEventListener('click', () => changeWorldTree('specialFertilizer'));
-
+document.addEventListener('click', e => { const btn=e.target.closest?.('[data-tree-reward]'); if(btn) claimWorldTreeReward(btn.dataset.treeReward); });
 mountWorldTreeScene();
 updateWorldTreeUI();
 
@@ -887,6 +820,7 @@ function showGame(profile, user) {
 function showLoggedOut() {
   document.body.classList.add('auth-pending');
   worldTreeState = JSON.parse(JSON.stringify(DEFAULT_WORLD_TREE_STATE));
+  worldTreeGrowth = 0;
   updateWorldTreeUI();
   authScreen?.classList.remove('hidden');
   accountModal?.classList.add('hidden');

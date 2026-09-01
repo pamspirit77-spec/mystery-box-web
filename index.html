@@ -108,11 +108,7 @@
           <div class="world-tree-title-wrap">
             <div class="eyebrow tree-eyebrow">WORLD TREE</div>
             <h1>🍃 <span>ต้นไม้โลก</span> <button class="tree-help-btn" type="button" title="วิธีเล่น">?</button></h1>
-            <p>ปลูกต้นไม้โลกเพื่อรับรางวัลวัสดุพิเศษ!</p>
-          </div>
-          <div class="world-tree-growth-badge">
-            <small>🍃 การเติบโตปัจจุบัน</small>
-            <strong id="treeGrowthBadge">0%</strong>
+            <p>ปลูกต้นไม้โลก แล้วใช้น้ำหรือปุ๋ยเพื่อเพิ่มการเติบโต</p>
           </div>
         </div>
 
@@ -127,66 +123,79 @@
               <section class="world-tree-visual-card">
                 <div class="world-tree-visual-glow"></div>
                 <canvas id="worldTreeCanvas"></canvas>
-                <div class="tree-growth-ruler" aria-hidden="true">
+                <div class="tree-growth-ruler" aria-label="ระดับการเติบโตของต้นไม้">
                   <div class="ruler-cap top">🍃</div>
-                  <div class="ruler-line"></div>
-                  <span class="ruler-mark mark-1000">1000%</span>
-                  <span class="ruler-mark mark-800">800%</span>
-                  <span class="ruler-mark mark-500">500%</span>
-                  <span class="ruler-mark mark-0">0%</span>
-                  <div class="ruler-cap bottom">🍃</div>
+                  <div class="ruler-track">
+                    <div class="ruler-fill" id="treeProgressFill"></div>
+                    <span class="ruler-marker mark-1000"><i></i><b>1,000%</b></span>
+                    <span class="ruler-marker mark-800"><i></i><b>800%</b></span>
+                    <span class="ruler-marker mark-500"><i></i><b>500%</b></span>
+                    <span class="ruler-marker mark-0"><i></i><b>0%</b></span>
+                    <span class="ruler-current" id="treeGrowthValue">0%</span>
+                  </div>
+                  <div class="ruler-cap bottom">🌱</div>
                 </div>
                 <div class="world-tree-stage-label" id="treeStageLabel">ยังไม่ได้ปลูกต้นไม้</div>
                 <div class="tree-plant-overlay">
                   <button type="button" class="tree-plant-btn" id="plantTreeBtn">🌱 ปลูกต้นไม้</button>
-                  <div>หมุนดูต้นไม้ได้ • ดูแลด้วยน้ำและปุ๋ย</div>
+                  <div>ต้นไม้จะไม่โตเอง • ใช้น้ำและปุ๋ยเพื่อเพิ่ม Growth</div>
                 </div>
               </section>
 
               <section class="world-tree-right-column">
-                <div class="tree-growth-panel">
-                  <div class="tree-growth-panel-head">
-                    <span>🌱 ความคืบหน้าต้นไม้</span>
-                    <strong id="treeGrowthText">0 / 1,000%</strong>
+                <div class="tree-section-card tree-rewards-card">
+                  <div class="tree-section-title">
+                    <span>🎁 รางวัลการเติบโต</span>
+                    <span class="tree-reward-rule">500% • 800% • 1,000%</span>
                   </div>
-                  <div class="tree-progress-track"><div class="tree-progress-fill" id="treeProgressFill"></div></div>
-                  <div class="tree-milestones"><span>0%</span><span>500%</span><span>800%</span><span>1,000%</span></div>
-                  <div class="tree-status-message" id="treeStatusMessage">กด “ปลูกต้นไม้” เพื่อเริ่มต้น</div>
-                </div>
-
-                <div class="tree-section-card">
-                  <div class="tree-section-title"><span>🎁 รางวัลการเติบโต</span><button type="button" class="tree-see-all" data-tree-tab="rewards">ดูทั้งหมด</button></div>
-                  <div class="tree-mini-rewards">
-                    <div class="tree-mini-reward milestone-1000"><span class="gem">◆</span><b>1,000%</b><small>รางวัลใหญ่</small></div>
-                    <div class="tree-mini-reward milestone-800"><span class="gem">◆</span><b>800%</b><small>รางวัลที่ 2</small></div>
-                    <div class="tree-mini-reward milestone-500"><span class="gem">◆</span><b>500%</b><small>รางวัลที่ 1</small></div>
-                  </div>
+                  <div class="tree-reward-list compact" id="treeRewardList"></div>
                 </div>
 
                 <div class="tree-section-card tree-items-card">
-                  <div class="tree-section-title"><span>🍃 ไอเท็มบำรุงต้นไม้</span><span class="tree-info-dot" title="ใช้ไอเท็มเพื่อเพิ่มการเติบโต">i</span></div>
-                  <div class="world-tree-actions" id="treeActions">
-                    <button type="button" class="tree-action" id="normalWaterBtn"><span class="tree-item-icon water">💧</span><span class="tree-item-copy"><b>น้ำธรรมดา</b><small>เพิ่มการเติบโต 10%</small></span><em>x<span id="normalWaterCount">25</span></em><strong>ใช้</strong></button>
-                    <button type="button" class="tree-action special" id="specialWaterBtn"><span class="tree-item-icon special-water">💦</span><span class="tree-item-copy"><b>น้ำพิเศษ</b><small>เพิ่มการเติบโต 30%</small></span><em>x<span id="specialWaterCount">15</span></em><strong>ใช้</strong></button>
-                    <button type="button" class="tree-action" id="normalFertilizerBtn"><span class="tree-item-icon fertilizer">🌿</span><span class="tree-item-copy"><b>ปุ๋ยธรรมดา</b><small>เพิ่มการเติบโต 10%</small></span><em>x<span id="normalFertilizerCount">20</span></em><strong>ใช้</strong></button>
-                    <button type="button" class="tree-action special" id="specialFertilizerBtn"><span class="tree-item-icon special-fertilizer">🌿</span><span class="tree-item-copy"><b>ปุ๋ยพิเศษ</b><small>เพิ่มการเติบโต 30%</small></span><em>x<span id="specialFertilizerCount">10</span></em><strong>ใช้</strong></button>
+                  <div class="tree-section-title">
+                    <span>🍃 ไอเทมบำรุงต้นไม้</span>
+                    <span class="tree-info-dot" title="ใช้ไอเทมเพื่อเพิ่ม Growth">i</span>
                   </div>
+                  <div class="world-tree-actions" id="treeActions">
+                    <button type="button" class="tree-action" id="normalWaterBtn">
+                      <span class="tree-item-icon water">💧</span>
+                      <span class="tree-item-copy"><b>น้ำธรรมดา</b><small>+10% Growth</small></span>
+                      <em>x<span id="normalWaterCount">25</span></em><strong>ใช้</strong>
+                    </button>
+                    <button type="button" class="tree-action special-water-card" id="specialWaterBtn">
+                      <span class="tree-item-icon special-water">💦</span>
+                      <span class="tree-item-copy"><b>น้ำพิเศษ</b><small>+30% Growth</small></span>
+                      <em>x<span id="specialWaterCount">15</span></em><strong>ใช้</strong>
+                    </button>
+                    <button type="button" class="tree-action" id="normalFertilizerBtn">
+                      <span class="tree-item-icon fertilizer">🌿</span>
+                      <span class="tree-item-copy"><b>ปุ๋ยธรรมดา</b><small>+10% Growth</small></span>
+                      <em>x<span id="normalFertilizerCount">20</span></em><strong>ใช้</strong>
+                    </button>
+                    <button type="button" class="tree-action special-fertilizer-card" id="specialFertilizerBtn">
+                      <span class="tree-item-icon special-fertilizer">🌿</span>
+                      <span class="tree-item-copy"><b>ปุ๋ยพิเศษ</b><small>+30% Growth</small></span>
+                      <em>x<span id="specialFertilizerCount">10</span></em><strong>ใช้</strong>
+                    </button>
+                  </div>
+                  <div class="tree-status-message" id="treeStatusMessage">กด “ปลูกต้นไม้” เพื่อเริ่มต้น</div>
+                </div>
+
+                <div class="tree-info-strip">
+                  <div><span>🌳 ระดับต้นไม้</span><b id="treeLevelText">1</b></div>
+                  <div><span>📅 ปลูกตั้งแต่</span><b id="treePlantedAt">ยังไม่ได้ปลูก</b></div>
                 </div>
               </section>
             </div>
 
             <div class="world-tree-bottom-grid">
-              <div class="tree-info-card">
-                <div class="tree-section-title"><span>🌳 ข้อมูลต้นไม้</span></div>
-                <div class="tree-info-stats"><span>🌳 ระดับต้นไม้ <b id="treeLevelText">1</b></span><i></i><span>💧 ปลูกตั้งแต่ <b id="treePlantedAt">ยังไม่ได้ปลูก</b></span></div>
-              </div>
               <div class="tree-info-card tree-daily-card">
                 <div class="tree-section-title"><span>⚡ กิจกรรมประจำวัน</span></div>
-                <div class="daily-task"><span class="daily-icon">💧</span><span>รดน้ำต้นไม้ 1 ครั้ง<br><small>(0/1)</small></span><span class="daily-reward">🍃 x50</span><button type="button">รับรางวัล</button></div>
+                <div class="daily-task"><span class="daily-icon">💧</span><span>รดน้ำต้นไม้ 1 ครั้ง<br><small>(0/1)</small></span><span class="daily-reward">🍃 x50</span><button type="button" disabled>รับรางวัล</button></div>
               </div>
               <div class="tree-info-card tree-tip-card">
                 <div class="tree-section-title"><span>🌱 เคล็ดลับ</span></div>
-                <p>ใช้<strong>น้ำพิเศษและปุ๋ยพิเศษ</strong><br>จะช่วยให้ต้นไม้เติบโตได้เร็วขึ้นมาก!</p>
+                <p>ใช้<strong>น้ำพิเศษและปุ๋ยพิเศษ</strong> เพื่อเพิ่ม Growth ได้เร็วขึ้น</p>
                 <span class="tip-tree">🌳</span>
               </div>
             </div>
@@ -194,10 +203,10 @@
 
           <div class="world-tree-tab-panel" id="treeRewardsTabPanel">
             <div class="tree-reward-intro">
-              <div>🎁 <b>รางวัลการเติบโต</b></div>
-              <span>ดูรางวัลที่ปลดล็อกตามระดับการเติบโตของต้นไม้โลก</span>
+              <div>🎁 <b>รางวัลต้นไม้โลก</b></div>
+              <span>ถึง Milestone แล้วกด “รับรางวัล” ได้จากการ์ดด้านล่าง</span>
             </div>
-            <div class="tree-reward-list" id="treeRewardList"></div>
+            <div class="tree-reward-list full" id="treeRewardListFull"></div>
           </div>
         </div>
       </section>
