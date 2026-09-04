@@ -285,7 +285,16 @@
     </div>
   </div>
 </section>
-              <section class="game-panel" data-game-panel-view="weapons"><div class="game-empty-panel"><span>⚔️</span><h2>อาวุธ</h2><p>พื้นที่สำหรับคลังอาวุธ อุปกรณ์ และรายละเอียดไอเท็ม</p><small>ระบบอาวุธจะเพิ่มในขั้นตอนถัดไป</small><button class="game-panel-back" type="button" data-game-panel="play">← กลับ Game Lobby</button></div></section>
+              <section class="game-panel" data-game-panel-view="weapons">
+                <div class="game-system-page weapons-page">
+                  <div class="game-system-head"><div><span class="game-section-kicker">WEAPON INVENTORY</span><h2>อาวุธ</h2><p>ดูอาวุธทั้งหมด เลือกสวมใส่ และไปยังระบบตีบวก</p></div><button class="game-panel-back" type="button" data-game-panel="play">← กลับ Game Lobby</button></div>
+                  <div id="weaponPageFeedback" class="weapon-feedback" aria-live="polite"></div>
+                  <div class="weapon-page-grid">
+                    <div class="weapon-page-list-card"><div class="inventory-section-head"><div><span class="game-section-kicker">WEAPON INVENTORY</span><h3>รายการอาวุธ</h3></div><span id="weaponPageCount"></span></div><div id="weaponPageList" class="weapon-inventory-list"></div></div>
+                    <div class="weapon-page-detail-card" id="weaponPageDetail"></div>
+                  </div>
+                </div>
+              </section>
               <section class="game-panel" data-game-panel-view="inventory">
   <div class="game-system-page game-inventory-page">
     <div class="game-system-head"><div><span class="game-section-kicker">PLAYER INVENTORY</span><h2>Inventory / คลังไอเท็ม</h2><p>ศูนย์กลางข้อมูลตัวละคร อาวุธ และไอเท็มจากระบบ Game Lobby</p></div><button class="game-panel-back" type="button" data-game-panel="play">← กลับ Game Lobby</button></div>
