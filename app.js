@@ -2017,3 +2017,12 @@ window.addEventListener('resize', () => scenes.forEach(o => {
   o.camera.aspect = o.renderer.domElement.clientWidth / o.renderer.domElement.clientHeight;
   o.camera.updateProjectionMatrix();
 }));
+// Game Lobby navigation — isolated from existing Mystery Box systems.
+$$('#gameLobbyPage .game-menu-item, #gameLobbyPage .game-primary-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const panel = btn.dataset.gamePanel;
+    if (!panel) return;
+    $$('#gameLobbyPage .game-menu-item').forEach(item => item.classList.toggle('active', item.dataset.gamePanel === panel));
+    $$('#gameLobbyPage .game-panel').forEach(view => view.classList.toggle('active', view.dataset.gamePanelView === panel));
+  });
+});

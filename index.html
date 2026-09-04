@@ -238,22 +238,85 @@
       </section>
 
       <section class="game-lobby-page hidden" id="gameLobbyPage">
-        <div class="game-lobby-card">
-          <div class="game-lobby-header">
-            <div>
-              <div class="eyebrow">GAME LOBBY</div>
-              <h1>🎮 Game Lobby</h1>
-              <p>พื้นที่สำหรับเข้าสู่ระบบเกมและฟีเจอร์เกมที่จะเพิ่มในขั้นตอนต่อไป</p>
+        <div class="game-lobby-shell">
+          <div class="game-lobby-topbar">
+            <div class="game-lobby-brand">
+              <div class="game-lobby-logo">⚔️</div>
+              <div>
+                <div class="game-lobby-kicker">PHYSICS BATTLE</div>
+                <h1>Game Lobby</h1>
+                <p>เตรียมพร้อมสำหรับสนามประลอง 2D ของคุณ</p>
+              </div>
             </div>
-            <button class="game-lobby-back-btn" id="gameLobbyBackHome" type="button">🏠 กลับหน้าหลัก</button>
+            <div class="game-lobby-actions">
+              <div class="game-currency" title="เงินในเกม">🪙 <strong id="gameLobbyCoins">24</strong> <span>COIN</span></div>
+              <button class="game-lobby-back-btn" id="gameLobbyBackHome" type="button">↩ กลับเว็บไซต์หลัก</button>
+            </div>
           </div>
 
-          <div class="game-lobby-content">
-            <div class="game-lobby-placeholder">
-              <div class="game-lobby-placeholder-icon">🎮</div>
-              <h2>เตรียมพร้อมสำหรับเกม</h2>
-              <p>หน้านี้เป็นโครงสร้างเริ่มต้นของ Game Lobby</p>
-              <span>ระบบตัวละคร • ระบบเกม • การต่อสู้ จะเพิ่มในขั้นตอนถัดไป</span>
+          <div class="game-lobby-layout">
+            <aside class="game-lobby-menu" aria-label="เมนูเกม">
+              <div class="game-menu-label">MAIN MENU</div>
+              <button class="game-menu-item active" type="button" data-game-panel="play">
+                <span class="game-menu-icon">▶</span><span>เล่นเกม</span><b>›</b>
+              </button>
+              <button class="game-menu-item" type="button" data-game-panel="characters">
+                <span class="game-menu-icon">👤</span><span>ตัวละคร</span><b>›</b>
+              </button>
+              <button class="game-menu-item" type="button" data-game-panel="weapons">
+                <span class="game-menu-icon">⚔</span><span>อาวุธ</span><b>›</b>
+              </button>
+              <button class="game-menu-item" type="button" data-game-panel="shop">
+                <span class="game-menu-icon">🛒</span><span>ร้านค้า</span><b>›</b>
+              </button>
+              <button class="game-menu-item" type="button" data-game-panel="missions">
+                <span class="game-menu-icon">🎯</span><span>ภารกิจ / ความสำเร็จ</span><b>›</b>
+              </button>
+              <button class="game-menu-item" type="button" data-game-panel="ranking">
+                <span class="game-menu-icon">🏆</span><span>กระดานอันดับ</span><b>›</b>
+              </button>
+              <div class="game-menu-divider"></div>
+              <button class="game-menu-item" type="button" data-game-panel="profile">
+                <span class="game-menu-icon">◎</span><span>โปรไฟล์</span><b>›</b>
+              </button>
+              <button class="game-menu-item" type="button" data-game-panel="settings">
+                <span class="game-menu-icon">⚙</span><span>ตั้งค่า</span><b>›</b>
+              </button>
+            </aside>
+
+            <div class="game-lobby-main">
+              <section class="game-panel active" data-game-panel-view="play">
+                <div class="game-hero">
+                  <div class="game-hero-copy">
+                    <span class="game-status-pill">● LOBBY READY</span>
+                    <h2>พร้อมเข้าสู่สนาม<br><em>Physics Battle</em></h2>
+                    <p>ศูนย์กลางเกมสำหรับเลือกโหมดและเริ่มการผจญภัย ระบบการเล่นจริงจะถูกเพิ่มในขั้นตอนถัดไป</p>
+                    <button class="game-primary-btn" type="button" data-game-panel="play">▶ เล่นเกม</button>
+                  </div>
+                  <div class="game-arena-preview" aria-hidden="true">
+                    <div class="arena-stars">✦　·　✧　　·　✦</div>
+                    <div class="arena-platform platform-a"></div>
+                    <div class="arena-platform platform-b"></div>
+                    <div class="arena-character">⚔️</div>
+                    <div class="arena-target">🎯</div>
+                    <div class="arena-trajectory"></div>
+                  </div>
+                </div>
+                <div class="game-feature-grid">
+                  <div class="game-feature-card"><span>🎮</span><strong>Battle</strong><small>โหมดการเล่น</small></div>
+                  <div class="game-feature-card"><span>🧍</span><strong>Heroes</strong><small>ตัวละครของคุณ</small></div>
+                  <div class="game-feature-card"><span>⚒</span><strong>Gear</strong><small>อุปกรณ์และอาวุธ</small></div>
+                  <div class="game-feature-card"><span>🏅</span><strong>Rank</strong><small>อันดับผู้เล่น</small></div>
+                </div>
+              </section>
+
+              <section class="game-panel" data-game-panel-view="characters"><div class="game-empty-panel"><span>👤</span><h2>ตัวละคร</h2><p>พื้นที่สำหรับจัดการตัวละครและข้อมูลฮีโร่</p><small>ระบบจะเพิ่มในขั้นตอนถัดไป</small></div></section>
+              <section class="game-panel" data-game-panel-view="weapons"><div class="game-empty-panel"><span>⚔️</span><h2>อาวุธ</h2><p>พื้นที่สำหรับคลังอาวุธ อุปกรณ์ และการจัดชุด</p><small>ระบบจะเพิ่มในขั้นตอนถัดไป</small></div></section>
+              <section class="game-panel" data-game-panel-view="shop"><div class="game-empty-panel"><span>🛒</span><h2>ร้านค้า</h2><p>พื้นที่สำหรับร้านค้าและไอเทมภายในเกม</p><small>ระบบจะเพิ่มในขั้นตอนถัดไป</small></div></section>
+              <section class="game-panel" data-game-panel-view="missions"><div class="game-empty-panel"><span>🎯</span><h2>ภารกิจ / ความสำเร็จ</h2><p>พื้นที่สำหรับภารกิจ รางวัล และ Achievement</p><small>ระบบจะเพิ่มในขั้นตอนถัดไป</small></div></section>
+              <section class="game-panel" data-game-panel-view="ranking"><div class="game-empty-panel"><span>🏆</span><h2>กระดานอันดับ</h2><p>พื้นที่สำหรับ Leaderboard และอันดับผู้เล่น</p><small>ระบบจะเพิ่มในขั้นตอนถัดไป</small></div></section>
+              <section class="game-panel" data-game-panel-view="profile"><div class="game-empty-panel"><span>◎</span><h2>โปรไฟล์</h2><p>พื้นที่สำหรับข้อมูลผู้เล่น สถิติ และความคืบหน้า</p><small>ระบบจะเพิ่มในขั้นตอนถัดไป</small></div></section>
+              <section class="game-panel" data-game-panel-view="settings"><div class="game-empty-panel"><span>⚙️</span><h2>ตั้งค่า</h2><p>พื้นที่สำหรับการตั้งค่าเกมและการควบคุม</p><small>ระบบจะเพิ่มในขั้นตอนถัดไป</small></div></section>
             </div>
           </div>
         </div>
