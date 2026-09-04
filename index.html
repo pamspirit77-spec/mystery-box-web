@@ -286,15 +286,21 @@
   </div>
 </section>
               <section class="game-panel" data-game-panel-view="weapons">
-                <div class="game-system-page weapons-page">
-                  <div class="game-system-head"><div><span class="game-section-kicker">WEAPON INVENTORY</span><h2>อาวุธ</h2><p>ดูอาวุธทั้งหมด เลือกสวมใส่ และไปยังระบบตีบวก</p></div><button class="game-panel-back" type="button" data-game-panel="play">← กลับ Game Lobby</button></div>
-                  <div id="weaponPageFeedback" class="weapon-feedback" aria-live="polite"></div>
-                  <div class="weapon-page-grid">
-                    <div class="weapon-page-list-card"><div class="inventory-section-head"><div><span class="game-section-kicker">WEAPON INVENTORY</span><h3>รายการอาวุธ</h3></div><span id="weaponPageCount"></span></div><div id="weaponPageList" class="weapon-inventory-list"></div></div>
-                    <div class="weapon-page-detail-card" id="weaponPageDetail"></div>
-                  </div>
-                </div>
-              </section>
+  <div class="game-system-page weapons-page">
+    <div class="game-system-head">
+      <div><span class="game-section-kicker">WEAPON INVENTORY</span><h2>อาวุธ</h2><p>จัดการอาวุธ เลือกสวมใส่ และเข้าสู่ระบบตีบวก</p></div>
+      <button class="game-panel-back" type="button" data-game-panel="play">← กลับ Game Lobby</button>
+    </div>
+    <div id="weaponPageStatus" class="weapon-feedback" aria-live="polite"></div>
+    <div class="weapon-page-grid">
+      <div class="weapon-page-list-card">
+        <div class="inventory-section-head"><div><span class="game-section-kicker">WEAPON INVENTORY</span><h3>รายการอาวุธ</h3></div><span id="weaponPageCount"></span></div>
+        <div id="weaponPageList" class="weapon-inventory-list"></div>
+      </div>
+      <div class="weapon-page-detail-card" id="weaponPageDetail"></div>
+    </div>
+  </div>
+</section>
               <section class="game-panel" data-game-panel-view="inventory">
   <div class="game-system-page game-inventory-page">
     <div class="game-system-head"><div><span class="game-section-kicker">PLAYER INVENTORY</span><h2>Inventory / คลังไอเท็ม</h2><p>ศูนย์กลางข้อมูลตัวละคร อาวุธ และไอเท็มจากระบบ Game Lobby</p></div><button class="game-panel-back" type="button" data-game-panel="play">← กลับ Game Lobby</button></div>
@@ -326,21 +332,7 @@
                   <div id="shopProductGrid" class="shop-product-grid"></div>
                 </div>
               </section>
-              <section class="game-panel" data-game-panel-view="missions">
-  <div class="game-system-page mission-page">
-    <div class="game-system-head">
-      <div><span class="game-section-kicker">MISSION & ACHIEVEMENT</span><h2>ภารกิจ / ความสำเร็จ</h2><p>ติดตามภารกิจ รับรางวัล และดูความสำเร็จของผู้เล่น</p></div>
-      <button class="game-panel-back" type="button" data-game-panel="play">← กลับ Game Lobby</button>
-    </div>
-    <div class="mission-tabs" role="tablist" aria-label="ภารกิจและความสำเร็จ">
-      <button type="button" class="mission-tab active" data-mission-tab="mission">🎯 ภารกิจ</button>
-      <button type="button" class="mission-tab" data-mission-tab="achievement">🏆 ความสำเร็จ</button>
-    </div>
-    <div id="missionFeedback" class="mission-feedback" aria-live="polite"></div>
-    <div class="mission-tab-panel active" data-mission-view="mission"><div id="missionList" class="mission-list"></div></div>
-    <div class="mission-tab-panel" data-mission-view="achievement"><div id="achievementList" class="achievement-list"></div></div>
-  </div>
-</section>
+              <section class="game-panel" data-game-panel-view="missions"><div class="game-empty-panel"><span>🎯</span><h2>ภารกิจ / ความสำเร็จ</h2><p>พื้นที่สำหรับภารกิจ Achievement และรางวัล</p><small>ระบบจริงจะเพิ่มในขั้นตอนถัดไป</small><button class="game-panel-back" type="button" data-game-panel="play">← กลับ Game Lobby</button></div></section>
               <section class="game-panel" data-game-panel-view="ranking"><div class="game-empty-panel"><span>🏆</span><h2>กระดานอันดับ</h2><p>พื้นที่สำหรับ Leaderboard และอันดับผู้เล่น</p><small>ยังไม่มีข้อมูลอันดับในขั้นตอนนี้</small><button class="game-panel-back" type="button" data-game-panel="play">← กลับ Game Lobby</button></div></section>
               <section class="game-panel" data-game-panel-view="profile"><div class="game-empty-panel"><span>◎</span><h2>โปรไฟล์</h2><p>พื้นที่สำหรับข้อมูลผู้เล่น สถิติ และความคืบหน้า</p><small>ระบบโปรไฟล์เกมจะเพิ่มในขั้นตอนถัดไป</small><button class="game-panel-back" type="button" data-game-panel="play">← กลับ Game Lobby</button></div></section>
               <section class="game-panel" data-game-panel-view="settings"><div class="game-empty-panel"><span>⚙️</span><h2>ตั้งค่า</h2><p>พื้นที่สำหรับการตั้งค่าเกมและการควบคุม</p><small>ยังไม่มีการบันทึกค่าจริงในขั้นตอนนี้</small><button class="game-panel-back" type="button" data-game-panel="play">← กลับ Game Lobby</button></div></section>
@@ -540,6 +532,5 @@
 
   <div class="toast" id="toast"></div>
   <script type="module" src="app.js"></script>
-  <script type="module" src="mission.js"></script>
 </body>
 </html>
