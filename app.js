@@ -2305,6 +2305,102 @@ $$('#gameLobbyPage .game-menu-item, #gameLobbyPage .game-primary-btn').forEach(b
     detail.innerHTML=`<div class="weapon-detail-top"><div class="weapon-detail-icon">${item.icon}</div><div class="weapon-detail-title"><h3>${item.name}</h3><div class="weapon-badges"><b class="weapon-badge ${gradeClass(item.grade)}">Grade ${item.grade}</b><b class="weapon-badge">${item.enhancementLevel}</b>${item.equipped?'<b class="weapon-badge equipped">EQUIPPED</b>':''}${item.broken?'<b class="weapon-badge broken">BROKEN</b>':''}</div></div></div><div class="weapon-enhance-level"><span>ENHANCEMENT LEVEL</span><strong>${item.enhancementLevel}</strong><small>+1 → +15 → I → II → III → IV → V → VI → VII → VIII → IX → X</small><div class="weapon-level-preview">สำเร็จครั้งถัดไป: <b>${next}</b> · โอกาสสำเร็จโดยประมาณ <b>${chance}%</b></div></div><div class="weapon-stat-grid"><div class="weapon-stat-box"><span>HP BONUS</span><strong>+${st.hp}</strong><em>จากอาวุธ</em></div><div class="weapon-stat-box"><span>ATTACK BONUS</span><strong>+${st.attack}</strong><em>จากอาวุธ</em></div><div class="weapon-stat-box"><span>DEFENSE BONUS</span><strong>+${st.defense}</strong><em>จากอาวุธ</em></div></div><div class="weapon-durability"><div class="weapon-durability-row"><span>DURABILITY</span><strong>${item.durability} / ${item.maxDurability}</strong></div><div class="weapon-durability-bar"><i class="${item.durability<=0?'empty':item.durability<=30?'low':''}" style="width:${Math.max(0,item.durability/item.maxDurability*100)}%"></i></div></div><div class="weapon-helper"><label><span>ไอเท็มป้องกันการลดระดับ</span><span>${weaponProtectNext?'เปิดใช้งาน':'ไม่ได้ใช้'}</span></label><button type="button" id="weaponProtectBtn" class="${weaponProtectNext?'active':''}">${weaponProtectNext?'✓ ใช้ไอเท็มป้องกันกับการตีบวกครั้งถัดไป':'＋ เลือกไอเท็มป้องกันการลดระดับ'}</button></div><div class="weapon-action-grid"><button class="game-action-placeholder" id="weaponEquipBtn" type="button" ${canEquip?'':'disabled'}>${item.equipped?'✓ สวมใส่อยู่':'⚔ ใส่อาวุธ'}</button><button class="game-secondary-action" id="weaponUnequipBtn" type="button" ${item.equipped?'':'disabled'}>ถอดอาวุธ</button><button class="game-action-placeholder" id="weaponEnhanceBtn" type="button" ${canEnhance?'':'disabled'}>🔨 ตีบวก</button><button class="game-secondary-action" id="weaponRestoreBtn" type="button" ${canRestore?'':'disabled'}>↻ คืนสภาพ</button><button class="game-secondary-action" id="weaponRepairBtn" type="button" ${canRepair?'':'disabled'}>🔧 ซ่อม</button></div><div class="weapon-disabled-reason">${item.broken?'อาวุธแตก: ต้องคืนสภาพก่อนจึงจะใส่หรือตีบวกได้':weaponIsMax(item.enhancementLevel)?'ถึงระดับสูงสุด X แล้ว':item.durability<item.maxDurability?'Durability ต่ำกว่า 100 สามารถซ่อมได้':'Durability เต็ม'}</div>`;
     detail.querySelector('#weaponEquipBtn')?.addEventListener('click',()=>equipWeapon(item.id)); detail.querySelector('#weaponUnequipBtn')?.addEventListener('click',unequipWeapon); detail.querySelector('#weaponEnhanceBtn')?.addEventListener('click',enhanceWeapon); detail.querySelector('#weaponRestoreBtn')?.addEventListener('click',restoreWeapon); detail.querySelector('#weaponRepairBtn')?.addEventListener('click',repairWeapon); detail.querySelector('#weaponProtectBtn')?.addEventListener('click',toggleWeaponProtection);
   }
+  // Mission / Achievement — isolated module using the existing Game Lobby progression state.
+  // No new Currency or Inventory state is created here.
+  const MISSION_STORAGE_KEY = 'gameLobbyMissionProgressV1';
+  const MISSION_CONFIG = [
+    {id:'gacha_once', type:'gacha', name:'เปิด Gacha 1 ครั้ง', description:'เปิด Gacha ให้สำเร็จอย่างน้อย 1 ครั้ง', target:1, reward:{type:'coin',amount:1,label:'🪙 1 Coin'}},
+    {id:'shop_once', type:'shop', name:'ซื้อ Item จาก Shop 1 ครั้ง', description:'ซื้อสินค้าในร้านค้าให้สำเร็จอย่างน้อย 1 ครั้ง', target:1, reward:{type:'item',item:{id:'mission_token',name:'Mission Token',icon:'🎟️',description:'ไอเท็มตัวอย่างจากรางวัลภารกิจ'},amount:1,label:'🎟️ Mission Token ×1'}},
+    {id:'character_upgrade_once', type:'character_upgrade', name:'อัปเกรด Character 1 ครั้ง', description:'อัปเกรดตัวละครสำเร็จ 1 ครั้ง', target:1, reward:{type:'coin',amount:2,label:'🪙 2 Coin'}},
+    {id:'weapon_enhance_once', type:'weapon_enhancement', name:'ตีบวก Weapon 1 ครั้ง', description:'ตีบวกอาวุธสำเร็จหรือดำเนินการตีบวก 1 ครั้ง', target:1, reward:{type:'coin',amount:2,label:'🪙 2 Coin'}}
+  ];
+  const ACHIEVEMENT_CONFIG = [
+    {id:'first_character', icon:'👤', name:'ได้ Character ตัวแรก', description:'มี Character อย่างน้อย 1 ตัว', target:1, getProgress:()=>characterData.length>0?1:0},
+    {id:'first_weapon', icon:'⚔️', name:'ได้ Weapon ตัวแรก', description:'มี Weapon อย่างน้อย 1 ชิ้น', target:1, getProgress:()=>equipmentData.some(i=>i.slot==='mainWeapon')?1:0},
+    {id:'has_inventory_item', icon:'🎒', name:'มี Item ใน Inventory', description:'มี Item อย่างน้อย 1 ชิ้นใน Inventory กลาง', target:1, getProgress:()=>itemInventory.some(i=>Number(i.quantity)>0)?1:0},
+    {id:'character_upgraded', icon:'⬆️', name:'อัปเกรด Character สำเร็จ', description:'มี Character ที่ผ่านการอัปเกรดอย่างน้อย 1 ครั้ง', target:1, getProgress:()=>characterData.some(c=>Number(c.level)>1)?1:0}
+  ];
+  let missionProgress = {};
+  try { const stored=JSON.parse(localStorage.getItem(MISSION_STORAGE_KEY)); if(stored && typeof stored==='object' && !Array.isArray(stored)) missionProgress=stored; } catch { missionProgress={}; }
+  const missionSave = () => { try { localStorage.setItem(MISSION_STORAGE_KEY,JSON.stringify(missionProgress)); } catch(err){ console.warn('Mission state save unavailable:',err); } };
+  const missionById = id => MISSION_CONFIG.find(m=>m.id===id);
+  const missionCurrent = m => Math.min(m.target,Math.max(0,Number(missionProgress[m.id]?.progress)||0));
+  const missionClaimed = m => missionProgress[m.id]?.claimed===true;
+  const missionCompleted = m => missionCurrent(m)>=m.target;
+  const recordMissionProgress = (type, amount=1) => {
+    const delta=Math.max(0,Number(amount)||0); if(!delta)return;
+    MISSION_CONFIG.filter(m=>m.type===type).forEach(m=>{ const old=missionCurrent(m); if(old>=m.target)return; missionProgress[m.id]={...(missionProgress[m.id]||{}),progress:Math.min(m.target,old+delta)}; });
+    missionSave();
+    if(document.querySelector('[data-mission-tab]')) renderMissionSystem();
+  };
+  const rewardMission = m => {
+    if(!m || !missionCompleted(m) || missionClaimed(m)) return {ok:false,reason:'not_claimable'};
+    try {
+      const reward=m.reward;
+      if(reward.type==='coin'){
+        gachaCurrency += Math.max(0,Number(reward.amount)||0);
+        saveGachaState();
+        updateGachaCurrencyUI();
+      } else if(reward.type==='item') {
+        const data=reward.item||{}; const amount=Math.max(1,Number(reward.amount)||1);
+        let item=itemInventory.find(i=>i.id===data.id);
+        if(item) item.quantity=(Number(item.quantity)||0)+amount;
+        else item={...data,quantity:amount};
+        if(!itemInventory.includes(item)) itemInventory.push(item);
+        save(); saveGachaState();
+      } else return {ok:false,reason:'unsupported_reward'};
+      missionProgress[m.id]={...(missionProgress[m.id]||{}),progress:m.target,claimed:true};
+      missionSave();
+      return {ok:true};
+    } catch(err){ console.error('Mission reward error:',err); return {ok:false,reason:'error'}; }
+  };
+  function achievementProgress(a){ return Math.min(a.target,Math.max(0,Number(a.getProgress?.())||0)); }
+  function missionRewardMarkup(m){ return `<span class="mission-reward-pill">${m.reward.label}</span>`; }
+  function missionStatusMarkup(m){
+    if(missionClaimed(m)) return '<span class="mission-status claimed">✓ รับแล้ว</span>';
+    if(missionCompleted(m)) return '<span class="mission-status complete">สำเร็จ · รับรางวัล</span>';
+    return '<span class="mission-status pending">กำลังทำ</span>';
+  }
+  function renderMissionList(){
+    const list=document.getElementById('missionList'); if(!list)return;
+    if(!MISSION_CONFIG.length){ list.innerHTML='<div class="mission-empty-state"><span>🎯</span><strong>ยังไม่มีภารกิจ</strong><small>ภารกิจใหม่จะแสดงที่นี่</small></div>'; return; }
+    list.innerHTML=MISSION_CONFIG.map(m=>{
+      const current=missionCurrent(m), pct=Math.round(current/m.target*100), claimed=missionClaimed(m), done=missionCompleted(m);
+      return `<article class="mission-card ${done?'is-complete':''} ${claimed?'is-claimed':''}"><div class="mission-card-icon">🎯</div><div class="mission-card-main"><div class="mission-card-top"><div><strong>${m.name}</strong><p>${m.description}</p></div>${missionStatusMarkup(m)}</div><div class="mission-progress-row"><span>Progress</span><b>${current} / ${m.target}</b></div><div class="mission-progress-bar"><i style="width:${pct}%"></i></div><div class="mission-card-bottom"><div><small>รางวัล</small>${missionRewardMarkup(m)}</div><button type="button" class="game-action-placeholder mission-claim-btn" data-claim-mission="${m.id}" ${done&&!claimed?'':'disabled'}>${claimed?'✓ รับแล้ว':done?'รับรางวัล':'ยังไม่สำเร็จ'}</button></div></div></article>`;
+    }).join('');
+    list.querySelectorAll('[data-claim-mission]').forEach(btn=>btn.addEventListener('click',()=>{
+      const m=missionById(btn.dataset.claimMission); const result=rewardMission(m);
+      const feedback=document.getElementById('missionFeedback');
+      if(feedback){ feedback.textContent=result.ok?`รับรางวัล ${m.reward.label} สำเร็จ`:'ไม่สามารถรับรางวัลนี้ได้'; feedback.className=`mission-feedback ${result.ok?'success':'fail'}`; setTimeout(()=>{feedback.textContent='';feedback.className='mission-feedback';},2200); }
+      renderMissionSystem();
+    }));
+  }
+  function renderAchievementList(){
+    const list=document.getElementById('achievementList'); if(!list)return;
+    if(!ACHIEVEMENT_CONFIG.length){ list.innerHTML='<div class="mission-empty-state"><span>🏆</span><strong>ยังไม่มีความสำเร็จ</strong><small>ความสำเร็จใหม่จะแสดงที่นี่</small></div>'; return; }
+    list.innerHTML=ACHIEVEMENT_CONFIG.map(a=>{
+      const current=achievementProgress(a), unlocked=current>=a.target, pct=Math.round(current/a.target*100);
+      return `<article class="achievement-card ${unlocked?'is-unlocked':''}"><div class="achievement-icon">${a.icon}</div><div class="achievement-main"><div class="mission-card-top"><div><strong>${a.name}</strong><p>${a.description}</p></div><span class="mission-status ${unlocked?'complete':'pending'}">${unlocked?'✓ ปลดล็อก':'ยังไม่ปลดล็อก'}</span></div><div class="mission-progress-row"><span>Progress</span><b>${current} / ${a.target}</b></div><div class="mission-progress-bar"><i style="width:${pct}%"></i></div></div></article>`;
+    }).join('');
+  }
+  function renderMissionSystem(){
+    const root=document.getElementById('missionSystemRoot'); if(!root)return;
+    const tab=root.dataset.missionTab||'mission';
+    root.innerHTML=`<div class="game-system-head"><div><span class="game-section-kicker">MISSION / ACHIEVEMENT</span><h2>ภารกิจ / ความสำเร็จ</h2><p>ติดตามความคืบหน้าและรับรางวัลจากระบบกลางของ Game Lobby</p></div><button class="game-panel-back" type="button" data-game-panel="play">← กลับ Game Lobby</button></div><div id="missionFeedback" class="mission-feedback" aria-live="polite"></div><div class="mission-tabs" role="tablist"><button type="button" data-mission-tab="mission" class="${tab==='mission'?'active':''}">🎯 ภารกิจ</button><button type="button" data-mission-tab="achievement" class="${tab==='achievement'?'active':''}">🏆 ความสำเร็จ</button></div><div class="mission-tab-panel ${tab==='mission'?'active':''}" data-mission-view="mission"><div id="missionList" class="mission-list"></div><div class="mission-test-note"><span>MOCK PROGRESS</span><small>ใช้ปุ่มด้านล่างเพื่อจำลอง Event สำหรับทดสอบโครงสร้าง Mission เท่านั้น</small><div class="mission-test-actions"><button type="button" class="game-secondary-action" data-mock-mission="gacha">+ Gacha</button><button type="button" class="game-secondary-action" data-mock-mission="shop">+ Shop</button><button type="button" class="game-secondary-action" data-mock-mission="character_upgrade">+ Upgrade</button><button type="button" class="game-secondary-action" data-mock-mission="weapon_enhancement">+ Enhancement</button></div></div></div><div class="mission-tab-panel ${tab==='achievement'?'active':''}" data-mission-view="achievement"><div id="achievementList" class="achievement-list"></div></div>`;
+    root.querySelectorAll('[data-mission-tab]').forEach(btn=>btn.addEventListener('click',()=>{root.dataset.missionTab=btn.dataset.missionTab;renderMissionSystem();}));
+    root.querySelectorAll('[data-mock-mission]').forEach(btn=>btn.addEventListener('click',()=>{recordMissionProgress(btn.dataset.mockMission,1);}));
+    root.querySelector('[data-game-panel="play"]')?.addEventListener('click',()=>document.querySelector('#gameLobbyPage .game-menu-item[data-game-panel="play"]')?.click());
+    renderMissionList(); renderAchievementList();
+  }
+  window.GameMission = {
+    getMissions:()=>MISSION_CONFIG.map(m=>({...m,progress:missionCurrent(m),claimed:missionClaimed(m),completed:missionCompleted(m)})),
+    getAchievements:()=>ACHIEVEMENT_CONFIG.map(a=>({...a,progress:achievementProgress(a),unlocked:achievementProgress(a)>=a.target})),
+    record:(type,amount=1)=>recordMissionProgress(type,amount),
+    claim:(id)=>{const result=rewardMission(missionById(id)); renderMissionSystem(); return result;},
+    refresh:()=>renderMissionSystem()
+  };
+  document.querySelector('#gameLobbyPage .game-menu-item[data-game-panel="missions"]')?.addEventListener('click',()=>{const root=document.getElementById('missionSystemRoot'); if(root){root.dataset.missionTab='mission';renderMissionSystem();}});
+
   syncWeaponEquipment(); save(); saveGachaState(); renderCharacterSystem(); renderUpgradeSystem(); renderWeaponEnhancement(); updateGachaCurrencyUI();
   document.getElementById('gachaCharacterBtn')?.addEventListener('click',()=>performGacha('character'));
   document.getElementById('gachaWeaponBtn')?.addEventListener('click',()=>performGacha('weapon'));
