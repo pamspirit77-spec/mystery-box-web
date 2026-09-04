@@ -307,9 +307,13 @@
 </section>
 
               <section class="game-panel" data-game-panel-view="enhancement">
-                <div class="game-system-page"><div class="game-system-head"><div><span class="game-section-kicker">WEAPON ENHANCEMENT</span><h2>ตีบวกอาวุธ</h2><p>โครง UI แยก Grade และ Enhancement Level ออกจากกัน</p></div><button class="game-panel-back" type="button" data-game-panel="play">← กลับ Game Lobby</button></div>
-                  <div class="enhancement-layout"><div class="weapon-slot"><span class="slot-label">WEAPON SLOT</span><div class="weapon-placeholder">⚔️</div><strong>ยังไม่ได้เลือกอาวุธ</strong><small>ช่องสำหรับใส่อาวุธ</small></div><div class="enhancement-info"><div class="weapon-name-row"><div><span>WEAPON</span><strong>—</strong></div><div><span>GRADE</span><strong class="grade-placeholder">—</strong></div></div><div class="enhancement-level"><span>ENHANCEMENT</span><strong>+0</strong><small>+1 → +15 → I → X</small></div><div class="durability"><div><span>DURABILITY</span><strong>100 / 100</strong></div><div class="durability-bar"><i></i></div></div><div class="helper-slot"><span>ไอเท็มช่วยตีบวก</span><div>＋ วางไอเท็มที่นี่</div></div><div class="enhancement-actions"><button class="game-action-placeholder" type="button">🔨 ตีบวก</button><button class="game-secondary-action" type="button">↻ คืนสภาพ</button><button class="game-secondary-action" type="button">🔧 ซ่อม</button></div></div></div>
-                  <div class="game-placeholder-note">โอกาสสำเร็จ/ล้มเหลว, การลดระดับ, Durability, แตก, คืนสภาพ และไอเท็มป้องกัน ยังเป็น Placeholder</div>
+                <div class="game-system-page weapon-enhancement-page">
+                  <div class="game-system-head"><div><span class="game-section-kicker">WEAPON ENHANCEMENT</span><h2>ตีบวกอาวุธ</h2><p>เลือกอาวุธ ใส่/ถอด และพัฒนา Enhancement โดย Grade จะไม่เปลี่ยน</p></div><button class="game-panel-back" type="button" data-game-panel="play">← กลับ Game Lobby</button></div>
+                  <div id="weaponEnhancementStatus" class="weapon-feedback" aria-live="polite"></div>
+                  <div class="weapon-enhancement-layout">
+                    <div class="weapon-inventory-card"><div class="inventory-section-head"><div><span class="game-section-kicker">WEAPON INVENTORY</span><h3>รายการอาวุธ</h3></div><span id="weaponInventoryCount"></span></div><div id="weaponInventoryList" class="weapon-inventory-list"></div></div>
+                    <div class="weapon-detail-card" id="weaponEnhancementDetail"></div>
+                  </div>
                 </div>
               </section>
             </div>

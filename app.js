@@ -2044,13 +2044,25 @@ $$('#gameLobbyPage .game-menu-item, #gameLobbyPage .game-primary-btn').forEach(b
     {id:'arms_storm',slot:'arms',name:'Storm Bracers',icon:'🦾',grade:'S',enhancement:'+2',hp:8,attack:6,defense:4},
     {id:'boots_shadow',slot:'boots',name:'Shadow Boots',icon:'👢',grade:'A',enhancement:'+7',hp:10,attack:5,defense:5},
     {id:'boots_star',slot:'boots',name:'Starstep Boots',icon:'🥾',grade:'SSR',enhancement:'VII',hp:30,attack:12,defense:9},
-    {id:'sword_flare',slot:'mainWeapon',name:'Flare Blade',icon:'⚔️',grade:'S',enhancement:'+5',hp:0,attack:18,defense:2},
-    {id:'sword_dragon',slot:'mainWeapon',name:'Dragon Edge',icon:'🗡️',grade:'SSR',enhancement:'III',hp:8,attack:34,defense:4}
+    {id:'sword_flare',slot:'mainWeapon',name:'Flare Blade',icon:'⚔️',grade:'S',enhancement:'+5',enhancementLevel:'+5',durability:100,maxDurability:100,hp:0,attack:18,defense:2,equipped:false,broken:false},
+    {id:'sword_dragon',slot:'mainWeapon',name:'Dragon Edge',icon:'🗡️',grade:'SSR',enhancement:'III',enhancementLevel:'III',durability:100,maxDurability:100,hp:8,attack:34,defense:4,equipped:false,broken:false}
   ];
   let characterData, equipmentData;
   try { characterData = JSON.parse(localStorage.getItem(CHARACTER_STORAGE_KEY)) || characterSeed; } catch { characterData = characterSeed; }
   try { equipmentData = JSON.parse(localStorage.getItem(EQUIPMENT_STORAGE_KEY)) || equipmentSeed; } catch { equipmentData = equipmentSeed; }
   characterData.forEach(c => { if(!c.equipment) c.equipment={}; });
+  equipmentData.forEach(i => {
+    if(i.slot === 'mainWeapon') {
+      i.enhancementLevel = i.enhancementLevel || i.enhancement || '+1';
+      i.enhancement = i.enhancementLevel;
+      i.durability = Number.isFinite(i.durability) ? i.durability : 100;
+      i.maxDurability = Number.isFinite(i.maxDurability) ? i.maxDurability : 100;
+      i.equipped = Boolean(i.equipped);
+      i.broken = Boolean(i.broken);
+      i.hpBonus = i.hpBonus ?? i.hp ?? 0; i.attackBonus = i.attackBonus ?? i.attack ?? 0; i.defenseBonus = i.defenseBonus ?? i.defense ?? 0;
+      i.hp = i.hpBonus; i.attack = i.attackBonus; i.defense = i.defenseBonus;
+    }
+  });
   let selectedCharacterId = characterData.find(c => c.active)?.id || characterData[0].id;
   let upgradeCharacterId = selectedCharacterId;
   let equipmentTargetSlot = null;
@@ -2071,7 +2083,7 @@ $$('#gameLobbyPage .game-menu-item, #gameLobbyPage .game-primary-btn').forEach(b
   function equipmentSlotMarkup(c, slot){
     const item=getItem(c.equipment?.[slot]);
     if(!item) return `<button type="button" class="equipment-slot equipment-empty" data-equip-slot="${slot}"><b>${slotIcons[slot]}</b><span>${slotNames[slot]}</span><small>ว่าง · กดเพื่อเลือก</small></button>`;
-    return `<button type="button" class="equipment-slot equipment-filled ${gradeClass(item.grade)}" data-equip-slot="${slot}"><div class="equipment-item-icon">${item.icon}</div><strong>${item.name}</strong><span>${slotNames[slot]}</span><div class="equipment-meta"><b>${item.grade}</b><b>${item.enhancement}</b></div><small>สวมใส่อยู่ · กดเพื่อเปลี่ยน</small></button>`;
+    return `<button type="button" class="equipment-slot equipment-filled ${gradeClass(item.grade)}" data-equip-slot="${slot}"><div class="equipment-item-icon">${item.icon}</div><strong>${item.name}</strong><span>${slotNames[slot]}</span><div class="equipment-meta"><b>${item.grade}</b><b>${item.enhancement}</b></div>${slot==='mainWeapon'?`<small>Durability ${item.durability??100}/${item.maxDurability??100}${item.broken?' · แตก':''}</small>`:'<small>สวมใส่อยู่ · กดเพื่อเปลี่ยน</small>'}</button>`;
   }
 
   function renderCharacterList(){
@@ -2097,8 +2109,8 @@ $$('#gameLobbyPage .game-menu-item, #gameLobbyPage .game-primary-btn').forEach(b
     panel.querySelectorAll('[data-item-id]').forEach(b=>b.addEventListener('click',()=>equipItem(characterId,slot,b.dataset.itemId)));
     panel.querySelector('#unequipBtn')?.addEventListener('click',()=>unequipItem(characterId,slot));
   }
-  function equipItem(characterId,slot,itemId){ const c=getCharacter(characterId); c.equipment[slot]=itemId; save(); equipmentTargetSlot=null; renderCharacterSystem(); }
-  function unequipItem(characterId,slot){ const c=getCharacter(characterId); delete c.equipment[slot]; save(); equipmentTargetSlot=null; renderCharacterSystem(); }
+  function equipItem(characterId,slot,itemId){ const c=getCharacter(characterId); c.equipment[slot]=itemId; if(slot==='mainWeapon' && typeof syncWeaponEquipment==='function') syncWeaponEquipment(); save(); equipmentTargetSlot=null; renderCharacterSystem(); if(typeof renderWeaponEnhancement==='function') renderWeaponEnhancement(); }
+  function unequipItem(characterId,slot){ const c=getCharacter(characterId); delete c.equipment[slot]; if(slot==='mainWeapon' && typeof syncWeaponEquipment==='function') syncWeaponEquipment(); save(); equipmentTargetSlot=null; renderCharacterSystem(); if(typeof renderWeaponEnhancement==='function') renderWeaponEnhancement(); }
   function renderCharacterSystem(){ renderCharacterList(); renderCharacterDetail(); }
 
   function renderUpgradeSystem(){
@@ -2109,5 +2121,84 @@ $$('#gameLobbyPage .game-menu-item, #gameLobbyPage .game-primary-btn').forEach(b
     content.innerHTML=`<div class="character-preview-card"><div class="character-placeholder">${c.avatar}</div><strong>${c.name}</strong><span>ตัวละครที่เลือกสำหรับอัปเกรด</span><div class="character-detail-level">LEVEL&nbsp; ${c.level}</div></div><div class="character-level-card"><div class="level-row"><span>LEVEL ปัจจุบัน</span><strong>Lv. ${c.level}</strong></div><div class="character-stat-grid"><div class="character-stat-box"><span>HP</span><strong>${totalStats(c).hp}</strong></div><div class="character-stat-box"><span>ATTACK</span><strong>${totalStats(c).attack}</strong></div><div class="character-stat-box"><span>DEFENSE</span><strong>${totalStats(c).defense}</strong></div></div><div class="upgrade-preview-note"><strong>PREVIEW หลังอัปเกรด</strong><div class="character-stat-grid" style="margin:10px 0 0"><div class="character-stat-box upgrade-preview-stat"><span>BASE HP</span><strong>${n.hp}</strong><em>+20</em></div><div class="character-stat-box upgrade-preview-stat"><span>BASE ATTACK</span><strong>${n.attack}</strong><em>+4</em></div><div class="character-stat-box upgrade-preview-stat"><span>BASE DEFENSE</span><strong>${n.defense}</strong><em>+3</em></div></div></div><button class="game-action-placeholder upgrade-action-disabled" id="characterUpgradeBtn" type="button">⬆ อัปเกรด ${c.name} เป็น Lv. ${c.level+1}</button><div class="upgrade-level-rule">Level เพิ่มผ่านปุ่มอัปเกรดตัวละครเท่านั้น · โบนัสจากอุปกรณ์ยังคงแยกจาก Base Stat</div></div>`;
     content.querySelector('#characterUpgradeBtn')?.addEventListener('click',()=>{const target=getCharacter(upgradeCharacterId);const ns=nextStats(target);target.level+=1;target.hp=ns.hp;target.attack=ns.attack;target.defense=ns.defense;save();selectedCharacterId=target.id;renderUpgradeSystem();renderCharacterSystem();});
   }
-  save(); renderCharacterSystem(); renderUpgradeSystem();
+  function weaponLevelIndex(level){ return enhancementLevels.indexOf(level); }
+  function weaponNextLevel(level){ const idx=weaponLevelIndex(level); return idx>=0 && idx<enhancementLevels.length-1 ? enhancementLevels[idx+1] : level; }
+  function weaponPrevLevel(level){ const idx=weaponLevelIndex(level); return idx>0 ? enhancementLevels[idx-1] : level; }
+  function weaponIsAtStart(level){ return level === '+1'; }
+  function weaponIsMax(level){ return level === 'X'; }
+  function weaponBonus(item){
+    const idx=Math.max(0,weaponLevelIndex(item.enhancementLevel||item.enhancement||'+1'));
+    const base={hp:item.baseHpBonus ?? item.hpBonus ?? item.hp ?? 0,attack:item.baseAttackBonus ?? item.attackBonus ?? item.attack ?? 0,defense:item.baseDefenseBonus ?? item.defenseBonus ?? item.defense ?? 0};
+    const multiplier=1 + idx*0.08;
+    return {hp:Math.round(base.hp*multiplier),attack:Math.round(base.attack*multiplier),defense:Math.round(base.defense*multiplier)};
+  }
+  equipmentData.filter(i=>i.slot==='mainWeapon').forEach(i=>{
+    if(i.baseHpBonus===undefined){i.baseHpBonus=i.hpBonus??i.hp??0;i.baseAttackBonus=i.attackBonus??i.attack??0;i.baseDefenseBonus=i.defenseBonus??i.defense??0;}
+    const b=weaponBonus(i); i.hp=b.hp;i.attack=b.attack;i.defense=b.defense;
+  });
+  let selectedWeaponId = equipmentData.find(i=>i.slot==='mainWeapon')?.id || null;
+  let weaponProtectNext = false;
+  let weaponFeedbackTimer = null;
+  const weaponItems = () => equipmentData.filter(i=>i.slot==='mainWeapon');
+  const activeCharacter = () => getCharacter(characterData.find(c=>c.active)?.id || selectedCharacterId);
+  const setWeaponFeedback = (msg,type='info') => { const el=document.getElementById('weaponEnhancementStatus'); if(!el)return; clearTimeout(weaponFeedbackTimer); el.className=`weapon-feedback ${type}`; el.textContent=msg; weaponFeedbackTimer=setTimeout(()=>{el.textContent='';el.className='weapon-feedback';},3200); };
+  const weaponStats = item => weaponBonus(item);
+  function syncWeaponEquipment(){
+    characterData.forEach(c=>{ const id=c.equipment?.mainWeapon; weaponItems().forEach(w=>w.equipped = w.id===id); });
+  }
+  function equipWeapon(itemId){
+    const c=activeCharacter(), item=getItem(itemId); if(!item || item.slot!=='mainWeapon')return;
+    if(item.broken){setWeaponFeedback('อาวุธแตก ต้องคืนสภาพก่อนจึงจะใส่ได้','fail');return;}
+    const oldId=c.equipment?.mainWeapon;
+    if(oldId===item.id){setWeaponFeedback('อาวุธชิ้นนี้สวมใส่อยู่แล้ว','info');return;}
+    c.equipment.mainWeapon=item.id; syncWeaponEquipment(); save(); selectedWeaponId=item.id; renderWeaponEnhancement(); renderCharacterSystem(); setWeaponFeedback(oldId?'เปลี่ยนอาวุธสำเร็จ':'ใส่อาวุธสำเร็จ','success');
+  }
+  function unequipWeapon(){
+    const c=activeCharacter(); if(!c.equipment?.mainWeapon){setWeaponFeedback('ยังไม่มีอาวุธที่สวมใส่','info');return;}
+    const old=getItem(c.equipment.mainWeapon); delete c.equipment.mainWeapon; syncWeaponEquipment(); save(); renderWeaponEnhancement(); renderCharacterSystem(); setWeaponFeedback(`ถอด ${old?.name||'อาวุธ'} สำเร็จ`,'success');
+  }
+  function enhanceWeapon(){
+    const item=getItem(selectedWeaponId); if(!item){setWeaponFeedback('กรุณาเลือกอาวุธก่อน','fail');return;}
+    if(item.broken){setWeaponFeedback('อาวุธแตก ไม่สามารถตีบวกได้','fail');return;}
+    if(weaponIsMax(item.enhancementLevel)){setWeaponFeedback('อาวุธอยู่ที่ระดับสูงสุด X แล้ว','info');return;}
+    const oldLevel=item.enhancementLevel;
+    const idx=weaponLevelIndex(oldLevel);
+    const chance=Math.max(0.18, 0.92 - idx*0.028);
+    const success=Math.random()<chance;
+    if(success){ item.enhancementLevel=weaponNextLevel(oldLevel); item.enhancement=item.enhancementLevel; const b=weaponBonus(item);item.hp=b.hp;item.attack=b.attack;item.defense=b.defense; save(); renderWeaponEnhancement(); renderCharacterSystem(); setWeaponFeedback(`ตีบวกสำเร็จ! ${oldLevel} → ${item.enhancementLevel}`,'success'); }
+    else {
+      item.durability=Math.max(0,item.durability-20);
+      const protectedLevel=weaponProtectNext;
+      weaponProtectNext=false;
+      if(protectedLevel){ setWeaponFeedback(`ตีบวกไม่สำเร็จ · ป้องกันการลดระดับสำเร็จ · Durability -20`,'info'); }
+      else { item.enhancementLevel=weaponPrevLevel(oldLevel);item.enhancement=item.enhancementLevel;const b=weaponBonus(item);item.hp=b.hp;item.attack=b.attack;item.defense=b.defense;setWeaponFeedback(`ตีบวกไม่สำเร็จ · ระดับลดลง ${oldLevel} → ${item.enhancementLevel}`,'fail'); }
+      if(item.durability<=0){item.broken=true;setWeaponFeedback('อาวุธแตก · ต้องคืนสภาพก่อน','fail');}
+      save(); renderWeaponEnhancement(); renderCharacterSystem();
+    }
+  }
+  function toggleWeaponProtection(){ weaponProtectNext=!weaponProtectNext; renderWeaponEnhancement(); }
+  function restoreWeapon(){
+    const item=getItem(selectedWeaponId); if(!item)return;
+    if(!item.broken){setWeaponFeedback('อาวุธยังไม่แตก ไม่จำเป็นต้องคืนสภาพ','info');return;}
+    item.broken=false; item.durability=Math.max(1,item.durability); save(); renderWeaponEnhancement(); renderCharacterSystem(); setWeaponFeedback('คืนสภาพสำเร็จ · สามารถซ่อมเพื่อเพิ่ม Durability ได้','success');
+  }
+  function repairWeapon(){
+    const item=getItem(selectedWeaponId); if(!item)return;
+    if(item.broken){setWeaponFeedback('ต้องคืนสภาพก่อนจึงจะซ่อมได้','fail');return;}
+    if(item.durability>=item.maxDurability){setWeaponFeedback('Durability เต็ม 100 / 100 แล้ว','info');return;}
+    item.durability=item.maxDurability; save(); renderWeaponEnhancement(); renderCharacterSystem(); setWeaponFeedback('ซ่อมสำเร็จ · Durability กลับเป็น 100 / 100','success');
+  }
+  function renderWeaponEnhancement(){
+    const list=document.getElementById('weaponInventoryList'),detail=document.getElementById('weaponEnhancementDetail'),count=document.getElementById('weaponInventoryCount'); if(!list||!detail)return;
+    syncWeaponEquipment(); const items=weaponItems(); if(!items.some(i=>i.id===selectedWeaponId))selectedWeaponId=items[0]?.id||null;
+    if(count)count.textContent=`${items.length} ชิ้น`;
+    list.innerHTML=items.map(i=>`<button type="button" class="weapon-inventory-item ${i.id===selectedWeaponId?'selected':''} ${i.broken?'broken':''}" data-weapon-id="${i.id}"><div class="weapon-mini-icon">${i.icon}</div><div class="weapon-mini-copy"><strong>${i.name}</strong><span>${i.grade} · ${i.enhancementLevel}</span><small>ATK +${weaponStats(i).attack} · DUR ${i.durability}/${i.maxDurability}</small></div><span class="weapon-mini-status ${i.broken?'broken':i.equipped?'equipped':''}">${i.broken?'แตก':i.equipped?'สวมใส่อยู่':'ไม่ได้สวมใส่'}</span></button>`).join('');
+    list.querySelectorAll('[data-weapon-id]').forEach(b=>b.addEventListener('click',()=>{selectedWeaponId=b.dataset.weaponId;renderWeaponEnhancement();}));
+    const item=getItem(selectedWeaponId); if(!item){detail.innerHTML='<div class="weapon-detail-empty"><div><span>⚔️</span><p>ยังไม่มีอาวุธใน Inventory</p></div></div>';return;}
+    const st=weaponStats(item), next=weaponNextLevel(item.enhancementLevel), chance=Math.max(18,Math.round((0.92-Math.max(0,weaponLevelIndex(item.enhancementLevel))*0.028)*100));
+    const canEnhance=!item.broken&&!weaponIsMax(item.enhancementLevel), canEquip=!item.broken&&!item.equipped, canRestore=item.broken, canRepair=!item.broken&&item.durability<item.maxDurability;
+    detail.innerHTML=`<div class="weapon-detail-top"><div class="weapon-detail-icon">${item.icon}</div><div class="weapon-detail-title"><h3>${item.name}</h3><div class="weapon-badges"><b class="weapon-badge ${gradeClass(item.grade)}">Grade ${item.grade}</b><b class="weapon-badge">${item.enhancementLevel}</b>${item.equipped?'<b class="weapon-badge equipped">EQUIPPED</b>':''}${item.broken?'<b class="weapon-badge broken">BROKEN</b>':''}</div></div></div><div class="weapon-enhance-level"><span>ENHANCEMENT LEVEL</span><strong>${item.enhancementLevel}</strong><small>+1 → +15 → I → II → III → IV → V → VI → VII → VIII → IX → X</small><div class="weapon-level-preview">สำเร็จครั้งถัดไป: <b>${next}</b> · โอกาสสำเร็จโดยประมาณ <b>${chance}%</b></div></div><div class="weapon-stat-grid"><div class="weapon-stat-box"><span>HP BONUS</span><strong>+${st.hp}</strong><em>จากอาวุธ</em></div><div class="weapon-stat-box"><span>ATTACK BONUS</span><strong>+${st.attack}</strong><em>จากอาวุธ</em></div><div class="weapon-stat-box"><span>DEFENSE BONUS</span><strong>+${st.defense}</strong><em>จากอาวุธ</em></div></div><div class="weapon-durability"><div class="weapon-durability-row"><span>DURABILITY</span><strong>${item.durability} / ${item.maxDurability}</strong></div><div class="weapon-durability-bar"><i class="${item.durability<=0?'empty':item.durability<=30?'low':''}" style="width:${Math.max(0,item.durability/item.maxDurability*100)}%"></i></div></div><div class="weapon-helper"><label><span>ไอเท็มป้องกันการลดระดับ</span><span>${weaponProtectNext?'เปิดใช้งาน':'ไม่ได้ใช้'}</span></label><button type="button" id="weaponProtectBtn" class="${weaponProtectNext?'active':''}">${weaponProtectNext?'✓ ใช้ไอเท็มป้องกันกับการตีบวกครั้งถัดไป':'＋ เลือกไอเท็มป้องกันการลดระดับ'}</button></div><div class="weapon-action-grid"><button class="game-action-placeholder" id="weaponEquipBtn" type="button" ${canEquip?'':'disabled'}>${item.equipped?'✓ สวมใส่อยู่':'⚔ ใส่อาวุธ'}</button><button class="game-secondary-action" id="weaponUnequipBtn" type="button" ${item.equipped?'':'disabled'}>ถอดอาวุธ</button><button class="game-action-placeholder" id="weaponEnhanceBtn" type="button" ${canEnhance?'':'disabled'}>🔨 ตีบวก</button><button class="game-secondary-action" id="weaponRestoreBtn" type="button" ${canRestore?'':'disabled'}>↻ คืนสภาพ</button><button class="game-secondary-action" id="weaponRepairBtn" type="button" ${canRepair?'':'disabled'}>🔧 ซ่อม</button></div><div class="weapon-disabled-reason">${item.broken?'อาวุธแตก: ต้องคืนสภาพก่อนจึงจะใส่หรือตีบวกได้':weaponIsMax(item.enhancementLevel)?'ถึงระดับสูงสุด X แล้ว':item.durability<item.maxDurability?'Durability ต่ำกว่า 100 สามารถซ่อมได้':'Durability เต็ม'}</div>`;
+    detail.querySelector('#weaponEquipBtn')?.addEventListener('click',()=>equipWeapon(item.id)); detail.querySelector('#weaponUnequipBtn')?.addEventListener('click',unequipWeapon); detail.querySelector('#weaponEnhanceBtn')?.addEventListener('click',enhanceWeapon); detail.querySelector('#weaponRestoreBtn')?.addEventListener('click',restoreWeapon); detail.querySelector('#weaponRepairBtn')?.addEventListener('click',repairWeapon); detail.querySelector('#weaponProtectBtn')?.addEventListener('click',toggleWeaponProtection);
+  }
+  syncWeaponEquipment(); save(); renderCharacterSystem(); renderUpgradeSystem(); renderWeaponEnhancement();
 })();
