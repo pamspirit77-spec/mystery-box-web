@@ -275,7 +275,15 @@
                 <div class="game-feature-grid"><div class="game-feature-card"><span>🎮</span><strong>Battle</strong><small>โหมดการเล่น</small></div><div class="game-feature-card"><span>🧍</span><strong>Heroes</strong><small>ตัวละครของคุณ</small></div><div class="game-feature-card"><span>⚒</span><strong>Gear</strong><small>อุปกรณ์และอาวุธ</small></div><div class="game-feature-card"><span>🏅</span><strong>Rank</strong><small>อันดับผู้เล่น</small></div></div>
               </section>
 
-              <section class="game-panel" data-game-panel-view="characters"><div class="game-empty-panel"><span>👤</span><h2>ตัวละคร</h2><p>พื้นที่สำหรับรายชื่อตัวละครและอุปกรณ์ที่สวมใส่</p><small>ระบบตัวละครจะเพิ่มในขั้นตอนถัดไป</small><button class="game-panel-back" type="button" data-game-panel="play">← กลับ Game Lobby</button></div></section>
+              <section class="game-panel" data-game-panel-view="characters">
+  <div class="game-system-page character-page">
+    <div class="game-system-head"><div><span class="game-section-kicker">CHARACTERS</span><h2>ตัวละคร</h2><p>จัดการตัวละคร เลือกตัวละครที่ใช้งาน และดูรายละเอียดพื้นฐาน</p></div><button class="game-panel-back" type="button" data-game-panel="play">← กลับ Game Lobby</button></div>
+    <div class="character-list-detail">
+      <div class="character-list" id="characterList"></div>
+      <div class="character-detail-card" id="characterDetailCard"></div>
+    </div>
+  </div>
+</section>
               <section class="game-panel" data-game-panel-view="weapons"><div class="game-empty-panel"><span>⚔️</span><h2>อาวุธ</h2><p>พื้นที่สำหรับคลังอาวุธ อุปกรณ์ และรายละเอียดไอเท็ม</p><small>ระบบอาวุธจะเพิ่มในขั้นตอนถัดไป</small><button class="game-panel-back" type="button" data-game-panel="play">← กลับ Game Lobby</button></div></section>
               <section class="game-panel" data-game-panel-view="shop"><div class="game-empty-panel"><span>🛒</span><h2>ร้านค้า</h2><p>พื้นที่สำหรับร้านค้าและไอเทมภายในเกม</p><small>ยังไม่มีระบบซื้อขายในขั้นตอนนี้</small><button class="game-panel-back" type="button" data-game-panel="play">← กลับ Game Lobby</button></div></section>
               <section class="game-panel" data-game-panel-view="missions"><div class="game-empty-panel"><span>🎯</span><h2>ภารกิจ / ความสำเร็จ</h2><p>พื้นที่สำหรับภารกิจ Achievement และรางวัล</p><small>ระบบจริงจะเพิ่มในขั้นตอนถัดไป</small><button class="game-panel-back" type="button" data-game-panel="play">← กลับ Game Lobby</button></div></section>
@@ -291,10 +299,12 @@
               </section>
 
               <section class="game-panel" data-game-panel-view="character-upgrade">
-                <div class="game-system-page"><div class="game-system-head"><div><span class="game-section-kicker">CHARACTER PROGRESSION</span><h2>อัปเกรดตัวละคร</h2><p>โครง UI สำหรับระบบ Level และค่าสถานะพื้นฐาน</p></div><button class="game-panel-back" type="button" data-game-panel="play">← กลับ Game Lobby</button></div>
-                  <div class="character-upgrade-layout"><div class="character-preview-card"><div class="character-placeholder">👤</div><strong>ตัวละครของคุณ</strong><span>Character Preview</span></div><div class="character-level-card"><div class="level-row"><span>LEVEL</span><strong>Lv. 1</strong></div><div class="xp-placeholder"><i></i></div><div class="stat-grid"><div><span>HP</span><strong>—</strong></div><div><span>ATTACK</span><strong>—</strong></div><div><span>DEFENSE</span><strong>—</strong></div></div><button class="game-action-placeholder" type="button">⬆ อัปเกรดตัวละคร</button><small>ยังไม่เชื่อมระบบ Level / Stat จริง</small></div></div>
-                </div>
-              </section>
+  <div class="game-system-page character-upgrade-page">
+    <div class="game-system-head"><div><span class="game-section-kicker">CHARACTER PROGRESSION</span><h2>อัปเกรดตัวละคร</h2><p>เลือกตัวละครและดู Preview ค่าสถานะหลังอัปเกรด</p></div><button class="game-panel-back" type="button" data-game-panel="play">← กลับ Game Lobby</button></div>
+    <div class="upgrade-character-picker" id="upgradeCharacterPicker"></div>
+    <div class="character-upgrade-layout" id="characterUpgradeContent"></div>
+  </div>
+</section>
 
               <section class="game-panel" data-game-panel-view="enhancement">
                 <div class="game-system-page"><div class="game-system-head"><div><span class="game-section-kicker">WEAPON ENHANCEMENT</span><h2>ตีบวกอาวุธ</h2><p>โครง UI แยก Grade และ Enhancement Level ออกจากกัน</p></div><button class="game-panel-back" type="button" data-game-panel="play">← กลับ Game Lobby</button></div>

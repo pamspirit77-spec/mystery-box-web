@@ -2026,3 +2026,46 @@ $$('#gameLobbyPage .game-menu-item, #gameLobbyPage .game-primary-btn').forEach(b
     $$('#gameLobbyPage .game-panel').forEach(view => view.classList.toggle('active', view.dataset.gamePanelView === panel));
   });
 });
+
+// Character system — isolated Game Lobby module. Uses mock data only; no Gacha/weapon/combat integration.
+(() => {
+  const CHARACTER_STORAGE_KEY = 'gameLobbyCharactersV1';
+  const characterSeed = [
+    { id:'nova', name:'Nova', avatar:'🧙', level:1, hp:120, attack:24, defense:14, active:true },
+    { id:'raven', name:'Raven', avatar:'🦹', level:3, hp:150, attack:31, defense:18, active:false },
+    { id:'lyra', name:'Lyra', avatar:'🧝', level:2, hp:135, attack:27, defense:16, active:false }
+  ];
+  let characterData;
+  try { characterData = JSON.parse(localStorage.getItem(CHARACTER_STORAGE_KEY)) || characterSeed; } catch { characterData = characterSeed; }
+  let selectedCharacterId = characterData.find(c => c.active)?.id || characterData[0].id;
+  let upgradeCharacterId = selectedCharacterId;
+
+  const save = () => localStorage.setItem(CHARACTER_STORAGE_KEY, JSON.stringify(characterData));
+  const getCharacter = id => characterData.find(c => c.id === id) || characterData[0];
+  const nextStats = c => ({ hp:c.hp + 20, attack:c.attack + 4, defense:c.defense + 3 });
+  const statMarkup = c => `<div class="character-stat-grid"><div class="character-stat-box"><span>HP</span><strong>${c.hp}</strong></div><div class="character-stat-box"><span>ATTACK</span><strong>${c.attack}</strong></div><div class="character-stat-box"><span>DEFENSE</span><strong>${c.defense}</strong></div></div>`;
+
+  function renderCharacterList(){
+    const el = document.getElementById('characterList'); if(!el) return;
+    el.innerHTML = characterData.map(c => `<button type="button" class="character-list-item ${c.id===selectedCharacterId?'selected':''}" data-character-id="${c.id}"><div class="character-avatar">${c.avatar}</div><div class="character-list-copy"><strong>${c.name}</strong><small>Lv. ${c.level}</small><div class="character-mini-stats"><span>HP ${c.hp}</span><span>ATK ${c.attack}</span><span>DEF ${c.defense}</span></div></div>${c.active?'<span class="character-active-badge">ใช้งานอยู่</span>':'<span></span>'}</button>`).join('');
+    el.querySelectorAll('[data-character-id]').forEach(btn => btn.addEventListener('click', () => { selectedCharacterId=btn.dataset.characterId; renderCharacterSystem(); }));
+  }
+  function renderCharacterDetail(){
+    const el=document.getElementById('characterDetailCard'); if(!el) return; const c=getCharacter(selectedCharacterId);
+    el.innerHTML=`<div class="character-detail-top"><div class="character-detail-avatar">${c.avatar}</div><div><h3 class="character-detail-name">${c.name}</h3><div class="character-detail-sub">Character ID · ${c.id.toUpperCase()}</div><div class="character-detail-level">LEVEL&nbsp; ${c.level}</div></div></div>${statMarkup(c)}<div class="equipment-title">EQUIPMENT SLOTS</div><div class="equipment-grid"><div class="equipment-slot"><b>🪖</b><span>หมวก</span></div><div class="equipment-slot"><b>🥋</b><span>ชุด</span></div><div class="equipment-slot"><b>🛡️</b><span>แขน</span></div><div class="equipment-slot"><b>👢</b><span>รองเท้า</span></div><div class="equipment-slot"><b>⚔️</b><span>อาวุธหลัก</span></div></div><div class="character-detail-actions"><button class="game-action-placeholder" type="button" id="characterUseBtn">${c.active?'✓ ใช้งานอยู่':'เลือกใช้งาน'}</button><button class="game-secondary-action" type="button" data-game-panel="character-upgrade">⬆ ไปอัปเกรดตัวละคร</button></div>`;
+    el.querySelector('#characterUseBtn')?.addEventListener('click',()=>{characterData.forEach(x=>x.active=x.id===c.id); selectedCharacterId=c.id; upgradeCharacterId=c.id; save(); renderCharacterSystem(); renderUpgradeSystem();});
+    el.querySelector('[data-game-panel]')?.addEventListener('click',()=>{ document.querySelector('#gameLobbyPage .game-menu-item[data-game-panel="character-upgrade"]')?.click(); });
+  }
+  function renderCharacterSystem(){ renderCharacterList(); renderCharacterDetail(); }
+
+  function renderUpgradeSystem(){
+    const picker=document.getElementById('upgradeCharacterPicker'), content=document.getElementById('characterUpgradeContent'); if(!picker||!content)return;
+    const c=getCharacter(upgradeCharacterId), n=nextStats(c);
+    picker.innerHTML=characterData.map(x=>`<button type="button" class="upgrade-character-chip ${x.id===upgradeCharacterId?'selected':''}" data-upgrade-id="${x.id}">${x.avatar} ${x.name}<small>Lv. ${x.level}</small></button>`).join('');
+    picker.querySelectorAll('[data-upgrade-id]').forEach(b=>b.addEventListener('click',()=>{upgradeCharacterId=b.dataset.upgradeId;renderUpgradeSystem();}));
+    content.innerHTML=`<div class="character-preview-card"><div class="character-placeholder">${c.avatar}</div><strong>${c.name}</strong><span>ตัวละครที่เลือกสำหรับอัปเกรด</span><div class="character-detail-level">LEVEL&nbsp; ${c.level}</div></div><div class="character-level-card"><div class="level-row"><span>LEVEL ปัจจุบัน</span><strong>Lv. ${c.level}</strong></div><div class="character-stat-grid"><div class="character-stat-box"><span>HP</span><strong>${c.hp}</strong></div><div class="character-stat-box"><span>ATTACK</span><strong>${c.attack}</strong></div><div class="character-stat-box"><span>DEFENSE</span><strong>${c.defense}</strong></div></div><div class="upgrade-preview-note"><strong>PREVIEW หลังอัปเกรด</strong><div class="character-stat-grid" style="margin:10px 0 0"><div class="character-stat-box upgrade-preview-stat"><span>HP</span><strong>${n.hp}</strong><em>+20</em></div><div class="character-stat-box upgrade-preview-stat"><span>ATTACK</span><strong>${n.attack}</strong><em>+4</em></div><div class="character-stat-box upgrade-preview-stat"><span>DEFENSE</span><strong>${n.defense}</strong><em>+3</em></div></div></div><button class="game-action-placeholder upgrade-action-disabled" id="characterUpgradeBtn" type="button">⬆ อัปเกรด ${c.name} เป็น Lv. ${c.level+1}</button><div class="upgrade-level-rule">กฎพื้นฐาน: <strong>Level เพิ่มผ่านปุ่มอัปเกรดตัวละครเท่านั้น</strong> · ยังไม่มี EXP หรือทรัพยากรจริง</div></div>`;
+    content.querySelector('#characterUpgradeBtn')?.addEventListener('click',()=>{const target=getCharacter(upgradeCharacterId);const ns=nextStats(target);target.level+=1;target.hp=ns.hp;target.attack=ns.attack;target.defense=ns.defense;save();selectedCharacterId=target.id;renderUpgradeSystem();renderCharacterSystem();});
+  }
+
+  renderCharacterSystem(); renderUpgradeSystem();
+})();
