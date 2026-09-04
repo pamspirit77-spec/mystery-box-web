@@ -2027,35 +2027,78 @@ $$('#gameLobbyPage .game-menu-item, #gameLobbyPage .game-primary-btn').forEach(b
   });
 });
 
-// Character system — isolated Game Lobby module. Uses mock data only; no Gacha/weapon/combat integration.
+// Character + Equipment system — isolated Game Lobby module.
 (() => {
   const CHARACTER_STORAGE_KEY = 'gameLobbyCharactersV1';
+  const EQUIPMENT_STORAGE_KEY = 'gameLobbyEquipmentV1';
   const characterSeed = [
-    { id:'nova', name:'Nova', avatar:'🧙', level:1, hp:120, attack:24, defense:14, active:true },
-    { id:'raven', name:'Raven', avatar:'🦹', level:3, hp:150, attack:31, defense:18, active:false },
-    { id:'lyra', name:'Lyra', avatar:'🧝', level:2, hp:135, attack:27, defense:16, active:false }
+    { id:'nova', name:'Nova', avatar:'🧙', level:1, hp:120, attack:24, defense:14, active:true, equipment:{} },
+    { id:'raven', name:'Raven', avatar:'🦹', level:3, hp:150, attack:31, defense:18, active:false, equipment:{} },
+    { id:'lyra', name:'Lyra', avatar:'🧝', level:2, hp:135, attack:27, defense:16, active:false, equipment:{} }
   ];
-  let characterData;
+  const equipmentSeed = [
+    {id:'helm_aurora',slot:'helmet',name:'Aurora Helm',icon:'🪖',grade:'A',enhancement:'+3',hp:12,attack:0,defense:5},
+    {id:'helm_void',slot:'helmet',name:'Void Crown',icon:'👑',grade:'SSR',enhancement:'III',hp:35,attack:3,defense:12},
+    {id:'armor_mist',slot:'armor',name:'Mist Guard',icon:'🥋',grade:'S',enhancement:'+5',hp:28,attack:4,defense:10},
+    {id:'armor_royal',slot:'armor',name:'Royal Aegis',icon:'🛡️',grade:'SSS',enhancement:'+10',hp:55,attack:8,defense:20},
+    {id:'arms_storm',slot:'arms',name:'Storm Bracers',icon:'🦾',grade:'S',enhancement:'+2',hp:8,attack:6,defense:4},
+    {id:'boots_shadow',slot:'boots',name:'Shadow Boots',icon:'👢',grade:'A',enhancement:'+7',hp:10,attack:5,defense:5},
+    {id:'boots_star',slot:'boots',name:'Starstep Boots',icon:'🥾',grade:'SSR',enhancement:'VII',hp:30,attack:12,defense:9},
+    {id:'sword_flare',slot:'mainWeapon',name:'Flare Blade',icon:'⚔️',grade:'S',enhancement:'+5',hp:0,attack:18,defense:2},
+    {id:'sword_dragon',slot:'mainWeapon',name:'Dragon Edge',icon:'🗡️',grade:'SSR',enhancement:'III',hp:8,attack:34,defense:4}
+  ];
+  let characterData, equipmentData;
   try { characterData = JSON.parse(localStorage.getItem(CHARACTER_STORAGE_KEY)) || characterSeed; } catch { characterData = characterSeed; }
+  try { equipmentData = JSON.parse(localStorage.getItem(EQUIPMENT_STORAGE_KEY)) || equipmentSeed; } catch { equipmentData = equipmentSeed; }
+  characterData.forEach(c => { if(!c.equipment) c.equipment={}; });
   let selectedCharacterId = characterData.find(c => c.active)?.id || characterData[0].id;
   let upgradeCharacterId = selectedCharacterId;
+  let equipmentTargetSlot = null;
 
-  const save = () => localStorage.setItem(CHARACTER_STORAGE_KEY, JSON.stringify(characterData));
+  const save = () => { localStorage.setItem(CHARACTER_STORAGE_KEY, JSON.stringify(characterData)); localStorage.setItem(EQUIPMENT_STORAGE_KEY, JSON.stringify(equipmentData)); };
   const getCharacter = id => characterData.find(c => c.id === id) || characterData[0];
+  const getItem = id => equipmentData.find(i => i.id === id);
   const nextStats = c => ({ hp:c.hp + 20, attack:c.attack + 4, defense:c.defense + 3 });
-  const statMarkup = c => `<div class="character-stat-grid"><div class="character-stat-box"><span>HP</span><strong>${c.hp}</strong></div><div class="character-stat-box"><span>ATTACK</span><strong>${c.attack}</strong></div><div class="character-stat-box"><span>DEFENSE</span><strong>${c.defense}</strong></div></div>`;
+  const equippedItems = c => Object.values(c.equipment || {}).map(getItem).filter(Boolean);
+  const totalStats = c => equippedItems(c).reduce((t,i)=>({hp:t.hp+(i.hp||0),attack:t.attack+(i.attack||0),defense:t.defense+(i.defense||0)}),{hp:c.hp,attack:c.attack,defense:c.defense});
+  const slotNames = {helmet:'หมวก',armor:'ชุด',arms:'แขน',boots:'รองเท้า',mainWeapon:'อาวุธหลัก'};
+  const slotIcons = {helmet:'🪖',armor:'🥋',arms:'🛡️',boots:'👢',mainWeapon:'⚔️'};
+  const gradeClass = g => `grade-${String(g).toLowerCase()}`;
+  const enhancementLevels = ['+1','+2','+3','+4','+5','+6','+7','+8','+9','+10','+11','+12','+13','+14','+15','I','II','III','IV','V','VI','VII','VIII','IX','X'];
+
+  const statMarkup = c => { const t=totalStats(c); return `<div class="character-stat-grid"><div class="character-stat-box"><span>HP</span><strong>${t.hp}</strong><em class="stat-bonus">รวมอุปกรณ์ +${t.hp-c.hp}</em></div><div class="character-stat-box"><span>ATTACK</span><strong>${t.attack}</strong><em class="stat-bonus">รวมอุปกรณ์ +${t.attack-c.attack}</em></div><div class="character-stat-box"><span>DEFENSE</span><strong>${t.defense}</strong><em class="stat-bonus">รวมอุปกรณ์ +${t.defense-c.defense}</em></div></div>`; };
+
+  function equipmentSlotMarkup(c, slot){
+    const item=getItem(c.equipment?.[slot]);
+    if(!item) return `<button type="button" class="equipment-slot equipment-empty" data-equip-slot="${slot}"><b>${slotIcons[slot]}</b><span>${slotNames[slot]}</span><small>ว่าง · กดเพื่อเลือก</small></button>`;
+    return `<button type="button" class="equipment-slot equipment-filled ${gradeClass(item.grade)}" data-equip-slot="${slot}"><div class="equipment-item-icon">${item.icon}</div><strong>${item.name}</strong><span>${slotNames[slot]}</span><div class="equipment-meta"><b>${item.grade}</b><b>${item.enhancement}</b></div><small>สวมใส่อยู่ · กดเพื่อเปลี่ยน</small></button>`;
+  }
 
   function renderCharacterList(){
     const el = document.getElementById('characterList'); if(!el) return;
-    el.innerHTML = characterData.map(c => `<button type="button" class="character-list-item ${c.id===selectedCharacterId?'selected':''}" data-character-id="${c.id}"><div class="character-avatar">${c.avatar}</div><div class="character-list-copy"><strong>${c.name}</strong><small>Lv. ${c.level}</small><div class="character-mini-stats"><span>HP ${c.hp}</span><span>ATK ${c.attack}</span><span>DEF ${c.defense}</span></div></div>${c.active?'<span class="character-active-badge">ใช้งานอยู่</span>':'<span></span>'}</button>`).join('');
+    el.innerHTML = characterData.map(c => { const t=totalStats(c); return `<button type="button" class="character-list-item ${c.id===selectedCharacterId?'selected':''}" data-character-id="${c.id}"><div class="character-avatar">${c.avatar}</div><div class="character-list-copy"><strong>${c.name}</strong><small>Lv. ${c.level}</small><div class="character-mini-stats"><span>HP ${t.hp}</span><span>ATK ${t.attack}</span><span>DEF ${t.defense}</span></div></div>${c.active?'<span class="character-active-badge">ใช้งานอยู่</span>':'<span></span>'}</button>`; }).join('');
     el.querySelectorAll('[data-character-id]').forEach(btn => btn.addEventListener('click', () => { selectedCharacterId=btn.dataset.characterId; renderCharacterSystem(); }));
   }
+
   function renderCharacterDetail(){
     const el=document.getElementById('characterDetailCard'); if(!el) return; const c=getCharacter(selectedCharacterId);
-    el.innerHTML=`<div class="character-detail-top"><div class="character-detail-avatar">${c.avatar}</div><div><h3 class="character-detail-name">${c.name}</h3><div class="character-detail-sub">Character ID · ${c.id.toUpperCase()}</div><div class="character-detail-level">LEVEL&nbsp; ${c.level}</div></div></div>${statMarkup(c)}<div class="equipment-title">EQUIPMENT SLOTS</div><div class="equipment-grid"><div class="equipment-slot"><b>🪖</b><span>หมวก</span></div><div class="equipment-slot"><b>🥋</b><span>ชุด</span></div><div class="equipment-slot"><b>🛡️</b><span>แขน</span></div><div class="equipment-slot"><b>👢</b><span>รองเท้า</span></div><div class="equipment-slot"><b>⚔️</b><span>อาวุธหลัก</span></div></div><div class="character-detail-actions"><button class="game-action-placeholder" type="button" id="characterUseBtn">${c.active?'✓ ใช้งานอยู่':'เลือกใช้งาน'}</button><button class="game-secondary-action" type="button" data-game-panel="character-upgrade">⬆ ไปอัปเกรดตัวละคร</button></div>`;
+    el.innerHTML=`<div class="character-detail-top"><div class="character-detail-avatar">${c.avatar}</div><div><h3 class="character-detail-name">${c.name}</h3><div class="character-detail-sub">Character ID · ${c.id.toUpperCase()}</div><div class="character-detail-level">LEVEL&nbsp; ${c.level}</div></div></div>${statMarkup(c)}<div class="equipment-title">EQUIPMENT SLOTS <small>เลือกช่องเพื่อจัดการอุปกรณ์</small></div><div class="equipment-grid">${Object.keys(slotNames).map(s=>equipmentSlotMarkup(c,s)).join('')}</div><div class="character-detail-actions"><button class="game-action-placeholder" type="button" id="characterUseBtn">${c.active?'✓ ใช้งานอยู่':'เลือกใช้งาน'}</button><button class="game-secondary-action" type="button" data-game-panel="character-upgrade">⬆ ไปอัปเกรดตัวละคร</button></div><div class="equipment-note">Grade และ Enhancement Level แยกกันอิสระ · รองรับ ${enhancementLevels.join(' → ')}</div><div class="equipment-picker-panel" id="equipmentPickerPanel" hidden></div>`;
     el.querySelector('#characterUseBtn')?.addEventListener('click',()=>{characterData.forEach(x=>x.active=x.id===c.id); selectedCharacterId=c.id; upgradeCharacterId=c.id; save(); renderCharacterSystem(); renderUpgradeSystem();});
     el.querySelector('[data-game-panel]')?.addEventListener('click',()=>{ document.querySelector('#gameLobbyPage .game-menu-item[data-game-panel="character-upgrade"]')?.click(); });
+    el.querySelectorAll('[data-equip-slot]').forEach(b=>b.addEventListener('click',()=>openEquipmentPicker(c.id,b.dataset.equipSlot)));
   }
+
+  function openEquipmentPicker(characterId, slot){
+    equipmentTargetSlot=slot; const c=getCharacter(characterId), panel=document.getElementById('equipmentPickerPanel'); if(!panel)return;
+    const equippedId=c.equipment?.[slot]; const items=equipmentData.filter(i=>i.slot===slot);
+    panel.hidden=false; panel.innerHTML=`<div class="equipment-picker-head"><div><span class="game-section-kicker">EQUIPMENT INVENTORY</span><h4>เลือก${slotNames[slot]}</h4></div><button type="button" class="picker-close" id="equipmentPickerClose">×</button></div><div class="equipment-inventory-grid">${items.map(i=>`<button type="button" class="inventory-item ${equippedId===i.id?'equipped':''} ${gradeClass(i.grade)}" data-item-id="${i.id}"><div class="inventory-icon">${i.icon}</div><div class="inventory-copy"><strong>${i.name}</strong><span><b>${i.grade}</b> · <b>${i.enhancement}</b></span><small>HP +${i.hp||0} · ATK +${i.attack||0} · DEF +${i.defense||0}</small></div>${equippedId===i.id?'<em>สวมใส่อยู่</em>':''}</button>`).join('') || '<div class="equipment-empty-message">ยังไม่มีไอเท็มในช่องนี้</div>'}</div><div class="picker-actions">${equippedId?'<button type="button" class="game-secondary-action" id="unequipBtn">ถอดอุปกรณ์</button>':''}</div>`;
+    panel.scrollIntoView({behavior:'smooth',block:'nearest'});
+    panel.querySelector('#equipmentPickerClose')?.addEventListener('click',()=>panel.hidden=true);
+    panel.querySelectorAll('[data-item-id]').forEach(b=>b.addEventListener('click',()=>equipItem(characterId,slot,b.dataset.itemId)));
+    panel.querySelector('#unequipBtn')?.addEventListener('click',()=>unequipItem(characterId,slot));
+  }
+  function equipItem(characterId,slot,itemId){ const c=getCharacter(characterId); c.equipment[slot]=itemId; save(); equipmentTargetSlot=null; renderCharacterSystem(); }
+  function unequipItem(characterId,slot){ const c=getCharacter(characterId); delete c.equipment[slot]; save(); equipmentTargetSlot=null; renderCharacterSystem(); }
   function renderCharacterSystem(){ renderCharacterList(); renderCharacterDetail(); }
 
   function renderUpgradeSystem(){
@@ -2063,9 +2106,8 @@ $$('#gameLobbyPage .game-menu-item, #gameLobbyPage .game-primary-btn').forEach(b
     const c=getCharacter(upgradeCharacterId), n=nextStats(c);
     picker.innerHTML=characterData.map(x=>`<button type="button" class="upgrade-character-chip ${x.id===upgradeCharacterId?'selected':''}" data-upgrade-id="${x.id}">${x.avatar} ${x.name}<small>Lv. ${x.level}</small></button>`).join('');
     picker.querySelectorAll('[data-upgrade-id]').forEach(b=>b.addEventListener('click',()=>{upgradeCharacterId=b.dataset.upgradeId;renderUpgradeSystem();}));
-    content.innerHTML=`<div class="character-preview-card"><div class="character-placeholder">${c.avatar}</div><strong>${c.name}</strong><span>ตัวละครที่เลือกสำหรับอัปเกรด</span><div class="character-detail-level">LEVEL&nbsp; ${c.level}</div></div><div class="character-level-card"><div class="level-row"><span>LEVEL ปัจจุบัน</span><strong>Lv. ${c.level}</strong></div><div class="character-stat-grid"><div class="character-stat-box"><span>HP</span><strong>${c.hp}</strong></div><div class="character-stat-box"><span>ATTACK</span><strong>${c.attack}</strong></div><div class="character-stat-box"><span>DEFENSE</span><strong>${c.defense}</strong></div></div><div class="upgrade-preview-note"><strong>PREVIEW หลังอัปเกรด</strong><div class="character-stat-grid" style="margin:10px 0 0"><div class="character-stat-box upgrade-preview-stat"><span>HP</span><strong>${n.hp}</strong><em>+20</em></div><div class="character-stat-box upgrade-preview-stat"><span>ATTACK</span><strong>${n.attack}</strong><em>+4</em></div><div class="character-stat-box upgrade-preview-stat"><span>DEFENSE</span><strong>${n.defense}</strong><em>+3</em></div></div></div><button class="game-action-placeholder upgrade-action-disabled" id="characterUpgradeBtn" type="button">⬆ อัปเกรด ${c.name} เป็น Lv. ${c.level+1}</button><div class="upgrade-level-rule">กฎพื้นฐาน: <strong>Level เพิ่มผ่านปุ่มอัปเกรดตัวละครเท่านั้น</strong> · ยังไม่มี EXP หรือทรัพยากรจริง</div></div>`;
+    content.innerHTML=`<div class="character-preview-card"><div class="character-placeholder">${c.avatar}</div><strong>${c.name}</strong><span>ตัวละครที่เลือกสำหรับอัปเกรด</span><div class="character-detail-level">LEVEL&nbsp; ${c.level}</div></div><div class="character-level-card"><div class="level-row"><span>LEVEL ปัจจุบัน</span><strong>Lv. ${c.level}</strong></div><div class="character-stat-grid"><div class="character-stat-box"><span>HP</span><strong>${totalStats(c).hp}</strong></div><div class="character-stat-box"><span>ATTACK</span><strong>${totalStats(c).attack}</strong></div><div class="character-stat-box"><span>DEFENSE</span><strong>${totalStats(c).defense}</strong></div></div><div class="upgrade-preview-note"><strong>PREVIEW หลังอัปเกรด</strong><div class="character-stat-grid" style="margin:10px 0 0"><div class="character-stat-box upgrade-preview-stat"><span>BASE HP</span><strong>${n.hp}</strong><em>+20</em></div><div class="character-stat-box upgrade-preview-stat"><span>BASE ATTACK</span><strong>${n.attack}</strong><em>+4</em></div><div class="character-stat-box upgrade-preview-stat"><span>BASE DEFENSE</span><strong>${n.defense}</strong><em>+3</em></div></div></div><button class="game-action-placeholder upgrade-action-disabled" id="characterUpgradeBtn" type="button">⬆ อัปเกรด ${c.name} เป็น Lv. ${c.level+1}</button><div class="upgrade-level-rule">Level เพิ่มผ่านปุ่มอัปเกรดตัวละครเท่านั้น · โบนัสจากอุปกรณ์ยังคงแยกจาก Base Stat</div></div>`;
     content.querySelector('#characterUpgradeBtn')?.addEventListener('click',()=>{const target=getCharacter(upgradeCharacterId);const ns=nextStats(target);target.level+=1;target.hp=ns.hp;target.attack=ns.attack;target.defense=ns.defense;save();selectedCharacterId=target.id;renderUpgradeSystem();renderCharacterSystem();});
   }
-
-  renderCharacterSystem(); renderUpgradeSystem();
+  save(); renderCharacterSystem(); renderUpgradeSystem();
 })();
