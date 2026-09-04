@@ -2031,10 +2031,14 @@ $$('#gameLobbyPage .game-menu-item, #gameLobbyPage .game-primary-btn').forEach(b
 (() => {
   const CHARACTER_STORAGE_KEY = 'gameLobbyCharactersV1';
   const EQUIPMENT_STORAGE_KEY = 'gameLobbyEquipmentV1';
+  const CHARACTER_UPGRADE_STORAGE_KEY = 'gameLobbyCharacterUpgradeItemsV1';
   const characterSeed = [
-    { id:'nova', name:'Nova', avatar:'🧙', level:1, hp:120, attack:24, defense:14, active:true, equipment:{} },
-    { id:'raven', name:'Raven', avatar:'🦹', level:3, hp:150, attack:31, defense:18, active:false, equipment:{} },
-    { id:'lyra', name:'Lyra', avatar:'🧝', level:2, hp:135, attack:27, defense:16, active:false, equipment:{} }
+    { id:'nova', name:'Nova', avatar:'🧙', level:1, baseHp:120, baseAttack:24, baseDefense:14, active:true, equipment:{} },
+    { id:'raven', name:'Raven', avatar:'🦹', level:3, baseHp:150, baseAttack:31, baseDefense:18, active:false, equipment:{} },
+    { id:'lyra', name:'Lyra', avatar:'🧝', level:2, baseHp:135, baseAttack:27, baseDefense:16, active:false, equipment:{} }
+  ];
+  const characterUpgradeItemSeed = [
+    {id:'char_core', name:'Character Core', icon:'💠', quantity:5, description:'วัสดุสำหรับอัปเกรดตัวละคร'},
   ];
   const equipmentSeed = [
     {id:'helm_aurora',slot:'helmet',name:'Aurora Helm',icon:'🪖',grade:'A',enhancement:'+3',hp:12,attack:0,defense:5},
@@ -2047,10 +2051,20 @@ $$('#gameLobbyPage .game-menu-item, #gameLobbyPage .game-primary-btn').forEach(b
     {id:'sword_flare',slot:'mainWeapon',name:'Flare Blade',icon:'⚔️',grade:'S',enhancement:'+5',enhancementLevel:'+5',durability:100,maxDurability:100,hp:0,attack:18,defense:2,equipped:false,broken:false},
     {id:'sword_dragon',slot:'mainWeapon',name:'Dragon Edge',icon:'🗡️',grade:'SSR',enhancement:'III',enhancementLevel:'III',durability:100,maxDurability:100,hp:8,attack:34,defense:4,equipped:false,broken:false}
   ];
-  let characterData, equipmentData;
+  let characterData, equipmentData, characterUpgradeItems;
   try { characterData = JSON.parse(localStorage.getItem(CHARACTER_STORAGE_KEY)) || characterSeed; } catch { characterData = characterSeed; }
   try { equipmentData = JSON.parse(localStorage.getItem(EQUIPMENT_STORAGE_KEY)) || equipmentSeed; } catch { equipmentData = equipmentSeed; }
-  characterData.forEach(c => { if(!c.equipment) c.equipment={}; });
+  try { characterUpgradeItems = JSON.parse(localStorage.getItem(CHARACTER_UPGRADE_STORAGE_KEY)) || characterUpgradeItemSeed; } catch { characterUpgradeItems = characterUpgradeItemSeed; }
+  characterData.forEach(c => {
+    if(!c.equipment) c.equipment={};
+    // Migrate the older character shape without changing existing progression.
+    c.baseHp = Number.isFinite(c.baseHp) ? c.baseHp : (Number.isFinite(c.hp) ? c.hp : 100);
+    c.baseAttack = Number.isFinite(c.baseAttack) ? c.baseAttack : (Number.isFinite(c.attack) ? c.attack : 20);
+    c.baseDefense = Number.isFinite(c.baseDefense) ? c.baseDefense : (Number.isFinite(c.defense) ? c.defense : 10);
+    c.level = Number.isFinite(c.level) ? c.level : 1;
+    c.hp = c.baseHp; c.attack = c.baseAttack; c.defense = c.baseDefense;
+  });
+  characterUpgradeItems.forEach(i => { i.quantity = Number.isFinite(i.quantity) ? i.quantity : 0; });
   equipmentData.forEach(i => {
     if(i.slot === 'mainWeapon') {
       i.enhancementLevel = i.enhancementLevel || i.enhancement || '+1';
@@ -2067,12 +2081,16 @@ $$('#gameLobbyPage .game-menu-item, #gameLobbyPage .game-primary-btn').forEach(b
   let upgradeCharacterId = selectedCharacterId;
   let equipmentTargetSlot = null;
 
-  const save = () => { localStorage.setItem(CHARACTER_STORAGE_KEY, JSON.stringify(characterData)); localStorage.setItem(EQUIPMENT_STORAGE_KEY, JSON.stringify(equipmentData)); };
+  const save = () => { localStorage.setItem(CHARACTER_STORAGE_KEY, JSON.stringify(characterData)); localStorage.setItem(EQUIPMENT_STORAGE_KEY, JSON.stringify(equipmentData)); localStorage.setItem(CHARACTER_UPGRADE_STORAGE_KEY, JSON.stringify(characterUpgradeItems)); };
   const getCharacter = id => characterData.find(c => c.id === id) || characterData[0];
   const getItem = id => equipmentData.find(i => i.id === id);
-  const nextStats = c => ({ hp:c.hp + 20, attack:c.attack + 4, defense:c.defense + 3 });
-  const equippedItems = c => Object.values(c.equipment || {}).map(getItem).filter(Boolean);
-  const totalStats = c => equippedItems(c).reduce((t,i)=>({hp:t.hp+(i.hp||0),attack:t.attack+(i.attack||0),defense:t.defense+(i.defense||0)}),{hp:c.hp,attack:c.attack,defense:c.defense});
+  const levelGrowth = c => ({ hp:c.hpPerLevel ?? 20, attack:c.attackPerLevel ?? 4, defense:c.defensePerLevel ?? 3 });
+  const nextBaseStats = c => { const g=levelGrowth(c); return { hp:c.baseHp+g.hp, attack:c.baseAttack+g.attack, defense:c.baseDefense+g.defense }; };
+  const upgradeItem = () => characterUpgradeItems.find(i=>i.id==='char_core') || characterUpgradeItems[0];
+  const upgradeCost = c => Math.max(1, Number(c.upgradeCost ?? 1));
+  const equippedItems = c => Object.values(c.equipment || {}).map(getItem).filter(i=>i && !i.broken);
+  const totalStats = c => equippedItems(c).reduce((t,i)=>({hp:t.hp+(i.hp||0),attack:t.attack+(i.attack||0),defense:t.defense+(i.defense||0)}),{hp:c.baseHp,attack:c.baseAttack,defense:c.baseDefense});
+  const equipmentBonusStats = c => equippedItems(c).reduce((t,i)=>({hp:t.hp+(i.hp||0),attack:t.attack+(i.attack||0),defense:t.defense+(i.defense||0)}),{hp:0,attack:0,defense:0});
   const slotNames = {helmet:'หมวก',armor:'ชุด',arms:'แขน',boots:'รองเท้า',mainWeapon:'อาวุธหลัก'};
   const slotIcons = {helmet:'🪖',armor:'🥋',arms:'🛡️',boots:'👢',mainWeapon:'⚔️'};
   const gradeClass = g => `grade-${String(g).toLowerCase()}`;
@@ -2115,11 +2133,40 @@ $$('#gameLobbyPage .game-menu-item, #gameLobbyPage .game-primary-btn').forEach(b
 
   function renderUpgradeSystem(){
     const picker=document.getElementById('upgradeCharacterPicker'), content=document.getElementById('characterUpgradeContent'); if(!picker||!content)return;
-    const c=getCharacter(upgradeCharacterId), n=nextStats(c);
-    picker.innerHTML=characterData.map(x=>`<button type="button" class="upgrade-character-chip ${x.id===upgradeCharacterId?'selected':''}" data-upgrade-id="${x.id}">${x.avatar} ${x.name}<small>Lv. ${x.level}</small></button>`).join('');
+    const c=getCharacter(upgradeCharacterId), n=nextBaseStats(c), growth=levelGrowth(c), resource=upgradeItem(), cost=upgradeCost(c), available=resource?.quantity||0, canUpgrade=available>=cost;
+    const current=totalStats(c), currentEq=equipmentBonusStats(c), previewTotal={hp:n.hp+currentEq.hp,attack:n.attack+currentEq.attack,defense:n.defense+currentEq.defense};
+    picker.innerHTML=characterData.map(x=>`<button type="button" class="upgrade-character-chip ${x.id===upgradeCharacterId?'selected':''}" data-upgrade-id="${x.id}">${x.avatar} ${x.name}<small>Lv. ${x.level} · Base HP ${x.baseHp}</small></button>`).join('');
     picker.querySelectorAll('[data-upgrade-id]').forEach(b=>b.addEventListener('click',()=>{upgradeCharacterId=b.dataset.upgradeId;renderUpgradeSystem();}));
-    content.innerHTML=`<div class="character-preview-card"><div class="character-placeholder">${c.avatar}</div><strong>${c.name}</strong><span>ตัวละครที่เลือกสำหรับอัปเกรด</span><div class="character-detail-level">LEVEL&nbsp; ${c.level}</div></div><div class="character-level-card"><div class="level-row"><span>LEVEL ปัจจุบัน</span><strong>Lv. ${c.level}</strong></div><div class="character-stat-grid"><div class="character-stat-box"><span>HP</span><strong>${totalStats(c).hp}</strong></div><div class="character-stat-box"><span>ATTACK</span><strong>${totalStats(c).attack}</strong></div><div class="character-stat-box"><span>DEFENSE</span><strong>${totalStats(c).defense}</strong></div></div><div class="upgrade-preview-note"><strong>PREVIEW หลังอัปเกรด</strong><div class="character-stat-grid" style="margin:10px 0 0"><div class="character-stat-box upgrade-preview-stat"><span>BASE HP</span><strong>${n.hp}</strong><em>+20</em></div><div class="character-stat-box upgrade-preview-stat"><span>BASE ATTACK</span><strong>${n.attack}</strong><em>+4</em></div><div class="character-stat-box upgrade-preview-stat"><span>BASE DEFENSE</span><strong>${n.defense}</strong><em>+3</em></div></div></div><button class="game-action-placeholder upgrade-action-disabled" id="characterUpgradeBtn" type="button">⬆ อัปเกรด ${c.name} เป็น Lv. ${c.level+1}</button><div class="upgrade-level-rule">Level เพิ่มผ่านปุ่มอัปเกรดตัวละครเท่านั้น · โบนัสจากอุปกรณ์ยังคงแยกจาก Base Stat</div></div>`;
-    content.querySelector('#characterUpgradeBtn')?.addEventListener('click',()=>{const target=getCharacter(upgradeCharacterId);const ns=nextStats(target);target.level+=1;target.hp=ns.hp;target.attack=ns.attack;target.defense=ns.defense;save();selectedCharacterId=target.id;renderUpgradeSystem();renderCharacterSystem();});
+    content.innerHTML=`
+      <div class="character-preview-card upgrade-character-preview">
+        <div class="character-placeholder">${c.avatar}</div><strong>${c.name}</strong><span>ตัวละครที่เลือกสำหรับอัปเกรด</span>
+        <div class="character-detail-level">LEVEL&nbsp; ${c.level}</div>
+        <div class="upgrade-resource-card"><span>UPGRADE RESOURCE</span><strong>${resource?.icon||'💠'} ${resource?.name||'Character Core'}</strong><small>มี ${available} · ใช้ ${cost} ต่อการอัปเกรด</small></div>
+      </div>
+      <div class="character-level-card">
+        <div class="level-row"><span>LEVEL ปัจจุบัน</span><strong>Lv. ${c.level}</strong></div>
+        <div class="upgrade-stat-section"><div class="upgrade-section-title">BASE STATS</div><div class="character-stat-grid">
+          <div class="character-stat-box"><span>HP</span><strong>${c.baseHp}</strong></div><div class="character-stat-box"><span>ATTACK</span><strong>${c.baseAttack}</strong></div><div class="character-stat-box"><span>DEFENSE</span><strong>${c.baseDefense}</strong></div>
+        </div></div>
+        <div class="upgrade-preview-note"><strong>PREVIEW หลังอัปเกรด</strong><div class="upgrade-flow"><b>Lv. ${c.level}</b><span>→</span><b>Lv. ${c.level+1}</b></div><div class="character-stat-grid upgrade-preview-grid">
+          <div class="character-stat-box upgrade-preview-stat"><span>BASE HP</span><strong>${c.baseHp} → ${n.hp}</strong><em>+${growth.hp}</em></div>
+          <div class="character-stat-box upgrade-preview-stat"><span>BASE ATTACK</span><strong>${c.baseAttack} → ${n.attack}</strong><em>+${growth.attack}</em></div>
+          <div class="character-stat-box upgrade-preview-stat"><span>BASE DEFENSE</span><strong>${c.baseDefense} → ${n.defense}</strong><em>+${growth.defense}</em></div>
+        </div></div>
+        <div class="upgrade-total-preview"><div><span>TOTAL NOW</span><strong>${current.hp} / ${current.attack} / ${current.defense}</strong><small>HP / ATK / DEF · Equipment +${currentEq.hp} / +${currentEq.attack} / +${currentEq.defense}</small></div><div class="upgrade-arrow">→</div><div><span>TOTAL AFTER</span><strong>${previewTotal.hp} / ${previewTotal.attack} / ${previewTotal.defense}</strong><small>โบนัสอุปกรณ์และอาวุธเดิมคงอยู่</small></div></div>
+        <button class="game-action-placeholder ${canUpgrade?'':'upgrade-action-disabled'}" id="characterUpgradeBtn" type="button" ${canUpgrade?'':'disabled'}>⬆ อัปเกรด ${c.name} เป็น Lv. ${c.level+1}</button>
+        <div class="upgrade-cost-row"><span>ใช้ ${resource?.icon||'💠'} ${cost} ${resource?.name||'Character Core'}</span><strong class="${canUpgrade?'resource-ok':'resource-low'}">คงเหลือ ${available}</strong></div>
+        <div class="upgrade-level-rule"><strong>กฎการอัปเกรด</strong> · Level เพิ่มผ่านระบบนี้เท่านั้น · Weapon Enhancement ไม่เพิ่ม Character Level · Base Stats แยกจาก Equipment/Weapon Bonus และ Total Stats จะคำนวณใหม่ทุกครั้ง</div>
+      </div>`;
+    content.querySelector('#characterUpgradeBtn')?.addEventListener('click',()=>{
+      const target=getCharacter(upgradeCharacterId), item=upgradeItem(), needed=upgradeCost(target);
+      if(!item || item.quantity<needed){ renderUpgradeSystem(); const note=document.querySelector('.upgrade-feedback'); if(note)note.textContent='ทรัพยากรไม่เพียงพอ'; return; }
+      const ns=nextBaseStats(target);
+      item.quantity-=needed; target.level+=1; target.baseHp=ns.hp; target.baseAttack=ns.attack; target.baseDefense=ns.defense;
+      target.hp=target.baseHp; target.attack=target.baseAttack; target.defense=target.baseDefense;
+      save(); selectedCharacterId=target.id; renderUpgradeSystem(); renderCharacterSystem();
+      const status=document.getElementById('characterUpgradeStatus'); if(status){status.textContent=`อัปเกรดสำเร็จ! ${target.name} เป็น Lv. ${target.level}`;status.className='character-upgrade-status success';setTimeout(()=>{status.textContent='';status.className='character-upgrade-status';},2800);}
+    });
   }
   function weaponLevelIndex(level){ return enhancementLevels.indexOf(level); }
   function weaponNextLevel(level){ const idx=weaponLevelIndex(level); return idx>=0 && idx<enhancementLevels.length-1 ? enhancementLevels[idx+1] : level; }
