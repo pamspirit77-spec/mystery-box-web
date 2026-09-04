@@ -2272,66 +2272,6 @@ $$('#gameLobbyPage .game-menu-item, #gameLobbyPage .game-primary-btn').forEach(b
     } catch(err) { addCurrency('diamond',GACHA_CONFIG.cost); setGachaFeedback('ไม่สามารถรับของรางวัลได้ · คืน Diamond ให้แล้ว','fail'); console.error(err); }
   }
 
-  // Shop System — scoped to Game Lobby; uses the existing central Currency + Inventory only.
-  const SHOP_CONFIG = {
-    currency: 'coin',
-    // Mock prices for testing only. Replace these values later when real shop rules are defined.
-    products: [
-      {id:'char_core', name:'Character Core', type:'upgrade', itemType:'character_upgrade', icon:'💠', description:'วัสดุสำหรับอัปเกรดตัวละคร', price:100, currency:'coin', quantity:1},
-      {id:'enhance_protect', name:'Enhancement Guard', type:'enhancement', itemType:'enhancement_protection', icon:'🛡️', description:'ไอเท็มช่วยป้องกันการลดระดับ Enhancement', price:150, currency:'coin', quantity:1},
-      {id:'restoration_kit', name:'Restoration Kit', type:'enhancement', itemType:'restoration', icon:'🧰', description:'ไอเท็มสำหรับคืนสภาพอาวุธที่แตก', price:200, currency:'coin', quantity:1},
-      {id:'repair_kit', name:'Repair Kit', type:'item', itemType:'repair', icon:'🔧', description:'ไอเท็มสำหรับซ่อม Durability ของอาวุธ', price:75, currency:'coin', quantity:1},
-      {id:'upgrade_material', name:'Upgrade Material', type:'material', itemType:'upgrade_material', icon:'🧩', description:'วัสดุทั่วไปสำหรับระบบพัฒนาในอนาคต', price:50, currency:'coin', quantity:1}
-    ]
-  };
-  let shopCategory='all';
-  let shopFeedbackTimer=null;
-  const shopProducts = () => SHOP_CONFIG.products.filter(p=>shopCategory==='all'||p.type===shopCategory);
-  const setShopFeedback = (msg,type='info') => { const el=document.getElementById('shopFeedback'); if(!el)return; clearTimeout(shopFeedbackTimer); el.className=`shop-feedback ${type}`; el.textContent=msg; shopFeedbackTimer=setTimeout(()=>{if(el.textContent===msg){el.textContent='';el.className='shop-feedback';}},3000); };
-  function renderShop(){
-    const grid=document.getElementById('shopProductGrid'), coinEl=document.getElementById('shopCoinBalance');
-    if(!grid)return;
-    if(coinEl)coinEl.textContent=getCurrency('coin');
-    $$('#gameLobbyPage [data-shop-category]').forEach(b=>b.classList.toggle('active',b.dataset.shopCategory===shopCategory));
-    const products=shopProducts();
-    grid.innerHTML=products.map(p=>{
-      const canAfford=getCurrency(p.currency)>=p.price;
-      return `<article class="shop-product-card">
-        <div class="shop-product-icon">${p.icon}</div>
-        <div class="shop-product-body"><span class="shop-product-type">${p.type==='upgrade'?'UPGRADE':p.type==='enhancement'?'ENHANCEMENT':p.type==='material'?'MATERIAL':'ITEM'}</span><h3>${p.name}</h3><p>${p.description}</p></div>
-        <div class="shop-product-buy"><div><strong>🪙 ${p.price}</strong><small>COIN · Mock Price</small></div><div class="shop-quantity-control"><button type="button" data-shop-qty-minus="${p.id}" aria-label="ลดจำนวน">−</button><span id="shopQty_${p.id}">1</span><button type="button" data-shop-qty-plus="${p.id}" aria-label="เพิ่มจำนวน">+</button></div><div class="shop-buy-total"><span>รวม</span><b id="shopTotal_${p.id}">${p.price}</b> COIN</div><button type="button" class="game-action-placeholder shop-buy-btn" data-shop-buy="${p.id}" ${canAfford?'':'disabled'}>ซื้อ ×${p.quantity}</button>${canAfford?'':'<small class="shop-disabled-reason">Coin ไม่เพียงพอ</small>'}</div>
-      </article>`;
-    }).join('') || `<div class="inventory-empty-state"><span>🛒</span><strong>ไม่มีสินค้าในหมวดนี้</strong><small>เลือกหมวดอื่นเพื่อดูสินค้า</small></div>`;
-  }
-  const shopQty = id => { const el=document.getElementById(`shopQty_${id}`); return Math.max(1,Math.min(99,Number(el?.textContent||1))); };
-  const setShopQty = (id,qty) => { const p=SHOP_CONFIG.products.find(x=>x.id===id); if(!p)return; const q=Math.max(1,Math.min(99,Number(qty)||1)), qEl=document.getElementById(`shopQty_${id}`), totalEl=document.getElementById(`shopTotal_${id}`), btn=document.querySelector(`[data-shop-buy="${id}"]`); if(qEl)qEl.textContent=q; if(totalEl)totalEl.textContent=p.price*q; if(btn)btn.textContent=`ซื้อ ×${q}`; const card=btn?.closest('.shop-product-card'); if(card){const reason=card.querySelector('.shop-disabled-reason'); const ok=getCurrency(p.currency)>=p.price*q; btn.disabled=!ok; if(reason)reason.textContent=ok?'':'Coin ไม่เพียงพอ';}}
-  function buyShopProduct(id){
-    const product=SHOP_CONFIG.products.find(p=>p.id===id);
-    if(!product){setShopFeedback('ไม่พบสินค้า','fail');return;}
-    const qty=shopQty(id), total=product.price*qty;
-    if(!Number.isFinite(total)||total<0){setShopFeedback('ข้อมูลราคาสินค้าไม่ถูกต้อง','fail');return;}
-    if(!canSpendCurrency(product.currency,total)){setShopFeedback('Coin ไม่เพียงพอ · ไม่หัก Coin และไม่ได้รับสินค้า','fail');renderShop();return;}
-    const itemBefore=itemInventory.find(i=>i.id===product.id)?.quantity||0;
-    if(!spendCurrency(product.currency,total)){setShopFeedback('ไม่สามารถหัก Coin ได้ · รายการถูกยกเลิก','fail');return;}
-    try {
-      const added=addItem({id:product.id,name:product.name,type:product.itemType,icon:product.icon,description:product.description},product.quantity*qty);
-      if(!added) throw new Error('Inventory add failed');
-      save(); renderInventory(); renderShop(); updateCurrencyUI();
-      setShopFeedback(`ซื้อสำเร็จ! ${product.name} ×${product.quantity*qty} · Coin เหลือ ${getCurrency('coin')}`,'success');
-    } catch(err){
-      // Compensating transaction: restore the exact Coin amount if Inventory insertion fails.
-      addCurrency(product.currency,total); const itemAfter=itemInventory.find(i=>i.id===product.id)?.quantity||0; if(itemAfter>itemBefore){const idx=itemInventory.findIndex(i=>i.id===product.id);if(idx>=0){itemInventory[idx].quantity=itemBefore;save();}}
-      renderInventory(); renderShop(); setShopFeedback('ไม่สามารถเพิ่มสินค้าเข้าคลังได้ · คืน Coin ให้แล้ว','fail'); console.error(err);
-    }
-  }
-  document.addEventListener('click',event=>{
-    const cat=event.target.closest('[data-shop-category]'); if(cat){shopCategory=cat.dataset.shopCategory;renderShop();return;}
-    const minus=event.target.closest('[data-shop-qty-minus]'); if(minus){const id=minus.dataset.shopQtyMinus;setShopQty(id,shopQty(id)-1);return;}
-    const plus=event.target.closest('[data-shop-qty-plus]'); if(plus){const id=plus.dataset.shopQtyPlus;setShopQty(id,shopQty(id)+1);return;}
-    const buy=event.target.closest('[data-shop-buy]'); if(buy){buyShopProduct(buy.dataset.shopBuy);return;}
-  });
-  renderShop();
-
   let selectedWeaponId = equipmentData.find(i=>i.slot==='mainWeapon')?.id || null;
   let weaponProtectNext = false;
   let weaponFeedbackTimer = null;
@@ -2401,4 +2341,138 @@ $$('#gameLobbyPage .game-menu-item, #gameLobbyPage .game-primary-btn').forEach(b
   document.getElementById('gachaCharacterBtn')?.addEventListener('click',()=>performGacha('character'));
   document.getElementById('gachaWeaponBtn')?.addEventListener('click',()=>performGacha('weapon'));
   document.getElementById('gachaItemBtn')?.addEventListener('click',()=>performGacha('item'));
+}
+  // Shop — isolated renderer. Uses only the existing Currency and Inventory functions above.
+  const SHOP_CONFIG = [
+    {id:'shop_char_core', name:'Character Core', type:'upgrade', description:'วัสดุสำหรับระบบอัปเกรดตัวละคร', icon:'💠', price:100, currency:'coin', quantity:1, itemType:'character_upgrade'},
+    {id:'shop_enhance_guard', name:'Enhancement Guard', type:'enhancement', description:'ไอเท็มช่วยป้องกันการลดระดับ Enhancement', icon:'🛡️', price:150, currency:'coin', quantity:1, itemType:'enhancement_protection'},
+    {id:'shop_restoration_kit', name:'Restoration Kit', type:'item', description:'ไอเท็มสำหรับคืนสภาพอาวุธที่แตก', icon:'🧰', price:200, currency:'coin', quantity:1, itemType:'restoration'},
+    {id:'shop_repair_kit', name:'Repair Kit', type:'item', description:'ไอเท็มสำหรับซ่อม Durability', icon:'🔧', price:80, currency:'coin', quantity:1, itemType:'repair'},
+    {id:'shop_metal_shard', name:'Enhancement Material', type:'material', description:'วัสดุสำหรับพัฒนาระบบอุปกรณ์ในอนาคต', icon:'🔩', price:50, currency:'coin', quantity:1, itemType:'material'}
+  ];
+  let shopCategory = 'all';
+
+  function shopMoney(){ return getCurrency('coin'); }
+  function shopProduct(id){ return SHOP_CONFIG.find(p => p.id === id) || null; }
+  function shopCategoryMatch(p){ return shopCategory === 'all' || p.type === shopCategory; }
+  function shopEscape(value){
+    return String(value ?? '').replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
+  }
+
+  function renderShop(){
+    const grid = document.getElementById('shopGrid');
+    const balance = document.getElementById('shopCoinBalance');
+    if(!grid || !balance) return;
+    balance.textContent = shopMoney().toLocaleString();
+    const products = SHOP_CONFIG.filter(shopCategoryMatch);
+    if(!products.length){
+      grid.innerHTML = '<div class="shop-empty-state"><span>🛒</span><strong>ยังไม่มีสินค้าในหมวดนี้</strong><small>รายการสินค้าจะเพิ่มได้จาก SHOP_CONFIG</small></div>';
+      return;
+    }
+    grid.innerHTML = products.map(p => `
+      <article class="shop-product-card" data-shop-product="${shopEscape(p.id)}">
+        <div class="shop-product-icon">${p.icon}</div>
+        <div class="shop-product-info">
+          <span class="shop-product-type">${shopEscape(p.type)}</span>
+          <h3>${shopEscape(p.name)}</h3>
+          <p>${shopEscape(p.description)}</p>
+          <div class="shop-product-meta"><span>ได้รับ ×${p.quantity}</span><strong>🪙 ${p.price.toLocaleString()}</strong></div>
+        </div>
+        <div class="shop-buy-row">
+          <div class="shop-quantity" role="group" aria-label="จำนวน">
+            <button type="button" data-shop-qty="1" class="active">×1</button>
+            <button type="button" data-shop-qty="5">×5</button>
+            <button type="button" data-shop-qty="10">×10</button>
+            <b data-shop-qty-value hidden>1</b>
+          </div>
+          <button type="button" class="shop-buy-btn" data-shop-buy>ซื้อ</button>
+        </div>
+        <small class="shop-buy-total" data-shop-total>รวม 🪙 ${p.price.toLocaleString()}</small>
+      </article>
+    `).join('');
+    grid.querySelectorAll('[data-shop-product]').forEach(card => {
+      const product = shopProduct(card.dataset.shopProduct);
+      const qtyValue = card.querySelector('[data-shop-qty-value]');
+      const total = card.querySelector('[data-shop-total]');
+      const buy = card.querySelector('[data-shop-buy]');
+      const refreshCard = () => {
+        const qty = Number(qtyValue?.textContent || 1);
+        if(total) total.textContent = `รวม 🪙 ${(product.price * qty).toLocaleString()}`;
+        if(buy){
+          const affordable = shopMoney() >= product.price * qty;
+          buy.disabled = !affordable;
+          buy.title = affordable ? '' : 'Coin ไม่เพียงพอ';
+        }
+      };
+      card.querySelectorAll('[data-shop-qty]').forEach(btn => btn.addEventListener('click', () => {
+        const q = Number(btn.dataset.shopQty);
+        qtyValue.textContent = q;
+        card.querySelectorAll('[data-shop-qty]').forEach(x => x.classList.toggle('active', x === btn));
+        refreshCard();
+      }));
+      buy?.addEventListener('click', () => purchaseShopProduct(product.id, Number(qtyValue.textContent || 1)));
+      refreshCard();
+    });
+  }
+
+  function shopFeedback(message, kind='info'){
+    const el = document.getElementById('shopFeedback');
+    if(!el) return;
+    el.textContent = message;
+    el.className = `shop-feedback ${kind}`;
+    window.setTimeout(() => { if(el.textContent === message) { el.textContent=''; el.className='shop-feedback'; } }, 2400);
+  }
+
+  function purchaseShopProduct(productId, count){
+    const product = shopProduct(productId);
+    const qty = Number(count);
+    if(!product || !Number.isInteger(qty) || qty < 1 || qty > 10) return shopFeedback('ไม่สามารถทำรายการได้', 'error');
+    if(product.currency !== 'coin') return shopFeedback('ร้านค้านี้รองรับ Coin เท่านั้น', 'error');
+    const totalCost = product.price * qty;
+    if(!canSpendCurrency('coin', totalCost)) return shopFeedback('Coin ไม่เพียงพอ', 'error');
+
+    // Use the existing central Currency + Inventory functions. No Shop state is persisted.
+    const item = {
+      id: product.itemId || product.id,
+      name: product.name,
+      type: product.itemType || product.type,
+      icon: product.icon,
+      description: product.description
+    };
+    const previousQty = itemInventory.find(i => i.id === item.id)?.quantity || 0;
+    try {
+      if(!spendCurrency('coin', totalCost)) throw new Error('currency');
+      const added = addItem(item, product.quantity * qty);
+      if(!added) throw new Error('inventory');
+      // Keep the existing Gacha/Item persistence bridge synchronized because it shares itemInventory.
+      if(typeof saveGachaState === 'function') saveGachaState();
+      renderShop();
+      renderInventory();
+      shopFeedback(`ซื้อ ${product.name} ×${product.quantity * qty} สำเร็จ`, 'success');
+    } catch (error) {
+      // Roll back only this Shop transaction; do not alter unrelated systems.
+      if(itemInventory.find(i => i.id === item.id)?.quantity > previousQty) {
+        const current = itemInventory.find(i => i.id === item.id);
+        current.quantity = previousQty;
+        save();
+      }
+      addCurrency('coin', totalCost);
+      shopFeedback('ไม่สามารถทำรายการได้ รายการถูกยกเลิก', 'error');
+    }
+  }
+
+  // Render only when the existing Game Lobby navigation opens the Shop panel.
+  document.getElementById('gameLobbyPage')?.addEventListener('click', event => {
+    const nav = event.target.closest('[data-game-panel="shop"]');
+    if(nav) window.setTimeout(renderShop, 0);
+  }, true);
+
+  document.getElementById('gameLobbyPage')?.addEventListener('click', event => {
+    const tab = event.target.closest('[data-shop-category]');
+    if(!tab) return;
+    shopCategory = tab.dataset.shopCategory || 'all';
+    document.querySelectorAll('#gameLobbyPage [data-shop-category]').forEach(x => x.classList.toggle('active', x === tab));
+    renderShop();
+  });
+
 })();
