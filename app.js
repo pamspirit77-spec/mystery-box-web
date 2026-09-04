@@ -1939,6 +1939,13 @@ function showAccountPage() {
 function showHomePage() {
   ['.world-tree-panel', '.content', '.bottom-grid'].forEach(sel => document.querySelector(sel)?.classList.remove('hidden'));
   $('#accountPage')?.classList.add('hidden');
+  $('#gameLobbyPage')?.classList.add('hidden');
+}
+
+function showGameLobbyPage() {
+  ['.world-tree-panel', '.content', '.bottom-grid', '#accountPage'].forEach(sel => document.querySelector(sel)?.classList.add('hidden'));
+  $('#gameLobbyPage')?.classList.remove('hidden');
+  window.scrollTo({top: 0, behavior: 'smooth'});
 }
 
 $$('.nav').forEach(n => n.onclick = () => {
@@ -1946,6 +1953,7 @@ $$('.nav').forEach(n => n.onclick = () => {
   n.classList.add('active');
   const p = n.dataset.page;
   if(p === 'account') showAccountPage();
+  else if(p === 'game') showGameLobbyPage();
   else if(p === 'rewards') { showHomePage(); openInventoryModal(); }
   else if(p === 'history') {
     showHomePage();
@@ -1971,6 +1979,11 @@ $('#accountPageLogout')?.addEventListener('click', async () => {
 });
 
 $('#accountBackHome')?.addEventListener('click', () => {
+  const home = document.querySelector('.nav[data-page="home"]');
+  home?.click();
+});
+
+$('#gameLobbyBackHome')?.addEventListener('click', () => {
   const home = document.querySelector('.nav[data-page="home"]');
   home?.click();
 });
