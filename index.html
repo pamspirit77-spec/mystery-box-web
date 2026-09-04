@@ -296,7 +296,27 @@
     <div class="inventory-tab-panel" data-inventory-view="items"><div id="inventoryItemsGrid" class="central-inventory-grid"></div></div>
   </div>
 </section>
-              <section class="game-panel" data-game-panel-view="shop"><div class="game-empty-panel"><span>🛒</span><h2>ร้านค้า</h2><p>พื้นที่สำหรับร้านค้าและไอเทมภายในเกม</p><small>ยังไม่มีระบบซื้อขายในขั้นตอนนี้</small><button class="game-panel-back" type="button" data-game-panel="play">← กลับ Game Lobby</button></div></section>
+              <section class="game-panel" data-game-panel-view="shop">
+                <div class="game-system-page shop-page">
+                  <div class="game-system-head">
+                    <div><span class="game-section-kicker">GAME SHOP</span><h2>ร้านค้า / Shop</h2><p>ซื้อไอเท็มด้วย Coin และเพิ่มเข้าคลังกลางของผู้เล่น</p></div>
+                    <button class="game-panel-back" type="button" data-game-panel="play">← กลับ Game Lobby</button>
+                  </div>
+                  <div class="shop-currency-bar">
+                    <div><span>AVAILABLE CURRENCY</span><strong>🪙 <b id="shopCoinBalance">0</b> COIN</strong></div>
+                    <small>💎 Diamond ใช้สำหรับ Gacha เท่านั้น</small>
+                  </div>
+                  <div id="shopFeedback" class="shop-feedback" aria-live="polite"></div>
+                  <div class="shop-category-tabs" role="tablist" aria-label="หมวดร้านค้า">
+                    <button type="button" class="shop-category-tab active" data-shop-category="all">ทั้งหมด</button>
+                    <button type="button" class="shop-category-tab" data-shop-category="item">ไอเท็ม</button>
+                    <button type="button" class="shop-category-tab" data-shop-category="material">วัตถุดิบ</button>
+                    <button type="button" class="shop-category-tab" data-shop-category="upgrade">สำหรับอัปเกรด</button>
+                    <button type="button" class="shop-category-tab" data-shop-category="enhancement">สำหรับตีบวก</button>
+                  </div>
+                  <div id="shopProductGrid" class="shop-product-grid"></div>
+                </div>
+              </section>
               <section class="game-panel" data-game-panel-view="missions"><div class="game-empty-panel"><span>🎯</span><h2>ภารกิจ / ความสำเร็จ</h2><p>พื้นที่สำหรับภารกิจ Achievement และรางวัล</p><small>ระบบจริงจะเพิ่มในขั้นตอนถัดไป</small><button class="game-panel-back" type="button" data-game-panel="play">← กลับ Game Lobby</button></div></section>
               <section class="game-panel" data-game-panel-view="ranking"><div class="game-empty-panel"><span>🏆</span><h2>กระดานอันดับ</h2><p>พื้นที่สำหรับ Leaderboard และอันดับผู้เล่น</p><small>ยังไม่มีข้อมูลอันดับในขั้นตอนนี้</small><button class="game-panel-back" type="button" data-game-panel="play">← กลับ Game Lobby</button></div></section>
               <section class="game-panel" data-game-panel-view="profile"><div class="game-empty-panel"><span>◎</span><h2>โปรไฟล์</h2><p>พื้นที่สำหรับข้อมูลผู้เล่น สถิติ และความคืบหน้า</p><small>ระบบโปรไฟล์เกมจะเพิ่มในขั้นตอนถัดไป</small><button class="game-panel-back" type="button" data-game-panel="play">← กลับ Game Lobby</button></div></section>
