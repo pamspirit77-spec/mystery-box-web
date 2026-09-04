@@ -2062,6 +2062,7 @@ $$('#gameLobbyPage .game-menu-item, #gameLobbyPage .game-primary-btn').forEach(b
     c.baseAttack = Number.isFinite(c.baseAttack) ? c.baseAttack : (Number.isFinite(c.attack) ? c.attack : 20);
     c.baseDefense = Number.isFinite(c.baseDefense) ? c.baseDefense : (Number.isFinite(c.defense) ? c.defense : 10);
     c.level = Number.isFinite(c.level) ? c.level : 1;
+    c.grade = c.grade || 'A';
     c.hp = c.baseHp; c.attack = c.baseAttack; c.defense = c.baseDefense;
   });
   characterUpgradeItems.forEach(i => { i.quantity = Number.isFinite(i.quantity) ? i.quantity : 0; });
@@ -2082,6 +2083,44 @@ $$('#gameLobbyPage .game-menu-item, #gameLobbyPage .game-primary-btn').forEach(b
   let equipmentTargetSlot = null;
 
   const save = () => { localStorage.setItem(CHARACTER_STORAGE_KEY, JSON.stringify(characterData)); localStorage.setItem(EQUIPMENT_STORAGE_KEY, JSON.stringify(equipmentData)); localStorage.setItem(CHARACTER_UPGRADE_STORAGE_KEY, JSON.stringify(characterUpgradeItems)); };
+
+  // Central Game Inventory + Currency store. All Game Lobby systems read/write this shared state.
+  const CURRENCY_STORAGE_KEY = 'gameLobbyCurrencyV1';
+  let currencyState = { diamond: 0, coin: 0 };
+  try {
+    const stored = JSON.parse(localStorage.getItem(CURRENCY_STORAGE_KEY));
+    if (stored && typeof stored === 'object') {
+      currencyState.diamond = Number.isFinite(Number(stored.diamond)) ? Number(stored.diamond) : 0;
+      currencyState.coin = Number.isFinite(Number(stored.coin)) ? Number(stored.coin) : 0;
+    } else {
+      // One-time migration of the previous Game Lobby Gacha balance into Diamond.
+      const legacy = Number(localStorage.getItem('gameLobbyGachaCurrencyV1'));
+      currencyState.diamond = Number.isFinite(legacy) ? legacy : 0;
+      currencyState.coin = 0;
+    }
+  } catch { currencyState = { diamond: 0, coin: 0 }; }
+  const saveCurrency = () => localStorage.setItem(CURRENCY_STORAGE_KEY, JSON.stringify(currencyState));
+  const getCurrency = type => Number(currencyState[type] || 0);
+  const canSpendCurrency = (type, amount) => Number.isFinite(amount) && amount >= 0 && getCurrency(type) >= amount;
+  const addCurrency = (type, amount) => { if (!['diamond','coin'].includes(type) || !Number.isFinite(amount)) return false; currencyState[type] = Math.max(0, getCurrency(type) + amount); saveCurrency(); updateCurrencyUI(); return true; };
+  const spendCurrency = (type, amount) => { if (!canSpendCurrency(type, amount) || amount === 0) return amount === 0; currencyState[type] -= amount; saveCurrency(); updateCurrencyUI(); return true; };
+  const hasItem = (id, qty=1) => (itemInventory.find(i=>i.id===id)?.quantity || 0) >= qty;
+  const addItem = (item, qty=1) => { if(!item || !Number.isFinite(qty) || qty <= 0) return null; const existing=itemInventory.find(i=>i.id===item.id); if(existing) existing.quantity=(existing.quantity||0)+qty; else itemInventory.push({...item,quantity:qty}); save(); renderInventory(); return itemInventory.find(i=>i.id===item.id); };
+  const removeItem = (id, qty=1) => { const item=itemInventory.find(i=>i.id===id); if(!item || !Number.isFinite(qty) || qty <= 0 || (item.quantity||0)<qty) return false; item.quantity-=qty; save(); renderInventory(); return true; };
+  const addWeapon = weapon => { if(!weapon) return null; equipmentData.push(weapon); save(); renderInventory(); return weapon; };
+  const addCharacter = character => { if(!character) return null; characterData.push(character); save(); renderInventory(); return character; };
+  window.GameInventory = { getCharacters:()=>characterData, getWeapons:()=>equipmentData.filter(i=>i.slot==='mainWeapon'), getItems:()=>itemInventory, getCurrency:()=>({...currencyState}), addItem, removeItem, hasItem, addWeapon, addCharacter, addDiamond:(n)=>addCurrency('diamond',n), spendDiamond:(n)=>spendCurrency('diamond',n), hasDiamond:(n)=>canSpendCurrency('diamond',n), addCoin:(n)=>addCurrency('coin',n), spendCoin:(n)=>spendCurrency('coin',n), hasCoin:(n)=>canSpendCurrency('coin',n) };
+  function updateCurrencyUI(){ const d=getCurrency('diamond'), c=getCurrency('coin'); ['gameLobbyDiamonds','gachaDiamondBalance','inventoryDiamondBalance'].forEach(id=>{const el=document.getElementById(id);if(el)el.textContent=d;}); ['gameLobbyCoins','inventoryCoinBalance'].forEach(id=>{const el=document.getElementById(id);if(el)el.textContent=c;}); }
+  function inventoryEmpty(message){ return `<div class="inventory-empty-state"><span>📦</span><strong>${message}</strong><small>เมื่อได้รับของจากระบบที่เกี่ยวข้อง รายการจะแสดงที่นี่อัตโนมัติ</small></div>`; }
+  function renderInventory(){
+    const cg=document.getElementById('inventoryCharactersGrid'), wg=document.getElementById('inventoryWeaponsGrid'), ig=document.getElementById('inventoryItemsGrid');
+    updateCurrencyUI();
+    if(cg){ cg.innerHTML=characterData.length?characterData.map(c=>{const t=totalStats(c);return `<button type="button" class="central-inventory-card" data-inv-character="${c.id}"><div class="central-item-icon">${c.avatar||'👤'}</div><div class="central-item-copy"><strong>${c.name}</strong><span class="central-grade ${gradeClass(c.grade)}">Grade ${c.grade||'A'}</span><small>Lv. ${c.level} · HP ${t.hp} · ATK ${t.attack} · DEF ${t.defense}</small></div><em>${c.active?'ใช้งานอยู่':'ไม่ได้ใช้งาน'}</em></button>`}).join(''):inventoryEmpty('ยังไม่มีตัวละคร'); cg.querySelectorAll('[data-inv-character]').forEach(b=>b.addEventListener('click',()=>{selectedCharacterId=b.dataset.invCharacter;renderCharacterSystem();document.querySelector('#gameLobbyPage .game-menu-item[data-game-panel="characters"]')?.click();})); }
+    if(wg){ const weapons=equipmentData.filter(i=>i.slot==='mainWeapon'); wg.innerHTML=weapons.length?weapons.map(w=>`<button type="button" class="central-inventory-card ${w.broken?'is-broken':''}" data-inv-weapon="${w.id}"><div class="central-item-icon">${w.icon||'⚔️'}</div><div class="central-item-copy"><strong>${w.name}</strong><span class="central-grade ${gradeClass(w.grade)}">Grade ${w.grade}</span><small>${w.enhancementLevel||w.enhancement||'+1'} · DUR ${w.durability??100}/${w.maxDurability??100} · HP +${w.hp??w.hpBonus??0} · ATK +${w.attack??w.attackBonus??0} · DEF +${w.defense??w.defenseBonus??0}</small></div><em>${w.broken?'แตก':w.equipped?'สวมใส่อยู่':'ไม่ได้สวมใส่'}</em></button>`).join(''):inventoryEmpty('ยังไม่มีอาวุธในคลัง'); wg.querySelectorAll('[data-inv-weapon]').forEach(b=>b.addEventListener('click',()=>{selectedWeaponId=b.dataset.invWeapon;document.querySelector('#gameLobbyPage .game-menu-item[data-game-panel="enhancement"]')?.click();})); }
+    if(ig){ ig.innerHTML=itemInventory.filter(i=>(i.quantity||0)>0).length?itemInventory.filter(i=>(i.quantity||0)>0).map(i=>`<div class="central-inventory-card item-card"><div class="central-item-icon">${i.icon||'🎁'}</div><div class="central-item-copy"><strong>${i.name}</strong><span>${i.type||'item'}</span><small>${i.description||'ไอเท็มในคลัง'}</small></div><em>×${i.quantity||0}</em></div>`).join(''):inventoryEmpty('ยังไม่มีไอเท็ม'); }
+  }
+  document.addEventListener('click', event=>{ const tab=event.target.closest('[data-inventory-tab]'); if(!tab)return; const key=tab.dataset.inventoryTab; $$('#gameLobbyPage [data-inventory-tab]').forEach(x=>x.classList.toggle('active',x===tab)); $$('#gameLobbyPage [data-inventory-view]').forEach(x=>x.classList.toggle('active',x.dataset.inventoryView===key)); });
+
   const getCharacter = id => characterData.find(c => c.id === id) || characterData[0];
   const getItem = id => equipmentData.find(i => i.id === id);
   const levelGrowth = c => ({ hp:c.hpPerLevel ?? 20, attack:c.attackPerLevel ?? 4, defense:c.defensePerLevel ?? 3 });
@@ -2187,7 +2226,7 @@ $$('#gameLobbyPage .game-menu-item, #gameLobbyPage .game-primary-btn').forEach(b
   const GACHA_CURRENCY_KEY = 'gameLobbyGachaCurrencyV1';
   const GACHA_ITEM_KEY = 'gameLobbyItemInventoryV1';
   const GACHA_CONFIG = {
-    cost: 1,
+    cost: null,
     gradeWeights: { A: 60, S: 25, SSS: 12, SSR: 3 },
     characterPool: [
       {id:'gacha_nova',name:'Nova',avatar:'🧙',grade:'A',baseHp:120,baseAttack:24,baseDefense:14},
@@ -2208,37 +2247,29 @@ $$('#gameLobbyPage .game-menu-item, #gameLobbyPage .game-primary-btn').forEach(b
       {type:'repair',id:'repair_kit',name:'Repair Kit',icon:'🔧',description:'ไอเท็มสำหรับซ่อม Durability'}
     ]
   };
-  let gachaCurrency = 24;
-  try { gachaCurrency = Number(localStorage.getItem(GACHA_CURRENCY_KEY)); if(!Number.isFinite(gachaCurrency)) gachaCurrency=24; } catch { gachaCurrency=24; }
-  let itemInventory = characterUpgradeItems;
-  try {
-    const storedItems = JSON.parse(localStorage.getItem(GACHA_ITEM_KEY));
-    if(Array.isArray(storedItems)){
-      storedItems.forEach(si=>{ const existing=itemInventory.find(i=>i.id===si.id); if(existing) existing.quantity=si.quantity; else itemInventory.push(si); });
-    }
-  } catch {}
-  const saveGachaState = () => { localStorage.setItem(GACHA_CURRENCY_KEY, String(gachaCurrency)); localStorage.setItem(GACHA_ITEM_KEY, JSON.stringify(itemInventory)); };
-  const updateGachaCurrencyUI = () => { const a=document.getElementById('gachaCoinBalance'), b=document.getElementById('gameLobbyCoins'); if(a)a.textContent=gachaCurrency; if(b)b.textContent=gachaCurrency; };
+  let gachaCurrency = getCurrency('diamond');
+  const saveGachaState = () => { gachaCurrency = getCurrency('diamond'); saveCurrency(); localStorage.setItem(GACHA_ITEM_KEY, JSON.stringify(itemInventory)); };
+  const updateGachaCurrencyUI = () => { updateCurrencyUI(); const a=document.getElementById('gachaDiamondBalance'); if(a)a.textContent=getCurrency('diamond'); const c=document.getElementById('gachaCostLabel'); if(c)c.textContent=Number.isFinite(GACHA_CONFIG.cost)?`${GACHA_CONFIG.cost} DIAMOND`:'ยังไม่ได้กำหนด'; };
   const setGachaFeedback = (msg,type='info') => { const el=document.getElementById('gachaFeedback'); if(!el)return; el.className=`gacha-feedback ${type}`; el.textContent=msg; setTimeout(()=>{ if(el.textContent===msg){el.textContent='';el.className='gacha-feedback';}},2600); };
   const weightedGrade = () => { const entries=Object.entries(GACHA_CONFIG.gradeWeights); const total=entries.reduce((n,[,w])=>n+w,0); let r=Math.random()*total; for(const [grade,w] of entries){r-=w;if(r<0)return grade;} return entries[entries.length-1][0]; };
   const poolPick = pool => { const grade=weightedGrade(); const candidates=pool.filter(x=>x.grade===grade); return (candidates.length?candidates:pool)[Math.floor(Math.random()*(candidates.length?candidates:pool).length)]; };
   const uniqueId = prefix => `${prefix}_${Date.now()}_${Math.random().toString(36).slice(2,7)}`;
-  const addGachaCharacter = template => { const c={...template,id:uniqueId(template.id),level:1,active:false,equipment:{},hpPerLevel:20,attackPerLevel:4,defensePerLevel:3,upgradeCost:1}; characterData.push(c); return c; };
-  const addGachaWeapon = template => { const item={...template,id:uniqueId(template.id),slot:'mainWeapon',enhancementLevel:'+1',enhancement:'+1',durability:100,maxDurability:100,equipped:false,broken:false,baseHpBonus:template.hpBonus||0,baseAttackBonus:template.attackBonus||0,baseDefenseBonus:template.defenseBonus||0}; const b=weaponBonus(item); item.hp=b.hp;item.attack=b.attack;item.defense=b.defense; equipmentData.push(item); return item; };
-  const addGachaItem = template => { let item=itemInventory.find(i=>i.id===template.id); if(item)item.quantity=(item.quantity||0)+1; else { item={...template,quantity:1}; itemInventory.push(item); } return item; };
+  const addGachaCharacter = template => { const c={...template,id:uniqueId(template.id),level:1,active:false,equipment:{},hpPerLevel:20,attackPerLevel:4,defensePerLevel:3}; addCharacter(c); return c; };
+  const addGachaWeapon = template => { const item={...template,id:uniqueId(template.id),slot:'mainWeapon',enhancementLevel:'+1',enhancement:'+1',durability:100,maxDurability:100,equipped:false,broken:false,baseHpBonus:template.hpBonus||0,baseAttackBonus:template.attackBonus||0,baseDefenseBonus:template.defenseBonus||0}; const b=weaponBonus(item); item.hp=b.hp;item.attack=b.attack;item.defense=b.defense; addWeapon(item); return item; };
+  const addGachaItem = template => addItem(template,1);
   const showGachaResult = (kind,result,detail) => { const card=document.getElementById('gachaResultCard'); if(!card)return; card.hidden=false; card.innerHTML=`<div class="gacha-result-kicker">GACHA RESULT</div><div class="gacha-result-main"><div class="gacha-result-icon">${result.icon||result.avatar||'🎁'}</div><div><h3>ได้รับไอเท็ม!</h3><div class="gacha-result-badges"><b class="${gradeClass(result.grade||'A')}">${result.grade?'Grade '+result.grade:'ITEM'}</b><b>${kind}</b></div><p><strong>${result.name}</strong></p><p>${detail}</p></div></div><div class="gacha-result-actions"><button class="game-action-placeholder" id="gachaResultOk" type="button">ตกลง</button></div>`; card.scrollIntoView({behavior:'smooth',block:'nearest'}); document.getElementById('gachaResultOk')?.addEventListener('click',()=>{card.hidden=true;}); };
   function performGacha(type){
     updateGachaCurrencyUI();
-    if(gachaCurrency < GACHA_CONFIG.cost){ setGachaFeedback('Coin ไม่เพียงพอ · ต้องใช้ 1 COIN ต่อการสุ่ม','fail'); return; }
-    // Commit the currency cost before granting the result so one roll cannot grant without payment.
-    gachaCurrency-=GACHA_CONFIG.cost; saveGachaState();
+    if(!Number.isFinite(GACHA_CONFIG.cost)){ setGachaFeedback('ยังไม่ได้กำหนดราคา Gacha · ระบบรอ Config Diamond','fail'); return; }
+    if(!canSpendCurrency('diamond', GACHA_CONFIG.cost)){ setGachaFeedback('Diamond ไม่เพียงพอ · ไม่หัก Diamond','fail'); return; }
+    if(!spendCurrency('diamond', GACHA_CONFIG.cost)){ setGachaFeedback('ไม่สามารถหัก Diamond ได้','fail'); return; }
     let result,kind,detail;
     try {
       if(type==='character'){ const t=poolPick(GACHA_CONFIG.characterPool); result=addGachaCharacter(t); kind='CHARACTER'; detail=`${result.name} · Grade ${result.grade} · เพิ่มเข้า Character Inventory แล้ว`; }
       else if(type==='weapon'){ const t=poolPick(GACHA_CONFIG.weaponPool); result=addGachaWeapon(t); kind='WEAPON'; detail=`${result.name} · ${result.enhancementLevel} · HP +${result.hp} · ATK +${result.attack} · DEF +${result.defense}`; }
       else { const t=GACHA_CONFIG.itemPool[Math.floor(Math.random()*GACHA_CONFIG.itemPool.length)]; result=addGachaItem(t); kind='ITEM'; detail=`${result.description} · จำนวนใน Inventory ${result.quantity}`; }
-      save(); saveGachaState(); updateGachaCurrencyUI(); renderCharacterSystem(); renderUpgradeSystem(); renderWeaponEnhancement(); showGachaResult(kind,result,detail);
-    } catch(err) { gachaCurrency+=GACHA_CONFIG.cost; saveGachaState(); updateGachaCurrencyUI(); setGachaFeedback('ไม่สามารถรับของรางวัลได้ · คืน Coin ให้แล้ว','fail'); console.error(err); }
+      save(); saveGachaState(); updateGachaCurrencyUI(); renderCharacterSystem(); renderUpgradeSystem(); renderWeaponEnhancement(); renderInventory(); showGachaResult(kind,result,detail);
+    } catch(err) { addCurrency('diamond',GACHA_CONFIG.cost); setGachaFeedback('ไม่สามารถรับของรางวัลได้ · คืน Diamond ให้แล้ว','fail'); console.error(err); }
   }
 
   let selectedWeaponId = equipmentData.find(i=>i.slot==='mainWeapon')?.id || null;
@@ -2260,7 +2291,7 @@ $$('#gameLobbyPage .game-menu-item, #gameLobbyPage .game-primary-btn').forEach(b
   }
   function unequipWeapon(){
     const c=activeCharacter(); if(!c.equipment?.mainWeapon){setWeaponFeedback('ยังไม่มีอาวุธที่สวมใส่','info');return;}
-    const old=getItem(c.equipment.mainWeapon); delete c.equipment.mainWeapon; syncWeaponEquipment(); save(); renderWeaponEnhancement(); renderCharacterSystem(); setWeaponFeedback(`ถอด ${old?.name||'อาวุธ'} สำเร็จ`,'success');
+    const old=getItem(c.equipment.mainWeapon); delete c.equipment.mainWeapon; syncWeaponEquipment(); save(); renderWeaponEnhancement(); renderCharacterSystem(); renderInventory(); setWeaponFeedback(`ถอด ${old?.name||'อาวุธ'} สำเร็จ`,'success');
   }
   function enhanceWeapon(){
     const item=getItem(selectedWeaponId); if(!item){setWeaponFeedback('กรุณาเลือกอาวุธก่อน','fail');return;}
@@ -2270,7 +2301,7 @@ $$('#gameLobbyPage .game-menu-item, #gameLobbyPage .game-primary-btn').forEach(b
     const idx=weaponLevelIndex(oldLevel);
     const chance=Math.max(0.18, 0.92 - idx*0.028);
     const success=Math.random()<chance;
-    if(success){ item.enhancementLevel=weaponNextLevel(oldLevel); item.enhancement=item.enhancementLevel; const b=weaponBonus(item);item.hp=b.hp;item.attack=b.attack;item.defense=b.defense; save(); renderWeaponEnhancement(); renderCharacterSystem(); setWeaponFeedback(`ตีบวกสำเร็จ! ${oldLevel} → ${item.enhancementLevel}`,'success'); }
+    if(success){ item.enhancementLevel=weaponNextLevel(oldLevel); item.enhancement=item.enhancementLevel; const b=weaponBonus(item);item.hp=b.hp;item.attack=b.attack;item.defense=b.defense; save(); renderWeaponEnhancement(); renderCharacterSystem(); renderInventory(); setWeaponFeedback(`ตีบวกสำเร็จ! ${oldLevel} → ${item.enhancementLevel}`,'success'); }
     else {
       item.durability=Math.max(0,item.durability-20);
       const protectedLevel=weaponProtectNext;
@@ -2278,20 +2309,20 @@ $$('#gameLobbyPage .game-menu-item, #gameLobbyPage .game-primary-btn').forEach(b
       if(protectedLevel){ setWeaponFeedback(`ตีบวกไม่สำเร็จ · ป้องกันการลดระดับสำเร็จ · Durability -20`,'info'); }
       else { item.enhancementLevel=weaponPrevLevel(oldLevel);item.enhancement=item.enhancementLevel;const b=weaponBonus(item);item.hp=b.hp;item.attack=b.attack;item.defense=b.defense;setWeaponFeedback(`ตีบวกไม่สำเร็จ · ระดับลดลง ${oldLevel} → ${item.enhancementLevel}`,'fail'); }
       if(item.durability<=0){item.broken=true;setWeaponFeedback('อาวุธแตก · ต้องคืนสภาพก่อน','fail');}
-      save(); renderWeaponEnhancement(); renderCharacterSystem();
+      save(); renderWeaponEnhancement(); renderCharacterSystem(); renderInventory();
     }
   }
   function toggleWeaponProtection(){ weaponProtectNext=!weaponProtectNext; renderWeaponEnhancement(); }
   function restoreWeapon(){
     const item=getItem(selectedWeaponId); if(!item)return;
     if(!item.broken){setWeaponFeedback('อาวุธยังไม่แตก ไม่จำเป็นต้องคืนสภาพ','info');return;}
-    item.broken=false; item.durability=Math.max(1,item.durability); save(); renderWeaponEnhancement(); renderCharacterSystem(); setWeaponFeedback('คืนสภาพสำเร็จ · สามารถซ่อมเพื่อเพิ่ม Durability ได้','success');
+    item.broken=false; item.durability=Math.max(1,item.durability); save(); renderWeaponEnhancement(); renderCharacterSystem(); renderInventory(); setWeaponFeedback('คืนสภาพสำเร็จ · สามารถซ่อมเพื่อเพิ่ม Durability ได้','success');
   }
   function repairWeapon(){
     const item=getItem(selectedWeaponId); if(!item)return;
     if(item.broken){setWeaponFeedback('ต้องคืนสภาพก่อนจึงจะซ่อมได้','fail');return;}
     if(item.durability>=item.maxDurability){setWeaponFeedback('Durability เต็ม 100 / 100 แล้ว','info');return;}
-    item.durability=item.maxDurability; save(); renderWeaponEnhancement(); renderCharacterSystem(); setWeaponFeedback('ซ่อมสำเร็จ · Durability กลับเป็น 100 / 100','success');
+    item.durability=item.maxDurability; save(); renderWeaponEnhancement(); renderCharacterSystem(); renderInventory(); setWeaponFeedback('ซ่อมสำเร็จ · Durability กลับเป็น 100 / 100','success');
   }
   function renderWeaponEnhancement(){
     const list=document.getElementById('weaponInventoryList'),detail=document.getElementById('weaponEnhancementDetail'),count=document.getElementById('weaponInventoryCount'); if(!list||!detail)return;
@@ -2305,103 +2336,8 @@ $$('#gameLobbyPage .game-menu-item, #gameLobbyPage .game-primary-btn').forEach(b
     detail.innerHTML=`<div class="weapon-detail-top"><div class="weapon-detail-icon">${item.icon}</div><div class="weapon-detail-title"><h3>${item.name}</h3><div class="weapon-badges"><b class="weapon-badge ${gradeClass(item.grade)}">Grade ${item.grade}</b><b class="weapon-badge">${item.enhancementLevel}</b>${item.equipped?'<b class="weapon-badge equipped">EQUIPPED</b>':''}${item.broken?'<b class="weapon-badge broken">BROKEN</b>':''}</div></div></div><div class="weapon-enhance-level"><span>ENHANCEMENT LEVEL</span><strong>${item.enhancementLevel}</strong><small>+1 → +15 → I → II → III → IV → V → VI → VII → VIII → IX → X</small><div class="weapon-level-preview">สำเร็จครั้งถัดไป: <b>${next}</b> · โอกาสสำเร็จโดยประมาณ <b>${chance}%</b></div></div><div class="weapon-stat-grid"><div class="weapon-stat-box"><span>HP BONUS</span><strong>+${st.hp}</strong><em>จากอาวุธ</em></div><div class="weapon-stat-box"><span>ATTACK BONUS</span><strong>+${st.attack}</strong><em>จากอาวุธ</em></div><div class="weapon-stat-box"><span>DEFENSE BONUS</span><strong>+${st.defense}</strong><em>จากอาวุธ</em></div></div><div class="weapon-durability"><div class="weapon-durability-row"><span>DURABILITY</span><strong>${item.durability} / ${item.maxDurability}</strong></div><div class="weapon-durability-bar"><i class="${item.durability<=0?'empty':item.durability<=30?'low':''}" style="width:${Math.max(0,item.durability/item.maxDurability*100)}%"></i></div></div><div class="weapon-helper"><label><span>ไอเท็มป้องกันการลดระดับ</span><span>${weaponProtectNext?'เปิดใช้งาน':'ไม่ได้ใช้'}</span></label><button type="button" id="weaponProtectBtn" class="${weaponProtectNext?'active':''}">${weaponProtectNext?'✓ ใช้ไอเท็มป้องกันกับการตีบวกครั้งถัดไป':'＋ เลือกไอเท็มป้องกันการลดระดับ'}</button></div><div class="weapon-action-grid"><button class="game-action-placeholder" id="weaponEquipBtn" type="button" ${canEquip?'':'disabled'}>${item.equipped?'✓ สวมใส่อยู่':'⚔ ใส่อาวุธ'}</button><button class="game-secondary-action" id="weaponUnequipBtn" type="button" ${item.equipped?'':'disabled'}>ถอดอาวุธ</button><button class="game-action-placeholder" id="weaponEnhanceBtn" type="button" ${canEnhance?'':'disabled'}>🔨 ตีบวก</button><button class="game-secondary-action" id="weaponRestoreBtn" type="button" ${canRestore?'':'disabled'}>↻ คืนสภาพ</button><button class="game-secondary-action" id="weaponRepairBtn" type="button" ${canRepair?'':'disabled'}>🔧 ซ่อม</button></div><div class="weapon-disabled-reason">${item.broken?'อาวุธแตก: ต้องคืนสภาพก่อนจึงจะใส่หรือตีบวกได้':weaponIsMax(item.enhancementLevel)?'ถึงระดับสูงสุด X แล้ว':item.durability<item.maxDurability?'Durability ต่ำกว่า 100 สามารถซ่อมได้':'Durability เต็ม'}</div>`;
     detail.querySelector('#weaponEquipBtn')?.addEventListener('click',()=>equipWeapon(item.id)); detail.querySelector('#weaponUnequipBtn')?.addEventListener('click',unequipWeapon); detail.querySelector('#weaponEnhanceBtn')?.addEventListener('click',enhanceWeapon); detail.querySelector('#weaponRestoreBtn')?.addEventListener('click',restoreWeapon); detail.querySelector('#weaponRepairBtn')?.addEventListener('click',repairWeapon); detail.querySelector('#weaponProtectBtn')?.addEventListener('click',toggleWeaponProtection);
   }
-  // Mission / Achievement — isolated module using the existing Game Lobby progression state.
-  // No new Currency or Inventory state is created here.
-  const MISSION_STORAGE_KEY = 'gameLobbyMissionProgressV1';
-  const MISSION_CONFIG = [
-    {id:'gacha_once', type:'gacha', name:'เปิด Gacha 1 ครั้ง', description:'เปิด Gacha ให้สำเร็จอย่างน้อย 1 ครั้ง', target:1, reward:{type:'coin',amount:1,label:'🪙 1 Coin'}},
-    {id:'shop_once', type:'shop', name:'ซื้อ Item จาก Shop 1 ครั้ง', description:'ซื้อสินค้าในร้านค้าให้สำเร็จอย่างน้อย 1 ครั้ง', target:1, reward:{type:'item',item:{id:'mission_token',name:'Mission Token',icon:'🎟️',description:'ไอเท็มตัวอย่างจากรางวัลภารกิจ'},amount:1,label:'🎟️ Mission Token ×1'}},
-    {id:'character_upgrade_once', type:'character_upgrade', name:'อัปเกรด Character 1 ครั้ง', description:'อัปเกรดตัวละครสำเร็จ 1 ครั้ง', target:1, reward:{type:'coin',amount:2,label:'🪙 2 Coin'}},
-    {id:'weapon_enhance_once', type:'weapon_enhancement', name:'ตีบวก Weapon 1 ครั้ง', description:'ตีบวกอาวุธสำเร็จหรือดำเนินการตีบวก 1 ครั้ง', target:1, reward:{type:'coin',amount:2,label:'🪙 2 Coin'}}
-  ];
-  const ACHIEVEMENT_CONFIG = [
-    {id:'first_character', icon:'👤', name:'ได้ Character ตัวแรก', description:'มี Character อย่างน้อย 1 ตัว', target:1, getProgress:()=>characterData.length>0?1:0},
-    {id:'first_weapon', icon:'⚔️', name:'ได้ Weapon ตัวแรก', description:'มี Weapon อย่างน้อย 1 ชิ้น', target:1, getProgress:()=>equipmentData.some(i=>i.slot==='mainWeapon')?1:0},
-    {id:'has_inventory_item', icon:'🎒', name:'มี Item ใน Inventory', description:'มี Item อย่างน้อย 1 ชิ้นใน Inventory กลาง', target:1, getProgress:()=>itemInventory.some(i=>Number(i.quantity)>0)?1:0},
-    {id:'character_upgraded', icon:'⬆️', name:'อัปเกรด Character สำเร็จ', description:'มี Character ที่ผ่านการอัปเกรดอย่างน้อย 1 ครั้ง', target:1, getProgress:()=>characterData.some(c=>Number(c.level)>1)?1:0}
-  ];
-  let missionProgress = {};
-  try { const stored=JSON.parse(localStorage.getItem(MISSION_STORAGE_KEY)); if(stored && typeof stored==='object' && !Array.isArray(stored)) missionProgress=stored; } catch { missionProgress={}; }
-  const missionSave = () => { try { localStorage.setItem(MISSION_STORAGE_KEY,JSON.stringify(missionProgress)); } catch(err){ console.warn('Mission state save unavailable:',err); } };
-  const missionById = id => MISSION_CONFIG.find(m=>m.id===id);
-  const missionCurrent = m => Math.min(m.target,Math.max(0,Number(missionProgress[m.id]?.progress)||0));
-  const missionClaimed = m => missionProgress[m.id]?.claimed===true;
-  const missionCompleted = m => missionCurrent(m)>=m.target;
-  const recordMissionProgress = (type, amount=1) => {
-    const delta=Math.max(0,Number(amount)||0); if(!delta)return;
-    MISSION_CONFIG.filter(m=>m.type===type).forEach(m=>{ const old=missionCurrent(m); if(old>=m.target)return; missionProgress[m.id]={...(missionProgress[m.id]||{}),progress:Math.min(m.target,old+delta)}; });
-    missionSave();
-    if(document.querySelector('[data-mission-tab]')) renderMissionSystem();
-  };
-  const rewardMission = m => {
-    if(!m || !missionCompleted(m) || missionClaimed(m)) return {ok:false,reason:'not_claimable'};
-    try {
-      const reward=m.reward;
-      if(reward.type==='coin'){
-        gachaCurrency += Math.max(0,Number(reward.amount)||0);
-        saveGachaState();
-        updateGachaCurrencyUI();
-      } else if(reward.type==='item') {
-        const data=reward.item||{}; const amount=Math.max(1,Number(reward.amount)||1);
-        let item=itemInventory.find(i=>i.id===data.id);
-        if(item) item.quantity=(Number(item.quantity)||0)+amount;
-        else item={...data,quantity:amount};
-        if(!itemInventory.includes(item)) itemInventory.push(item);
-        save(); saveGachaState();
-      } else return {ok:false,reason:'unsupported_reward'};
-      missionProgress[m.id]={...(missionProgress[m.id]||{}),progress:m.target,claimed:true};
-      missionSave();
-      return {ok:true};
-    } catch(err){ console.error('Mission reward error:',err); return {ok:false,reason:'error'}; }
-  };
-  function achievementProgress(a){ return Math.min(a.target,Math.max(0,Number(a.getProgress?.())||0)); }
-  function missionRewardMarkup(m){ return `<span class="mission-reward-pill">${m.reward.label}</span>`; }
-  function missionStatusMarkup(m){
-    if(missionClaimed(m)) return '<span class="mission-status claimed">✓ รับแล้ว</span>';
-    if(missionCompleted(m)) return '<span class="mission-status complete">สำเร็จ · รับรางวัล</span>';
-    return '<span class="mission-status pending">กำลังทำ</span>';
-  }
-  function renderMissionList(){
-    const list=document.getElementById('missionList'); if(!list)return;
-    if(!MISSION_CONFIG.length){ list.innerHTML='<div class="mission-empty-state"><span>🎯</span><strong>ยังไม่มีภารกิจ</strong><small>ภารกิจใหม่จะแสดงที่นี่</small></div>'; return; }
-    list.innerHTML=MISSION_CONFIG.map(m=>{
-      const current=missionCurrent(m), pct=Math.round(current/m.target*100), claimed=missionClaimed(m), done=missionCompleted(m);
-      return `<article class="mission-card ${done?'is-complete':''} ${claimed?'is-claimed':''}"><div class="mission-card-icon">🎯</div><div class="mission-card-main"><div class="mission-card-top"><div><strong>${m.name}</strong><p>${m.description}</p></div>${missionStatusMarkup(m)}</div><div class="mission-progress-row"><span>Progress</span><b>${current} / ${m.target}</b></div><div class="mission-progress-bar"><i style="width:${pct}%"></i></div><div class="mission-card-bottom"><div><small>รางวัล</small>${missionRewardMarkup(m)}</div><button type="button" class="game-action-placeholder mission-claim-btn" data-claim-mission="${m.id}" ${done&&!claimed?'':'disabled'}>${claimed?'✓ รับแล้ว':done?'รับรางวัล':'ยังไม่สำเร็จ'}</button></div></div></article>`;
-    }).join('');
-    list.querySelectorAll('[data-claim-mission]').forEach(btn=>btn.addEventListener('click',()=>{
-      const m=missionById(btn.dataset.claimMission); const result=rewardMission(m);
-      const feedback=document.getElementById('missionFeedback');
-      if(feedback){ feedback.textContent=result.ok?`รับรางวัล ${m.reward.label} สำเร็จ`:'ไม่สามารถรับรางวัลนี้ได้'; feedback.className=`mission-feedback ${result.ok?'success':'fail'}`; setTimeout(()=>{feedback.textContent='';feedback.className='mission-feedback';},2200); }
-      renderMissionSystem();
-    }));
-  }
-  function renderAchievementList(){
-    const list=document.getElementById('achievementList'); if(!list)return;
-    if(!ACHIEVEMENT_CONFIG.length){ list.innerHTML='<div class="mission-empty-state"><span>🏆</span><strong>ยังไม่มีความสำเร็จ</strong><small>ความสำเร็จใหม่จะแสดงที่นี่</small></div>'; return; }
-    list.innerHTML=ACHIEVEMENT_CONFIG.map(a=>{
-      const current=achievementProgress(a), unlocked=current>=a.target, pct=Math.round(current/a.target*100);
-      return `<article class="achievement-card ${unlocked?'is-unlocked':''}"><div class="achievement-icon">${a.icon}</div><div class="achievement-main"><div class="mission-card-top"><div><strong>${a.name}</strong><p>${a.description}</p></div><span class="mission-status ${unlocked?'complete':'pending'}">${unlocked?'✓ ปลดล็อก':'ยังไม่ปลดล็อก'}</span></div><div class="mission-progress-row"><span>Progress</span><b>${current} / ${a.target}</b></div><div class="mission-progress-bar"><i style="width:${pct}%"></i></div></div></article>`;
-    }).join('');
-  }
-  function renderMissionSystem(){
-    const root=document.getElementById('missionSystemRoot'); if(!root)return;
-    const tab=root.dataset.missionTab||'mission';
-    root.innerHTML=`<div class="game-system-head"><div><span class="game-section-kicker">MISSION / ACHIEVEMENT</span><h2>ภารกิจ / ความสำเร็จ</h2><p>ติดตามความคืบหน้าและรับรางวัลจากระบบกลางของ Game Lobby</p></div><button class="game-panel-back" type="button" data-game-panel="play">← กลับ Game Lobby</button></div><div id="missionFeedback" class="mission-feedback" aria-live="polite"></div><div class="mission-tabs" role="tablist"><button type="button" data-mission-tab="mission" class="${tab==='mission'?'active':''}">🎯 ภารกิจ</button><button type="button" data-mission-tab="achievement" class="${tab==='achievement'?'active':''}">🏆 ความสำเร็จ</button></div><div class="mission-tab-panel ${tab==='mission'?'active':''}" data-mission-view="mission"><div id="missionList" class="mission-list"></div><div class="mission-test-note"><span>MOCK PROGRESS</span><small>ใช้ปุ่มด้านล่างเพื่อจำลอง Event สำหรับทดสอบโครงสร้าง Mission เท่านั้น</small><div class="mission-test-actions"><button type="button" class="game-secondary-action" data-mock-mission="gacha">+ Gacha</button><button type="button" class="game-secondary-action" data-mock-mission="shop">+ Shop</button><button type="button" class="game-secondary-action" data-mock-mission="character_upgrade">+ Upgrade</button><button type="button" class="game-secondary-action" data-mock-mission="weapon_enhancement">+ Enhancement</button></div></div></div><div class="mission-tab-panel ${tab==='achievement'?'active':''}" data-mission-view="achievement"><div id="achievementList" class="achievement-list"></div></div>`;
-    root.querySelectorAll('[data-mission-tab]').forEach(btn=>btn.addEventListener('click',()=>{root.dataset.missionTab=btn.dataset.missionTab;renderMissionSystem();}));
-    root.querySelectorAll('[data-mock-mission]').forEach(btn=>btn.addEventListener('click',()=>{recordMissionProgress(btn.dataset.mockMission,1);}));
-    root.querySelector('[data-game-panel="play"]')?.addEventListener('click',()=>document.querySelector('#gameLobbyPage .game-menu-item[data-game-panel="play"]')?.click());
-    renderMissionList(); renderAchievementList();
-  }
-  window.GameMission = {
-    getMissions:()=>MISSION_CONFIG.map(m=>({...m,progress:missionCurrent(m),claimed:missionClaimed(m),completed:missionCompleted(m)})),
-    getAchievements:()=>ACHIEVEMENT_CONFIG.map(a=>({...a,progress:achievementProgress(a),unlocked:achievementProgress(a)>=a.target})),
-    record:(type,amount=1)=>recordMissionProgress(type,amount),
-    claim:(id)=>{const result=rewardMission(missionById(id)); renderMissionSystem(); return result;},
-    refresh:()=>renderMissionSystem()
-  };
-  document.querySelector('#gameLobbyPage .game-menu-item[data-game-panel="missions"]')?.addEventListener('click',()=>{const root=document.getElementById('missionSystemRoot'); if(root){root.dataset.missionTab='mission';renderMissionSystem();}});
-
-  syncWeaponEquipment(); save(); saveGachaState(); renderCharacterSystem(); renderUpgradeSystem(); renderWeaponEnhancement(); updateGachaCurrencyUI();
+  syncWeaponEquipment(); save(); saveGachaState(); renderCharacterSystem(); renderUpgradeSystem(); renderWeaponEnhancement(); renderInventory(); updateGachaCurrencyUI();
+  const gachaButtons=['gachaCharacterBtn','gachaWeaponBtn','gachaItemBtn'].map(id=>document.getElementById(id)).filter(Boolean); gachaButtons.forEach(btn=>{ btn.disabled=!Number.isFinite(GACHA_CONFIG.cost); btn.title=btn.disabled?'ยังไม่ได้กำหนดราคา Diamond':''; });
   document.getElementById('gachaCharacterBtn')?.addEventListener('click',()=>performGacha('character'));
   document.getElementById('gachaWeaponBtn')?.addEventListener('click',()=>performGacha('weapon'));
   document.getElementById('gachaItemBtn')?.addEventListener('click',()=>performGacha('item'));

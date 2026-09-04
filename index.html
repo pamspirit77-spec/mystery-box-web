@@ -245,7 +245,7 @@
               <div><div class="game-lobby-kicker">PHYSICS BATTLE</div><h1>Game Lobby</h1><p>ศูนย์กลางเกมสำหรับเตรียมตัวก่อนเข้าสู่สนาม</p></div>
             </div>
             <div class="game-lobby-actions">
-              <div class="game-currency" title="เงินในเกม">🪙 <strong id="gameLobbyCoins">24</strong> <span>COIN</span></div>
+              <div class="game-currency-group" title="Currency กลางของเกม"><div class="game-currency diamond-currency">💎 <strong id="gameLobbyDiamonds">0</strong> <span>DIAMOND</span></div><div class="game-currency coin-currency">🪙 <strong id="gameLobbyCoins">0</strong> <span>COIN</span></div></div>
               <button class="game-lobby-back-btn" id="gameLobbyBackHome" type="button">↩ กลับเว็บไซต์หลัก</button>
             </div>
           </div>
@@ -256,6 +256,7 @@
               <button class="game-menu-item active" type="button" data-game-panel="play"><span class="game-menu-icon">▶</span><span>เล่นเกม</span><b>›</b></button>
               <button class="game-menu-item" type="button" data-game-panel="characters"><span class="game-menu-icon">👤</span><span>ตัวละคร</span><b>›</b></button>
               <button class="game-menu-item" type="button" data-game-panel="weapons"><span class="game-menu-icon">⚔</span><span>อาวุธ</span><b>›</b></button>
+              <button class="game-menu-item" type="button" data-game-panel="inventory"><span class="game-menu-icon">📦</span><span>Inventory / คลังไอเท็ม</span><b>›</b></button>
               <button class="game-menu-item" type="button" data-game-panel="shop"><span class="game-menu-icon">🛒</span><span>ร้านค้า</span><b>›</b></button>
               <button class="game-menu-item" type="button" data-game-panel="missions"><span class="game-menu-icon">🎯</span><span>ภารกิจ / ความสำเร็จ</span><b>›</b></button>
               <button class="game-menu-item" type="button" data-game-panel="ranking"><span class="game-menu-icon">🏆</span><span>กระดานอันดับ</span><b>›</b></button>
@@ -285,8 +286,18 @@
   </div>
 </section>
               <section class="game-panel" data-game-panel-view="weapons"><div class="game-empty-panel"><span>⚔️</span><h2>อาวุธ</h2><p>พื้นที่สำหรับคลังอาวุธ อุปกรณ์ และรายละเอียดไอเท็ม</p><small>ระบบอาวุธจะเพิ่มในขั้นตอนถัดไป</small><button class="game-panel-back" type="button" data-game-panel="play">← กลับ Game Lobby</button></div></section>
-              <section class="game-panel" data-game-panel-view="shop"><div class="game-empty-panel"><span>🛒</span><h2>ร้านค้า</h2><p>พื้นที่สำหรับร้านค้าและไอเทมภายในเกม</p><small>ยังไม่มีระบบซื้อขายในขั้นตอนนี้</small><button class="game-panel-back" type="button" data-game-panel="play">← กลับ Game Lobby</button></div></section>
-              <section class="game-panel" data-game-panel-view="missions"><div class="game-system-page mission-page" id="missionSystemRoot" data-mission-tab="mission"></div></section>
+              <section class="game-panel" data-game-panel-view="inventory">
+  <div class="game-system-page game-inventory-page">
+    <div class="game-system-head"><div><span class="game-section-kicker">PLAYER INVENTORY</span><h2>Inventory / คลังไอเท็ม</h2><p>ศูนย์กลางข้อมูลตัวละคร อาวุธ และไอเท็มจากระบบ Game Lobby</p></div><button class="game-panel-back" type="button" data-game-panel="play">← กลับ Game Lobby</button></div>
+    <div class="inventory-currency-strip"><div>💎 <span>Diamond</span><strong id="inventoryDiamondBalance">0</strong></div><div>🪙 <span>Coin</span><strong id="inventoryCoinBalance">0</strong></div></div>
+    <div class="inventory-tabs" role="tablist" aria-label="ประเภท Inventory"><button type="button" class="inventory-tab active" data-inventory-tab="characters">👤 ตัวละคร</button><button type="button" class="inventory-tab" data-inventory-tab="weapons">⚔️ อาวุธ</button><button type="button" class="inventory-tab" data-inventory-tab="items">🎁 ไอเท็ม</button></div>
+    <div class="inventory-tab-panel active" data-inventory-view="characters"><div id="inventoryCharactersGrid" class="central-inventory-grid"></div></div>
+    <div class="inventory-tab-panel" data-inventory-view="weapons"><div id="inventoryWeaponsGrid" class="central-inventory-grid"></div></div>
+    <div class="inventory-tab-panel" data-inventory-view="items"><div id="inventoryItemsGrid" class="central-inventory-grid"></div></div>
+  </div>
+</section>
+              <section class="game-panel" data-game-panel-view="shop"><div id="gameShopRoot" class="game-shop-root"></div></section>
+              <section class="game-panel" data-game-panel-view="missions"><div class="game-empty-panel"><span>🎯</span><h2>ภารกิจ / ความสำเร็จ</h2><p>พื้นที่สำหรับภารกิจ Achievement และรางวัล</p><small>ระบบจริงจะเพิ่มในขั้นตอนถัดไป</small><button class="game-panel-back" type="button" data-game-panel="play">← กลับ Game Lobby</button></div></section>
               <section class="game-panel" data-game-panel-view="ranking"><div class="game-empty-panel"><span>🏆</span><h2>กระดานอันดับ</h2><p>พื้นที่สำหรับ Leaderboard และอันดับผู้เล่น</p><small>ยังไม่มีข้อมูลอันดับในขั้นตอนนี้</small><button class="game-panel-back" type="button" data-game-panel="play">← กลับ Game Lobby</button></div></section>
               <section class="game-panel" data-game-panel-view="profile"><div class="game-empty-panel"><span>◎</span><h2>โปรไฟล์</h2><p>พื้นที่สำหรับข้อมูลผู้เล่น สถิติ และความคืบหน้า</p><small>ระบบโปรไฟล์เกมจะเพิ่มในขั้นตอนถัดไป</small><button class="game-panel-back" type="button" data-game-panel="play">← กลับ Game Lobby</button></div></section>
               <section class="game-panel" data-game-panel-view="settings"><div class="game-empty-panel"><span>⚙️</span><h2>ตั้งค่า</h2><p>พื้นที่สำหรับการตั้งค่าเกมและการควบคุม</p><small>ยังไม่มีการบันทึกค่าจริงในขั้นตอนนี้</small><button class="game-panel-back" type="button" data-game-panel="play">← กลับ Game Lobby</button></div></section>
@@ -294,12 +305,12 @@
               <section class="game-panel" data-game-panel-view="gacha">
                 <div class="game-system-page gacha-page">
                   <div class="game-system-head"><div><span class="game-section-kicker">GACHA SYSTEM</span><h2>สุ่มกาชา</h2><p>สุ่มตัวละคร อาวุธ และไอเท็มจาก Pool ที่แยกจาก UI</p></div><button class="game-panel-back" type="button" data-game-panel="play">← กลับ Game Lobby</button></div>
-                  <div class="gacha-currency-bar"><div><span>GACHA CURRENCY</span><strong>🪙 <b id="gachaCoinBalance">24</b> COIN</strong></div><small>ค่าใช้จ่ายต่อครั้ง <b id="gachaCostLabel">1 COIN</b></small></div>
+                  <div class="gacha-currency-bar"><div><span>GACHA CURRENCY</span><strong>💎 <b id="gachaDiamondBalance">0</b> DIAMOND</strong></div><small>ค่าใช้จ่ายต่อครั้ง <b id="gachaCostLabel">ยังไม่ได้กำหนด</b></small></div>
                   <div id="gachaFeedback" class="gacha-feedback" aria-live="polite"></div>
                   <div class="game-choice-grid gacha-choice-grid">
-                    <button class="game-choice-card gacha-choice" id="gachaCharacterBtn" type="button"><span>👤</span><strong>สุ่มตัวละคร</strong><small>Character Gacha · 1 COIN</small></button>
-                    <button class="game-choice-card gacha-choice" id="gachaWeaponBtn" type="button"><span>⚔️</span><strong>สุ่มอาวุธ</strong><small>Weapon Gacha · 1 COIN</small></button>
-                    <button class="game-choice-card gacha-choice" id="gachaItemBtn" type="button"><span>🎁</span><strong>สุ่มไอเท็ม</strong><small>Item Gacha · 1 COIN</small></button>
+                    <button class="game-choice-card gacha-choice" id="gachaCharacterBtn" type="button"><span>👤</span><strong>สุ่มตัวละคร</strong><small>Character Gacha · ใช้ Diamond</small></button>
+                    <button class="game-choice-card gacha-choice" id="gachaWeaponBtn" type="button"><span>⚔️</span><strong>สุ่มอาวุธ</strong><small>Weapon Gacha · ใช้ Diamond</small></button>
+                    <button class="game-choice-card gacha-choice" id="gachaItemBtn" type="button"><span>🎁</span><strong>สุ่มไอเท็ม</strong><small>Item Gacha · ใช้ Diamond</small></button>
                   </div>
                   <div class="gacha-pool-note"><strong>GACHA POOLS</strong><span>Grade: A · S · SSS · SSR</span><span>ข้อมูล Pool และ Probability แยกจาก UI และปรับภายหลังได้</span></div>
                   <div class="gacha-result-card" id="gachaResultCard" hidden></div>
@@ -486,5 +497,6 @@
 
   <div class="toast" id="toast"></div>
   <script type="module" src="app.js"></script>
+  <script type="module" src="shop.js"></script>
 </body>
 </html>
