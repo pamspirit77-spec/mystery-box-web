@@ -292,9 +292,17 @@
               <section class="game-panel" data-game-panel-view="settings"><div class="game-empty-panel"><span>⚙️</span><h2>ตั้งค่า</h2><p>พื้นที่สำหรับการตั้งค่าเกมและการควบคุม</p><small>ยังไม่มีการบันทึกค่าจริงในขั้นตอนนี้</small><button class="game-panel-back" type="button" data-game-panel="play">← กลับ Game Lobby</button></div></section>
 
               <section class="game-panel" data-game-panel-view="gacha">
-                <div class="game-system-page"><div class="game-system-head"><div><span class="game-section-kicker">GACHA</span><h2>สุ่มกาชา</h2><p>โครงหน้า Gacha สำหรับระบบที่จะพัฒนาภายหลัง</p></div><button class="game-panel-back" type="button" data-game-panel="play">← กลับ Game Lobby</button></div>
-                  <div class="game-choice-grid"><button class="game-choice-card" type="button"><span>👤</span><strong>สุ่มตัวละคร</strong><small>Character Gacha</small></button><button class="game-choice-card" type="button"><span>⚔️</span><strong>สุ่มอาวุธ</strong><small>Weapon Gacha</small></button><button class="game-choice-card" type="button"><span>🎁</span><strong>สุ่มไอเท็ม</strong><small>Item Gacha</small></button></div>
-                  <div class="game-placeholder-note">ระบบสุ่ม, Probability และการรับไอเท็มยังไม่เปิดใช้งาน</div>
+                <div class="game-system-page gacha-page">
+                  <div class="game-system-head"><div><span class="game-section-kicker">GACHA SYSTEM</span><h2>สุ่มกาชา</h2><p>สุ่มตัวละคร อาวุธ และไอเท็มจาก Pool ที่แยกจาก UI</p></div><button class="game-panel-back" type="button" data-game-panel="play">← กลับ Game Lobby</button></div>
+                  <div class="gacha-currency-bar"><div><span>GACHA CURRENCY</span><strong>🪙 <b id="gachaCoinBalance">24</b> COIN</strong></div><small>ค่าใช้จ่ายต่อครั้ง <b id="gachaCostLabel">1 COIN</b></small></div>
+                  <div id="gachaFeedback" class="gacha-feedback" aria-live="polite"></div>
+                  <div class="game-choice-grid gacha-choice-grid">
+                    <button class="game-choice-card gacha-choice" id="gachaCharacterBtn" type="button"><span>👤</span><strong>สุ่มตัวละคร</strong><small>Character Gacha · 1 COIN</small></button>
+                    <button class="game-choice-card gacha-choice" id="gachaWeaponBtn" type="button"><span>⚔️</span><strong>สุ่มอาวุธ</strong><small>Weapon Gacha · 1 COIN</small></button>
+                    <button class="game-choice-card gacha-choice" id="gachaItemBtn" type="button"><span>🎁</span><strong>สุ่มไอเท็ม</strong><small>Item Gacha · 1 COIN</small></button>
+                  </div>
+                  <div class="gacha-pool-note"><strong>GACHA POOLS</strong><span>Grade: A · S · SSS · SSR</span><span>ข้อมูล Pool และ Probability แยกจาก UI และปรับภายหลังได้</span></div>
+                  <div class="gacha-result-card" id="gachaResultCard" hidden></div>
                 </div>
               </section>
 
