@@ -1,0 +1,291 @@
+    // Migrate the older character shape without changing existing progression.
+    c.baseHp = Number.isFinite(c.baseHp) ? c.baseHp : (Number.isFinite(c.hp) ? c.hp : 100);
+    c.baseAttack = Number.isFinite(c.baseAttack) ? c.baseAttack : (Number.isFinite(c.attack) ? c.attack : 20);
+    c.baseDefense = Number.isFinite(c.baseDefense) ? c.baseDefense : (Number.isFinite(c.defense) ? c.defense : 10);
+    c.level = Number.isFinite(c.level) ? c.level : 1;
+    c.grade = c.grade || 'A';
+    c.hp = c.baseHp; c.attack = c.baseAttack; c.defense = c.baseDefense;
+  });
+  characterUpgradeItems.forEach(i => { i.quantity = Number.isFinite(i.quantity) ? i.quantity : 0; });
+  equipmentData.forEach(i => {
+    if(i.slot === 'mainWeapon') {
+      i.enhancementLevel = i.enhancementLevel || i.enhancement || '+1';
+      i.enhancement = i.enhancementLevel;
+      i.durability = Number.isFinite(i.durability) ? i.durability : 100;
+      i.maxDurability = Number.isFinite(i.maxDurability) ? i.maxDurability : 100;
+      i.equipped = Boolean(i.equipped);
+      i.broken = Boolean(i.broken);
+      i.hpBonus = i.hpBonus ?? i.hp ?? 0; i.attackBonus = i.attackBonus ?? i.attack ?? 0; i.defenseBonus = i.defenseBonus ?? i.defense ?? 0;
+      i.hp = i.hpBonus; i.attack = i.attackBonus; i.defense = i.defenseBonus;
+    }
+  });
+  let selectedCharacterId = characterData.find(c => c.active)?.id || characterData[0].id;
+  let upgradeCharacterId = selectedCharacterId;
+  let equipmentTargetSlot = null;
+
+  const save = () => { localStorage.setItem(CHARACTER_STORAGE_KEY, JSON.stringify(characterData)); localStorage.setItem(EQUIPMENT_STORAGE_KEY, JSON.stringify(equipmentData)); localStorage.setItem(CHARACTER_UPGRADE_STORAGE_KEY, JSON.stringify(characterUpgradeItems)); };
+
+  // Central Game Inventory + Currency store. All Game Lobby systems read/write this shared state.
+  const CURRENCY_STORAGE_KEY = 'gameLobbyCurrencyV1';
+  let currencyState = { diamond: 0, coin: 0 };
+  try {
+    const stored = JSON.parse(localStorage.getItem(CURRENCY_STORAGE_KEY));
+    if (stored && typeof stored === 'object') {
+      currencyState.diamond = Number.isFinite(Number(stored.diamond)) ? Number(stored.diamond) : 0;
+      currencyState.coin = Number.isFinite(Number(stored.coin)) ? Number(stored.coin) : 0;
+    } else {
+      // One-time migration of the previous Game Lobby Gacha balance into Diamond.
+      const legacy = Number(localStorage.getItem('gameLobbyGachaCurrencyV1'));
+      currencyState.diamond = Number.isFinite(legacy) ? legacy : 0;
+      currencyState.coin = 0;
+    }
+  } catch { currencyState = { diamond: 0, coin: 0 }; }
+  const saveCurrency = () => localStorage.setItem(CURRENCY_STORAGE_KEY, JSON.stringify(currencyState));
+  const getCurrency = type => Number(currencyState[type] || 0);
+  const canSpendCurrency = (type, amount) => Number.isFinite(amount) && amount >= 0 && getCurrency(type) >= amount;
+  const addCurrency = (type, amount) => { if (!['diamond','coin'].includes(type) || !Number.isFinite(amount)) return false; currencyState[type] = Math.max(0, getCurrency(type) + amount); saveCurrency(); updateCurrencyUI(); return true; };
+  const spendCurrency = (type, amount) => { if (!canSpendCurrency(type, amount) || amount === 0) return amount === 0; currencyState[type] -= amount; saveCurrency(); updateCurrencyUI(); return true; };
+  const hasItem = (id, qty=1) => (itemInventory.find(i=>i.id===id)?.quantity || 0) >= qty;
+  const addItem = (item, qty=1) => { if(!item || !Number.isFinite(qty) || qty <= 0) return null; const existing=itemInventory.find(i=>i.id===item.id); if(existing) existing.quantity=(existing.quantity||0)+qty; else itemInventory.push({...item,quantity:qty}); save(); renderInventory(); return itemInventory.find(i=>i.id===item.id); };
+  const removeItem = (id, qty=1) => { const item=itemInventory.find(i=>i.id===id); if(!item || !Number.isFinite(qty) || qty <= 0 || (item.quantity||0)<qty) return false; item.quantity-=qty; save(); renderInventory(); return true; };
+  const addWeapon = weapon => { if(!weapon) return null; equipmentData.push(weapon); save(); renderInventory(); return weapon; };
+  const addCharacter = character => { if(!character) return null; characterData.push(character); save(); renderInventory(); return character; };
+  window.GameInventory = { getCharacters:()=>characterData, getWeapons:()=>equipmentData.filter(i=>i.slot==='mainWeapon'), getItems:()=>itemInventory, getCurrency:()=>({...currencyState}), addItem, removeItem, hasItem, addWeapon, addCharacter, addDiamond:(n)=>addCurrency('diamond',n), spendDiamond:(n)=>spendCurrency('diamond',n), hasDiamond:(n)=>canSpendCurrency('diamond',n), addCoin:(n)=>addCurrency('coin',n), spendCoin:(n)=>spendCurrency('coin',n), hasCoin:(n)=>canSpendCurrency('coin',n) };
+  function updateCurrencyUI(){ const d=getCurrency('diamond'), c=getCurrency('coin'); ['gameLobbyDiamonds','gachaDiamondBalance','inventoryDiamondBalance'].forEach(id=>{const el=document.getElementById(id);if(el)el.textContent=d;}); ['gameLobbyCoins','inventoryCoinBalance'].forEach(id=>{const el=document.getElementById(id);if(el)el.textContent=c;}); }
+  function inventoryEmpty(message){ return `<div class="inventory-empty-state"><span>📦</span><strong>${message}</strong><small>เมื่อได้รับของจากระบบที่เกี่ยวข้อง รายการจะแสดงที่นี่อัตโนมัติ</small></div>`; }
+  function renderInventory(){
+    const cg=document.getElementById('inventoryCharactersGrid'), wg=document.getElementById('inventoryWeaponsGrid'), ig=document.getElementById('inventoryItemsGrid');
+    updateCurrencyUI();
+    if(cg){ cg.innerHTML=characterData.length?characterData.map(c=>{const t=totalStats(c);return `<button type="button" class="central-inventory-card" data-inv-character="${c.id}"><div class="central-item-icon">${c.avatar||'👤'}</div><div class="central-item-copy"><strong>${c.name}</strong><span class="central-grade ${gradeClass(c.grade)}">Grade ${c.grade||'A'}</span><small>Lv. ${c.level} · HP ${t.hp} · ATK ${t.attack} · DEF ${t.defense}</small></div><em>${c.active?'ใช้งานอยู่':'ไม่ได้ใช้งาน'}</em></button>`}).join(''):inventoryEmpty('ยังไม่มีตัวละคร'); cg.querySelectorAll('[data-inv-character]').forEach(b=>b.addEventListener('click',()=>{selectedCharacterId=b.dataset.invCharacter;renderCharacterSystem();document.querySelector('#gameLobbyPage .game-menu-item[data-game-panel="characters"]')?.click();})); }
+    if(wg){ const weapons=equipmentData.filter(i=>i.slot==='mainWeapon'); wg.innerHTML=weapons.length?weapons.map(w=>`<button type="button" class="central-inventory-card ${w.broken?'is-broken':''}" data-inv-weapon="${w.id}"><div class="central-item-icon">${w.icon||'⚔️'}</div><div class="central-item-copy"><strong>${w.name}</strong><span class="central-grade ${gradeClass(w.grade)}">Grade ${w.grade}</span><small>${w.enhancementLevel||w.enhancement||'+1'} · DUR ${w.durability??100}/${w.maxDurability??100} · HP +${w.hp??w.hpBonus??0} · ATK +${w.attack??w.attackBonus??0} · DEF +${w.defense??w.defenseBonus??0}</small></div><em>${w.broken?'แตก':w.equipped?'สวมใส่อยู่':'ไม่ได้สวมใส่'}</em></button>`).join(''):inventoryEmpty('ยังไม่มีอาวุธในคลัง'); wg.querySelectorAll('[data-inv-weapon]').forEach(b=>b.addEventListener('click',()=>{selectedWeaponId=b.dataset.invWeapon;document.querySelector('#gameLobbyPage .game-menu-item[data-game-panel="enhancement"]')?.click();})); }
+    if(ig){ ig.innerHTML=itemInventory.filter(i=>(i.quantity||0)>0).length?itemInventory.filter(i=>(i.quantity||0)>0).map(i=>`<div class="central-inventory-card item-card"><div class="central-item-icon">${i.icon||'🎁'}</div><div class="central-item-copy"><strong>${i.name}</strong><span>${i.type||'item'}</span><small>${i.description||'ไอเท็มในคลัง'}</small></div><em>×${i.quantity||0}</em></div>`).join(''):inventoryEmpty('ยังไม่มีไอเท็ม'); }
+  }
+  document.addEventListener('click', event=>{ const tab=event.target.closest('[data-inventory-tab]'); if(!tab)return; const key=tab.dataset.inventoryTab; $$('#gameLobbyPage [data-inventory-tab]').forEach(x=>x.classList.toggle('active',x===tab)); $$('#gameLobbyPage [data-inventory-view]').forEach(x=>x.classList.toggle('active',x.dataset.inventoryView===key)); });
+
+  const getCharacter = id => characterData.find(c => c.id === id) || characterData[0];
+  const getItem = id => equipmentData.find(i => i.id === id);
+  const levelGrowth = c => ({ hp:c.hpPerLevel ?? 20, attack:c.attackPerLevel ?? 4, defense:c.defensePerLevel ?? 3 });
+  const nextBaseStats = c => { const g=levelGrowth(c); return { hp:c.baseHp+g.hp, attack:c.baseAttack+g.attack, defense:c.baseDefense+g.defense }; };
+  const upgradeItem = () => characterUpgradeItems.find(i=>i.id==='char_core') || characterUpgradeItems[0];
+  const upgradeCost = c => Math.max(1, Number(c.upgradeCost ?? 1));
+  const equippedItems = c => Object.values(c.equipment || {}).map(getItem).filter(i=>i && !i.broken);
+  const totalStats = c => equippedItems(c).reduce((t,i)=>({hp:t.hp+(i.hp||0),attack:t.attack+(i.attack||0),defense:t.defense+(i.defense||0)}),{hp:c.baseHp,attack:c.baseAttack,defense:c.baseDefense});
+  const equipmentBonusStats = c => equippedItems(c).reduce((t,i)=>({hp:t.hp+(i.hp||0),attack:t.attack+(i.attack||0),defense:t.defense+(i.defense||0)}),{hp:0,attack:0,defense:0});
+  const slotNames = {helmet:'หมวก',armor:'ชุด',arms:'แขน',boots:'รองเท้า',mainWeapon:'อาวุธหลัก'};
+  const slotIcons = {helmet:'🪖',armor:'🥋',arms:'🛡️',boots:'👢',mainWeapon:'⚔️'};
+  const gradeClass = g => `grade-${String(g).toLowerCase()}`;
+  const enhancementLevels = ['+1','+2','+3','+4','+5','+6','+7','+8','+9','+10','+11','+12','+13','+14','+15','I','II','III','IV','V','VI','VII','VIII','IX','X'];
+
+  const statMarkup = c => { const t=totalStats(c); return `<div class="character-stat-grid"><div class="character-stat-box"><span>HP</span><strong>${t.hp}</strong><em class="stat-bonus">รวมอุปกรณ์ +${t.hp-c.hp}</em></div><div class="character-stat-box"><span>ATTACK</span><strong>${t.attack}</strong><em class="stat-bonus">รวมอุปกรณ์ +${t.attack-c.attack}</em></div><div class="character-stat-box"><span>DEFENSE</span><strong>${t.defense}</strong><em class="stat-bonus">รวมอุปกรณ์ +${t.defense-c.defense}</em></div></div>`; };
+
+  function equipmentSlotMarkup(c, slot){
+    const item=getItem(c.equipment?.[slot]);
+    if(!item) return `<button type="button" class="equipment-slot equipment-empty" data-equip-slot="${slot}"><b>${slotIcons[slot]}</b><span>${slotNames[slot]}</span><small>ว่าง · กดเพื่อเลือก</small></button>`;
+    return `<button type="button" class="equipment-slot equipment-filled ${gradeClass(item.grade)}" data-equip-slot="${slot}"><div class="equipment-item-icon">${item.icon}</div><strong>${item.name}</strong><span>${slotNames[slot]}</span><div class="equipment-meta"><b>${item.grade}</b><b>${item.enhancement}</b></div>${slot==='mainWeapon'?`<small>Durability ${item.durability??100}/${item.maxDurability??100}${item.broken?' · แตก':''}</small>`:'<small>สวมใส่อยู่ · กดเพื่อเปลี่ยน</small>'}</button>`;
+  }
+
+  function renderCharacterList(){
+    const el = document.getElementById('characterList'); if(!el) return;
+    el.innerHTML = characterData.map(c => { const t=totalStats(c); return `<button type="button" class="character-list-item ${c.id===selectedCharacterId?'selected':''}" data-character-id="${c.id}"><div class="character-avatar">${c.avatar}</div><div class="character-list-copy"><strong>${c.name}</strong><small>Lv. ${c.level}</small><div class="character-mini-stats"><span>HP ${t.hp}</span><span>ATK ${t.attack}</span><span>DEF ${t.defense}</span></div></div>${c.active?'<span class="character-active-badge">ใช้งานอยู่</span>':'<span></span>'}</button>`; }).join('');
+    el.querySelectorAll('[data-character-id]').forEach(btn => btn.addEventListener('click', () => { selectedCharacterId=btn.dataset.characterId; renderCharacterSystem(); }));
+  }
+
+  function renderCharacterDetail(){
+    const el=document.getElementById('characterDetailCard'); if(!el) return; const c=getCharacter(selectedCharacterId);
+    el.innerHTML=`<div class="character-detail-top"><div class="character-detail-avatar">${c.avatar}</div><div><h3 class="character-detail-name">${c.name}</h3><div class="character-detail-sub">Character ID · ${c.id.toUpperCase()}</div><div class="character-detail-level">LEVEL&nbsp; ${c.level}</div></div></div>${statMarkup(c)}<div class="equipment-title">EQUIPMENT SLOTS <small>เลือกช่องเพื่อจัดการอุปกรณ์</small></div><div class="equipment-grid">${Object.keys(slotNames).map(s=>equipmentSlotMarkup(c,s)).join('')}</div><div class="character-detail-actions"><button class="game-action-placeholder" type="button" id="characterUseBtn">${c.active?'✓ ใช้งานอยู่':'เลือกใช้งาน'}</button><button class="game-secondary-action" type="button" data-game-panel="character-upgrade">⬆ ไปอัปเกรดตัวละคร</button></div><div class="equipment-note">Grade และ Enhancement Level แยกกันอิสระ · รองรับ ${enhancementLevels.join(' → ')}</div><div class="equipment-picker-panel" id="equipmentPickerPanel" hidden></div>`;
+    el.querySelector('#characterUseBtn')?.addEventListener('click',()=>{characterData.forEach(x=>x.active=x.id===c.id); selectedCharacterId=c.id; upgradeCharacterId=c.id; save(); renderCharacterSystem(); renderUpgradeSystem();});
+    el.querySelector('[data-game-panel]')?.addEventListener('click',()=>{ document.querySelector('#gameLobbyPage .game-menu-item[data-game-panel="character-upgrade"]')?.click(); });
+    el.querySelectorAll('[data-equip-slot]').forEach(b=>b.addEventListener('click',()=>openEquipmentPicker(c.id,b.dataset.equipSlot)));
+  }
+
+  function openEquipmentPicker(characterId, slot){
+    equipmentTargetSlot=slot; const c=getCharacter(characterId), panel=document.getElementById('equipmentPickerPanel'); if(!panel)return;
+    const equippedId=c.equipment?.[slot]; const items=equipmentData.filter(i=>i.slot===slot);
+    panel.hidden=false; panel.innerHTML=`<div class="equipment-picker-head"><div><span class="game-section-kicker">EQUIPMENT INVENTORY</span><h4>เลือก${slotNames[slot]}</h4></div><button type="button" class="picker-close" id="equipmentPickerClose">×</button></div><div class="equipment-inventory-grid">${items.map(i=>`<button type="button" class="inventory-item ${equippedId===i.id?'equipped':''} ${gradeClass(i.grade)}" data-item-id="${i.id}"><div class="inventory-icon">${i.icon}</div><div class="inventory-copy"><strong>${i.name}</strong><span><b>${i.grade}</b> · <b>${i.enhancement}</b></span><small>HP +${i.hp||0} · ATK +${i.attack||0} · DEF +${i.defense||0}</small></div>${equippedId===i.id?'<em>สวมใส่อยู่</em>':''}</button>`).join('') || '<div class="equipment-empty-message">ยังไม่มีไอเท็มในช่องนี้</div>'}</div><div class="picker-actions">${equippedId?'<button type="button" class="game-secondary-action" id="unequipBtn">ถอดอุปกรณ์</button>':''}</div>`;
+    panel.scrollIntoView({behavior:'smooth',block:'nearest'});
+    panel.querySelector('#equipmentPickerClose')?.addEventListener('click',()=>panel.hidden=true);
+    panel.querySelectorAll('[data-item-id]').forEach(b=>b.addEventListener('click',()=>equipItem(characterId,slot,b.dataset.itemId)));
+    panel.querySelector('#unequipBtn')?.addEventListener('click',()=>unequipItem(characterId,slot));
+  }
+  function equipItem(characterId,slot,itemId){ const c=getCharacter(characterId); c.equipment[slot]=itemId; if(slot==='mainWeapon' && typeof syncWeaponEquipment==='function') syncWeaponEquipment(); save(); equipmentTargetSlot=null; renderCharacterSystem(); if(typeof renderWeaponEnhancement==='function') renderWeaponEnhancement(); }
+  function unequipItem(characterId,slot){ const c=getCharacter(characterId); delete c.equipment[slot]; if(slot==='mainWeapon' && typeof syncWeaponEquipment==='function') syncWeaponEquipment(); save(); equipmentTargetSlot=null; renderCharacterSystem(); if(typeof renderWeaponEnhancement==='function') renderWeaponEnhancement(); }
+  function renderCharacterSystem(){ renderCharacterList(); renderCharacterDetail(); }
+
+  function renderUpgradeSystem(){
+    const picker=document.getElementById('upgradeCharacterPicker'), content=document.getElementById('characterUpgradeContent'); if(!picker||!content)return;
+    const c=getCharacter(upgradeCharacterId), n=nextBaseStats(c), growth=levelGrowth(c), resource=upgradeItem(), cost=upgradeCost(c), available=resource?.quantity||0, canUpgrade=available>=cost;
+    const current=totalStats(c), currentEq=equipmentBonusStats(c), previewTotal={hp:n.hp+currentEq.hp,attack:n.attack+currentEq.attack,defense:n.defense+currentEq.defense};
+    picker.innerHTML=characterData.map(x=>`<button type="button" class="upgrade-character-chip ${x.id===upgradeCharacterId?'selected':''}" data-upgrade-id="${x.id}">${x.avatar} ${x.name}<small>Lv. ${x.level} · Base HP ${x.baseHp}</small></button>`).join('');
+    picker.querySelectorAll('[data-upgrade-id]').forEach(b=>b.addEventListener('click',()=>{upgradeCharacterId=b.dataset.upgradeId;renderUpgradeSystem();}));
+    content.innerHTML=`
+      <div class="character-preview-card upgrade-character-preview">
+        <div class="character-placeholder">${c.avatar}</div><strong>${c.name}</strong><span>ตัวละครที่เลือกสำหรับอัปเกรด</span>
+        <div class="character-detail-level">LEVEL&nbsp; ${c.level}</div>
+        <div class="upgrade-resource-card"><span>UPGRADE RESOURCE</span><strong>${resource?.icon||'💠'} ${resource?.name||'Character Core'}</strong><small>มี ${available} · ใช้ ${cost} ต่อการอัปเกรด</small></div>
+      </div>
+      <div class="character-level-card">
+        <div class="level-row"><span>LEVEL ปัจจุบัน</span><strong>Lv. ${c.level}</strong></div>
+        <div class="upgrade-stat-section"><div class="upgrade-section-title">BASE STATS</div><div class="character-stat-grid">
+          <div class="character-stat-box"><span>HP</span><strong>${c.baseHp}</strong></div><div class="character-stat-box"><span>ATTACK</span><strong>${c.baseAttack}</strong></div><div class="character-stat-box"><span>DEFENSE</span><strong>${c.baseDefense}</strong></div>
+        </div></div>
+        <div class="upgrade-preview-note"><strong>PREVIEW หลังอัปเกรด</strong><div class="upgrade-flow"><b>Lv. ${c.level}</b><span>→</span><b>Lv. ${c.level+1}</b></div><div class="character-stat-grid upgrade-preview-grid">
+          <div class="character-stat-box upgrade-preview-stat"><span>BASE HP</span><strong>${c.baseHp} → ${n.hp}</strong><em>+${growth.hp}</em></div>
+          <div class="character-stat-box upgrade-preview-stat"><span>BASE ATTACK</span><strong>${c.baseAttack} → ${n.attack}</strong><em>+${growth.attack}</em></div>
+          <div class="character-stat-box upgrade-preview-stat"><span>BASE DEFENSE</span><strong>${c.baseDefense} → ${n.defense}</strong><em>+${growth.defense}</em></div>
+        </div></div>
+        <div class="upgrade-total-preview"><div><span>TOTAL NOW</span><strong>${current.hp} / ${current.attack} / ${current.defense}</strong><small>HP / ATK / DEF · Equipment +${currentEq.hp} / +${currentEq.attack} / +${currentEq.defense}</small></div><div class="upgrade-arrow">→</div><div><span>TOTAL AFTER</span><strong>${previewTotal.hp} / ${previewTotal.attack} / ${previewTotal.defense}</strong><small>โบนัสอุปกรณ์และอาวุธเดิมคงอยู่</small></div></div>
+        <button class="game-action-placeholder ${canUpgrade?'':'upgrade-action-disabled'}" id="characterUpgradeBtn" type="button" ${canUpgrade?'':'disabled'}>⬆ อัปเกรด ${c.name} เป็น Lv. ${c.level+1}</button>
+        <div class="upgrade-cost-row"><span>ใช้ ${resource?.icon||'💠'} ${cost} ${resource?.name||'Character Core'}</span><strong class="${canUpgrade?'resource-ok':'resource-low'}">คงเหลือ ${available}</strong></div>
+        <div class="upgrade-level-rule"><strong>กฎการอัปเกรด</strong> · Level เพิ่มผ่านระบบนี้เท่านั้น · Weapon Enhancement ไม่เพิ่ม Character Level · Base Stats แยกจาก Equipment/Weapon Bonus และ Total Stats จะคำนวณใหม่ทุกครั้ง</div>
+      </div>`;
+    content.querySelector('#characterUpgradeBtn')?.addEventListener('click',()=>{
+      const target=getCharacter(upgradeCharacterId), item=upgradeItem(), needed=upgradeCost(target);
+      if(!item || item.quantity<needed){ renderUpgradeSystem(); const note=document.querySelector('.upgrade-feedback'); if(note)note.textContent='ทรัพยากรไม่เพียงพอ'; return; }
+      const ns=nextBaseStats(target);
+      item.quantity-=needed; target.level+=1; target.baseHp=ns.hp; target.baseAttack=ns.attack; target.baseDefense=ns.defense;
+      target.hp=target.baseHp; target.attack=target.baseAttack; target.defense=target.baseDefense;
+      save(); selectedCharacterId=target.id; renderUpgradeSystem(); renderCharacterSystem();
+      const status=document.getElementById('characterUpgradeStatus'); if(status){status.textContent=`อัปเกรดสำเร็จ! ${target.name} เป็น Lv. ${target.level}`;status.className='character-upgrade-status success';setTimeout(()=>{status.textContent='';status.className='character-upgrade-status';},2800);}
+    });
+  }
+  function weaponLevelIndex(level){ return enhancementLevels.indexOf(level); }
+  function weaponNextLevel(level){ const idx=weaponLevelIndex(level); return idx>=0 && idx<enhancementLevels.length-1 ? enhancementLevels[idx+1] : level; }
+  function weaponPrevLevel(level){ const idx=weaponLevelIndex(level); return idx>0 ? enhancementLevels[idx-1] : level; }
+  function weaponIsAtStart(level){ return level === '+1'; }
+  function weaponIsMax(level){ return level === 'X'; }
+  function weaponBonus(item){
+    const idx=Math.max(0,weaponLevelIndex(item.enhancementLevel||item.enhancement||'+1'));
+    const base={hp:item.baseHpBonus ?? item.hpBonus ?? item.hp ?? 0,attack:item.baseAttackBonus ?? item.attackBonus ?? item.attack ?? 0,defense:item.baseDefenseBonus ?? item.defenseBonus ?? item.defense ?? 0};
+    const multiplier=1 + idx*0.08;
+    return {hp:Math.round(base.hp*multiplier),attack:Math.round(base.attack*multiplier),defense:Math.round(base.defense*multiplier)};
+  }
+  equipmentData.filter(i=>i.slot==='mainWeapon').forEach(i=>{
+    if(i.baseHpBonus===undefined){i.baseHpBonus=i.hpBonus??i.hp??0;i.baseAttackBonus=i.attackBonus??i.attack??0;i.baseDefenseBonus=i.defenseBonus??i.defense??0;}
+    const b=weaponBonus(i); i.hp=b.hp;i.attack=b.attack;i.defense=b.defense;
+  });
+  // Gacha System — isolated inside the existing Game Lobby data module.
+  const GACHA_CURRENCY_KEY = 'gameLobbyGachaCurrencyV1';
+  const GACHA_ITEM_KEY = 'gameLobbyItemInventoryV1';
+  const GACHA_CONFIG = {
+    cost: null,
+    gradeWeights: { A: 60, S: 25, SSS: 12, SSR: 3 },
+    characterPool: [
+      {id:'gacha_nova',name:'Nova',avatar:'🧙',grade:'A',baseHp:120,baseAttack:24,baseDefense:14},
+      {id:'gacha_raven',name:'Raven',avatar:'🦹',grade:'S',baseHp:155,baseAttack:32,baseDefense:18},
+      {id:'gacha_lyra',name:'Lyra',avatar:'🧝',grade:'SSS',baseHp:175,baseAttack:37,baseDefense:22},
+      {id:'gacha_kael',name:'Kael',avatar:'🧑‍🚀',grade:'SSR',baseHp:200,baseAttack:45,baseDefense:27}
+    ],
+    weaponPool: [
+      {id:'gacha_blade',name:'Ember Blade',icon:'🔥',grade:'A',hpBonus:4,attackBonus:15,defenseBonus:1},
+      {id:'gacha_saber',name:'Moon Saber',icon:'⚔️',grade:'S',hpBonus:7,attackBonus:22,defenseBonus:2},
+      {id:'gacha_lance',name:'Astral Lance',icon:'🔱',grade:'SSS',hpBonus:12,attackBonus:32,defenseBonus:4},
+      {id:'gacha_dragon',name:'Dragon Fang',icon:'🗡️',grade:'SSR',hpBonus:18,attackBonus:46,defenseBonus:6}
+    ],
+    itemPool: [
+      {type:'character_upgrade',id:'char_core',name:'Character Core',icon:'💠',description:'วัสดุสำหรับอัปเกรดตัวละคร'},
+      {type:'enhancement_protection',id:'enhance_protect',name:'Enhancement Guard',icon:'🛡️',description:'ป้องกันการลดระดับ Enhancement 1 ครั้ง'},
+      {type:'restoration',id:'restoration_kit',name:'Restoration Kit',icon:'🧰',description:'ไอเท็มสำหรับคืนสภาพอาวุธที่แตก'},
+      {type:'repair',id:'repair_kit',name:'Repair Kit',icon:'🔧',description:'ไอเท็มสำหรับซ่อม Durability'}
+    ]
+  };
+  let gachaCurrency = getCurrency('diamond');
+  const saveGachaState = () => { gachaCurrency = getCurrency('diamond'); saveCurrency(); localStorage.setItem(GACHA_ITEM_KEY, JSON.stringify(itemInventory)); };
+  const updateGachaCurrencyUI = () => { updateCurrencyUI(); const a=document.getElementById('gachaDiamondBalance'); if(a)a.textContent=getCurrency('diamond'); const c=document.getElementById('gachaCostLabel'); if(c)c.textContent=Number.isFinite(GACHA_CONFIG.cost)?`${GACHA_CONFIG.cost} DIAMOND`:'ยังไม่ได้กำหนด'; };
+  const setGachaFeedback = (msg,type='info') => { const el=document.getElementById('gachaFeedback'); if(!el)return; el.className=`gacha-feedback ${type}`; el.textContent=msg; setTimeout(()=>{ if(el.textContent===msg){el.textContent='';el.className='gacha-feedback';}},2600); };
+  const weightedGrade = () => { const entries=Object.entries(GACHA_CONFIG.gradeWeights); const total=entries.reduce((n,[,w])=>n+w,0); let r=Math.random()*total; for(const [grade,w] of entries){r-=w;if(r<0)return grade;} return entries[entries.length-1][0]; };
+  const poolPick = pool => { const grade=weightedGrade(); const candidates=pool.filter(x=>x.grade===grade); return (candidates.length?candidates:pool)[Math.floor(Math.random()*(candidates.length?candidates:pool).length)]; };
+  const uniqueId = prefix => `${prefix}_${Date.now()}_${Math.random().toString(36).slice(2,7)}`;
+  const addGachaCharacter = template => { const c={...template,id:uniqueId(template.id),level:1,active:false,equipment:{},hpPerLevel:20,attackPerLevel:4,defensePerLevel:3}; addCharacter(c); return c; };
+  const addGachaWeapon = template => { const item={...template,id:uniqueId(template.id),slot:'mainWeapon',enhancementLevel:'+1',enhancement:'+1',durability:100,maxDurability:100,equipped:false,broken:false,baseHpBonus:template.hpBonus||0,baseAttackBonus:template.attackBonus||0,baseDefenseBonus:template.defenseBonus||0}; const b=weaponBonus(item); item.hp=b.hp;item.attack=b.attack;item.defense=b.defense; addWeapon(item); return item; };
+  const addGachaItem = template => addItem(template,1);
+  const showGachaResult = (kind,result,detail) => { const card=document.getElementById('gachaResultCard'); if(!card)return; card.hidden=false; card.innerHTML=`<div class="gacha-result-kicker">GACHA RESULT</div><div class="gacha-result-main"><div class="gacha-result-icon">${result.icon||result.avatar||'🎁'}</div><div><h3>ได้รับไอเท็ม!</h3><div class="gacha-result-badges"><b class="${gradeClass(result.grade||'A')}">${result.grade?'Grade '+result.grade:'ITEM'}</b><b>${kind}</b></div><p><strong>${result.name}</strong></p><p>${detail}</p></div></div><div class="gacha-result-actions"><button class="game-action-placeholder" id="gachaResultOk" type="button">ตกลง</button></div>`; card.scrollIntoView({behavior:'smooth',block:'nearest'}); document.getElementById('gachaResultOk')?.addEventListener('click',()=>{card.hidden=true;}); };
+  function performGacha(type){
+    updateGachaCurrencyUI();
+    if(!Number.isFinite(GACHA_CONFIG.cost)){ setGachaFeedback('ยังไม่ได้กำหนดราคา Gacha · ระบบรอ Config Diamond','fail'); return; }
+    if(!canSpendCurrency('diamond', GACHA_CONFIG.cost)){ setGachaFeedback('Diamond ไม่เพียงพอ · ไม่หัก Diamond','fail'); return; }
+    if(!spendCurrency('diamond', GACHA_CONFIG.cost)){ setGachaFeedback('ไม่สามารถหัก Diamond ได้','fail'); return; }
+    let result,kind,detail;
+    try {
+      if(type==='character'){ const t=poolPick(GACHA_CONFIG.characterPool); result=addGachaCharacter(t); kind='CHARACTER'; detail=`${result.name} · Grade ${result.grade} · เพิ่มเข้า Character Inventory แล้ว`; }
+      else if(type==='weapon'){ const t=poolPick(GACHA_CONFIG.weaponPool); result=addGachaWeapon(t); kind='WEAPON'; detail=`${result.name} · ${result.enhancementLevel} · HP +${result.hp} · ATK +${result.attack} · DEF +${result.defense}`; }
+      else { const t=GACHA_CONFIG.itemPool[Math.floor(Math.random()*GACHA_CONFIG.itemPool.length)]; result=addGachaItem(t); kind='ITEM'; detail=`${result.description} · จำนวนใน Inventory ${result.quantity}`; }
+      save(); saveGachaState(); updateGachaCurrencyUI(); renderCharacterSystem(); renderUpgradeSystem(); renderWeaponEnhancement(); renderInventory(); showGachaResult(kind,result,detail);
+    } catch(err) { addCurrency('diamond',GACHA_CONFIG.cost); setGachaFeedback('ไม่สามารถรับของรางวัลได้ · คืน Diamond ให้แล้ว','fail'); console.error(err); }
+  }
+
+  // Shop System — scoped to Game Lobby; uses the existing central Currency + Inventory only.
+  const SHOP_CONFIG = {
+    currency: 'coin',
+    // Mock prices for testing only. Replace these values later when real shop rules are defined.
+    products: [
+      {id:'char_core', name:'Character Core', type:'upgrade', itemType:'character_upgrade', icon:'💠', description:'วัสดุสำหรับอัปเกรดตัวละคร', price:100, currency:'coin', quantity:1},
+      {id:'enhance_protect', name:'Enhancement Guard', type:'enhancement', itemType:'enhancement_protection', icon:'🛡️', description:'ไอเท็มช่วยป้องกันการลดระดับ Enhancement', price:150, currency:'coin', quantity:1},
+      {id:'restoration_kit', name:'Restoration Kit', type:'enhancement', itemType:'restoration', icon:'🧰', description:'ไอเท็มสำหรับคืนสภาพอาวุธที่แตก', price:200, currency:'coin', quantity:1},
+      {id:'repair_kit', name:'Repair Kit', type:'item', itemType:'repair', icon:'🔧', description:'ไอเท็มสำหรับซ่อม Durability ของอาวุธ', price:75, currency:'coin', quantity:1},
+      {id:'upgrade_material', name:'Upgrade Material', type:'material', itemType:'upgrade_material', icon:'🧩', description:'วัสดุทั่วไปสำหรับระบบพัฒนาในอนาคต', price:50, currency:'coin', quantity:1}
+    ]
+  };
+  let shopCategory='all';
+  let shopFeedbackTimer=null;
+  const shopProducts = () => SHOP_CONFIG.products.filter(p=>shopCategory==='all'||p.type===shopCategory);
+  const setShopFeedback = (msg,type='info') => { const el=document.getElementById('shopFeedback'); if(!el)return; clearTimeout(shopFeedbackTimer); el.className=`shop-feedback ${type}`; el.textContent=msg; shopFeedbackTimer=setTimeout(()=>{if(el.textContent===msg){el.textContent='';el.className='shop-feedback';}},3000); };
+  function renderShop(){
+    const grid=document.getElementById('shopProductGrid'), coinEl=document.getElementById('shopCoinBalance');
+    if(!grid)return;
+    if(coinEl)coinEl.textContent=getCurrency('coin');
+    $$('#gameLobbyPage [data-shop-category]').forEach(b=>b.classList.toggle('active',b.dataset.shopCategory===shopCategory));
+    const products=shopProducts();
+    grid.innerHTML=products.map(p=>{
+      const canAfford=getCurrency(p.currency)>=p.price;
+      return `<article class="shop-product-card">
+        <div class="shop-product-icon">${p.icon}</div>
+        <div class="shop-product-body"><span class="shop-product-type">${p.type==='upgrade'?'UPGRADE':p.type==='enhancement'?'ENHANCEMENT':p.type==='material'?'MATERIAL':'ITEM'}</span><h3>${p.name}</h3><p>${p.description}</p></div>
+        <div class="shop-product-buy"><div><strong>🪙 ${p.price}</strong><small>COIN · Mock Price</small></div><div class="shop-quantity-control"><button type="button" data-shop-qty-minus="${p.id}" aria-label="ลดจำนวน">−</button><span id="shopQty_${p.id}">1</span><button type="button" data-shop-qty-plus="${p.id}" aria-label="เพิ่มจำนวน">+</button></div><div class="shop-buy-total"><span>รวม</span><b id="shopTotal_${p.id}">${p.price}</b> COIN</div><button type="button" class="game-action-placeholder shop-buy-btn" data-shop-buy="${p.id}" ${canAfford?'':'disabled'}>ซื้อ ×${p.quantity}</button>${canAfford?'':'<small class="shop-disabled-reason">Coin ไม่เพียงพอ</small>'}</div>
+      </article>`;
+    }).join('') || `<div class="inventory-empty-state"><span>🛒</span><strong>ไม่มีสินค้าในหมวดนี้</strong><small>เลือกหมวดอื่นเพื่อดูสินค้า</small></div>`;
+  }
+  const shopQty = id => { const el=document.getElementById(`shopQty_${id}`); return Math.max(1,Math.min(99,Number(el?.textContent||1))); };
+  const setShopQty = (id,qty) => { const p=SHOP_CONFIG.products.find(x=>x.id===id); if(!p)return; const q=Math.max(1,Math.min(99,Number(qty)||1)), qEl=document.getElementById(`shopQty_${id}`), totalEl=document.getElementById(`shopTotal_${id}`), btn=document.querySelector(`[data-shop-buy="${id}"]`); if(qEl)qEl.textContent=q; if(totalEl)totalEl.textContent=p.price*q; if(btn)btn.textContent=`ซื้อ ×${q}`; const card=btn?.closest('.shop-product-card'); if(card){const reason=card.querySelector('.shop-disabled-reason'); const ok=getCurrency(p.currency)>=p.price*q; btn.disabled=!ok; if(reason)reason.textContent=ok?'':'Coin ไม่เพียงพอ';}}
+  function buyShopProduct(id){
+    const product=SHOP_CONFIG.products.find(p=>p.id===id);
+    if(!product){setShopFeedback('ไม่พบสินค้า','fail');return;}
+    const qty=shopQty(id), total=product.price*qty;
+    if(!Number.isFinite(total)||total<0){setShopFeedback('ข้อมูลราคาสินค้าไม่ถูกต้อง','fail');return;}
+    if(!canSpendCurrency(product.currency,total)){setShopFeedback('Coin ไม่เพียงพอ · ไม่หัก Coin และไม่ได้รับสินค้า','fail');renderShop();return;}
+    const itemBefore=itemInventory.find(i=>i.id===product.id)?.quantity||0;
+    if(!spendCurrency(product.currency,total)){setShopFeedback('ไม่สามารถหัก Coin ได้ · รายการถูกยกเลิก','fail');return;}
+    try {
+      const added=addItem({id:product.id,name:product.name,type:product.itemType,icon:product.icon,description:product.description},product.quantity*qty);
+      if(!added) throw new Error('Inventory add failed');
+      save(); renderInventory(); renderShop(); updateCurrencyUI();
+      setShopFeedback(`ซื้อสำเร็จ! ${product.name} ×${product.quantity*qty} · Coin เหลือ ${getCurrency('coin')}`,'success');
+    } catch(err){
+      // Compensating transaction: restore the exact Coin amount if Inventory insertion fails.
+      addCurrency(product.currency,total); const itemAfter=itemInventory.find(i=>i.id===product.id)?.quantity||0; if(itemAfter>itemBefore){const idx=itemInventory.findIndex(i=>i.id===product.id);if(idx>=0){itemInventory[idx].quantity=itemBefore;save();}}
+      renderInventory(); renderShop(); setShopFeedback('ไม่สามารถเพิ่มสินค้าเข้าคลังได้ · คืน Coin ให้แล้ว','fail'); console.error(err);
+    }
+  }
+  document.addEventListener('click',event=>{
+    const cat=event.target.closest('[data-shop-category]'); if(cat){shopCategory=cat.dataset.shopCategory;renderShop();return;}
+    const minus=event.target.closest('[data-shop-qty-minus]'); if(minus){const id=minus.dataset.shopQtyMinus;setShopQty(id,shopQty(id)-1);return;}
+    const plus=event.target.closest('[data-shop-qty-plus]'); if(plus){const id=plus.dataset.shopQtyPlus;setShopQty(id,shopQty(id)+1);return;}
+    const buy=event.target.closest('[data-shop-buy]'); if(buy){buyShopProduct(buy.dataset.shopBuy);return;}
+  });
+  renderShop();
+
+  let selectedWeaponId = equipmentData.find(i=>i.slot==='mainWeapon')?.id || null;
+  let weaponProtectNext = false;
+  let weaponFeedbackTimer = null;
+  const weaponItems = () => equipmentData.filter(i=>i.slot==='mainWeapon');
+  const activeCharacter = () => getCharacter(characterData.find(c=>c.active)?.id || selectedCharacterId);
+  const setWeaponFeedback = (msg,type='info') => { const el=document.getElementById('weaponEnhancementStatus'); if(!el)return; clearTimeout(weaponFeedbackTimer); el.className=`weapon-feedback ${type}`; el.textContent=msg; weaponFeedbackTimer=setTimeout(()=>{el.textContent='';el.className='weapon-feedback';},3200); };
+  const weaponStats = item => weaponBonus(item);
+  function syncWeaponEquipment(){
+    characterData.forEach(c=>{ const id=c.equipment?.mainWeapon; weaponItems().forEach(w=>w.equipped = w.id===id); });
+  }
+  function equipWeapon(itemId){
+    const c=activeCharacter(), item=getItem(itemId); if(!item || item.slot!=='mainWeapon')return;
+    if(item.broken){setWeaponFeedback('อาวุธแตก ต้องคืนสภาพก่อนจึงจะใส่ได้','fail');return;}
+    const oldId=c.equipment?.mainWeapon;
+    if(oldId===item.id){setWeaponFeedback('อาวุธชิ้นนี้สวมใส่อยู่แล้ว','info');return;}
+    c.equipment.mainWeapon=item.id; syncWeaponEquipment(); save(); selectedWeaponId=item.id; renderWeaponEnhancement(); renderCharacterSystem(); setWeaponFeedback(oldId?'เปลี่ยนอาวุธสำเร็จ':'ใส่อาวุธสำเร็จ','success');
