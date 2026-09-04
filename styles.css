@@ -1620,19 +1620,3 @@ body.auth-pending > .app-shell { visibility: hidden; }
 .shop-category-tabs{display:flex;gap:8px;overflow:auto;margin-bottom:14px}.shop-category-tab{border:1px solid #2d2942;background:#11101a;color:#8e899b;border-radius:11px;padding:10px 14px;cursor:pointer;font:inherit;font-size:10px;font-weight:800;white-space:nowrap}.shop-category-tab:hover,.shop-category-tab.active{color:#fff;border-color:#7653cc;background:#1d1830}
 .shop-product-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.shop-product-card{display:grid;grid-template-columns:76px 1fr;gap:13px;padding:14px;border:1px solid #2d2942;border-radius:15px;background:#14131f;min-width:0}.shop-product-card:hover{border-color:#4b3d70}.shop-product-icon{width:76px;height:76px;display:grid;place-items:center;border-radius:15px;background:#211b32;border:1px solid #332c49;font-size:36px}.shop-product-body{min-width:0}.shop-product-type{font-size:8px;letter-spacing:1.5px;color:#746d83;font-weight:900}.shop-product-body h3{margin:5px 0 4px;font-size:14px}.shop-product-body p{margin:0;color:#777183;font-size:9px;line-height:1.5}.shop-product-buy{grid-column:1/-1;display:grid;grid-template-columns:1fr auto auto;gap:8px;align-items:center;padding-top:11px;border-top:1px solid #28243a}.shop-product-buy>div:first-child strong{display:block;font-size:14px;color:#f6d85c}.shop-product-buy>div:first-child small{display:block;margin-top:3px;color:#625d6d;font-size:8px}.shop-quantity-control{display:flex;align-items:center;border:1px solid #302b45;border-radius:9px;overflow:hidden}.shop-quantity-control button{width:28px;height:30px;border:0;background:#1b1828;color:#cfc7da;cursor:pointer;font:inherit}.shop-quantity-control button:hover{background:#28213b}.shop-quantity-control span{width:28px;text-align:center;font-size:10px;font-weight:900}.shop-buy-total{text-align:right;color:#6f697c;font-size:8px}.shop-buy-total b{font-size:12px;color:#d9d1e5}.shop-buy-btn{grid-column:1/-1;width:100%;min-height:42px}.shop-buy-btn:disabled{opacity:.42;cursor:not-allowed}.shop-disabled-reason{grid-column:1/-1;text-align:center;color:#ff9eaa;font-size:8px}.shop-product-grid .inventory-empty-state{grid-column:1/-1}
 @media(max-width:800px){.shop-product-grid{grid-template-columns:1fr}}@media(max-width:600px){.shop-currency-bar{align-items:flex-start;flex-direction:column}.shop-product-card{grid-template-columns:58px 1fr}.shop-product-icon{width:58px;height:58px;font-size:28px}.shop-product-buy{grid-template-columns:1fr auto}.shop-buy-total{grid-column:1/-1;text-align:left}.shop-category-tabs{padding-bottom:2px}}
-
-
-/* =========================================================
-   Progression repair — Character / Weapon / Upgrade / Enhancement
-   Isolated styles; no navigation or Mystery Box styles changed.
-   ========================================================= */
-.weapons-page .weapon-page-grid{display:grid;grid-template-columns:minmax(280px,.82fr) minmax(0,1.18fr);gap:16px}
-.weapons-page .weapon-page-list-card,.weapons-page .weapon-page-detail-card{border:1px solid #2d2942;border-radius:17px;background:#14131f;padding:18px}
-.weapons-page .weapon-page-detail-card{min-height:420px}
-.weapons-page .weapon-page-actions{display:grid;grid-template-columns:1fr 1fr 1.25fr;gap:8px;margin-top:18px}
-.weapons-page .weapon-page-actions button{min-height:43px}
-.character-detail-empty,.upgrade-empty-state{min-height:260px;display:grid;place-items:center;align-content:center;gap:8px;color:#777183;text-align:center}
-.character-detail-empty span{font-size:38px}.character-detail-empty strong{color:#d9d1e5;font-size:15px}
-.character-detail-empty small{font-size:10px}
-@media(max-width:900px){.weapons-page .weapon-page-grid{grid-template-columns:1fr}}
-@media(max-width:560px){.weapons-page .weapon-page-actions{grid-template-columns:1fr}}
